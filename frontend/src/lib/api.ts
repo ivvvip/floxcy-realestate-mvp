@@ -1,5 +1,6 @@
 import type {
   Area,
+  AreaStats,
   ROICalculateRequest,
   ROICalculateResponse,
 } from './types';
@@ -59,6 +60,10 @@ async function request<T>(
 
 export async function getAreas(): Promise<Area[]> {
   return request<Area[]>('/api/v1/areas', { revalidate: 60 });
+}
+
+export async function getAreaStats(): Promise<AreaStats> {
+  return request<AreaStats>('/api/v1/areas/stats', { revalidate: 300 });
 }
 
 export async function getArea(id: string): Promise<Area> {

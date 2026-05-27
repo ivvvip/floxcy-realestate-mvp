@@ -32,3 +32,9 @@ export interface ROICalculateResponse {
   payback_years: number | null;
   interpretation: string;
 }
+
+export interface AreaStats {
+  total_count: number;
+  count_by_type: Record<string, number>;
+  area_names: string[];
+}

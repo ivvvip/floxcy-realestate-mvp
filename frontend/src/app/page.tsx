@@ -1,5 +1,9 @@
 import Link from 'next/link';
 import { Container } from '@/components/Container';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { getAreaStats } from '@/lib/api';
+
+export const revalidate = 300;
 
 const FEATURES = [
   {
@@ -39,68 +43,192 @@ const FEATURES = [
   },
 ];
 
-export default function HomePage() {
+const FALLBACK_AREA_NAMES = [
+  'Downtown Dubai',
+  'Dubai Marina',
+  'Palm Jumeirah',
+  'Business Bay',
+  'Jumeirah Village Circle',
+  'Dubai Hills Estate',
+  'Arjan',
+  'Meydan',
+  'Dubai South',
+  'Jumeirah Lake Towers',
+];
+
+async function loadStats() {
+  try {
+    const stats = await getAreaStats();
+    return {
+      total: stats.total_count,
+      names: stats.area_names,
+    };
+  } catch {
+    return { total: FALLBACK_AREA_NAMES.length, names: FALLBACK_AREA_NAMES };
+  }
+}
+
+export default async function HomePage() {
+  const { total, names } = await loadStats();
+  const tickerNames = [...names, ...names];
+
   return (
     <>
       <section className="relative overflow-hidden">
         <div aria-hidden className="absolute inset-0 grid-bg" />
         <div
           aria-hidden
-          className="pointer-events-none absolute left-1/2 top-0 h-[480px] w-[1100px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"
+          className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[1200px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-40 top-32 h-72 w-72 rounded-full bg-accent/20 blur-3xl animate-float-slow"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-32 top-64 h-80 w-80 rounded-full bg-indigo-500/15 blur-3xl animate-float-slower"
         />
 
         <Container>
-          <div className="relative mx-auto max-w-3xl pt-20 pb-16 text-center sm:pt-28 sm:pb-24">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-border bg-bg-card/60 px-3 py-1 text-xs font-medium text-fg-muted backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(0,212,170,0.8)]" />
-              Live API · Dubai market intelligence
+          <div className="relative mx-auto max-w-4xl pt-20 pb-20 text-center sm:pt-28 sm:pb-28">
+            <div className="mx-auto inline-flex animate-fade-up items-center gap-2 rounded-full border border-border bg-bg-card/60 px-3.5 py-1.5 text-xs font-medium text-fg-muted backdrop-blur">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent animate-pulse-ring" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(0,212,170,0.9)]" />
+              </span>
+              Live API · Updated in real time
             </div>
 
-            <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-              <span className="text-gradient">Invest smarter</span>
+            <h1
+              className="mt-6 animate-fade-up text-5xl font-semibold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl"
+              style={{ animationDelay: '60ms' }}
+            >
+              <span className="text-gradient">Dubai real estate,</span>
               <br />
-              in Dubai real estate.
+              <span className="bg-gradient-to-r from-accent via-emerald-300 to-accent bg-clip-text text-transparent">
+                by the numbers.
+              </span>
             </h1>
 
-            <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
-              Floxcy turns Dubai property data into clear investment signals.
-              Explore curated areas, model real returns, and act with
-              confidence.
+            <p
+              className="mx-auto mt-6 max-w-2xl animate-fade-up text-base leading-relaxed text-fg-muted sm:text-lg"
+              style={{ animationDelay: '140ms' }}
+            >
+              Stop guessing. Compare curated investment-grade neighborhoods,
+              model net yield and payback in seconds, and act on data — not
+              hype.
             </p>
 
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div
+              className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 sm:flex-row"
+              style={{ animationDelay: '220ms' }}
+            >
               <Link
                 href="/areas"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-6 text-sm font-semibold text-accent-fg shadow-glow transition-colors hover:bg-accent/90"
+                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-6 text-sm font-semibold text-accent-fg shadow-glow transition-all duration-200 hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-[0_0_0_1px_rgba(0,212,170,0.35),0_12px_40px_-8px_rgba(0,212,170,0.5)]"
               >
-                Explore Areas
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                Explore {total} Dubai Areas
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                >
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />
                 </svg>
               </Link>
               <Link
                 href="/roi-calculator"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-bg-card/60 px-6 text-sm font-semibold text-fg transition-colors hover:border-border-strong hover:bg-bg-elev"
+                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-bg-card/60 px-6 text-sm font-semibold text-fg backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-bg-elev"
               >
-                ROI Calculator
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 text-accent"
+                >
+                  <rect x="4" y="2" width="16" height="20" rx="2" />
+                  <line x1="8" y1="6" x2="16" y2="6" />
+                  <line x1="8" y1="10" x2="10" y2="10" />
+                  <line x1="12" y1="10" x2="14" y2="10" />
+                  <line x1="8" y1="14" x2="10" y2="14" />
+                  <line x1="12" y1="14" x2="14" y2="14" />
+                  <line x1="8" y1="18" x2="10" y2="18" />
+                  <line x1="12" y1="18" x2="14" y2="18" />
+                </svg>
+                Calculate Your ROI
               </Link>
             </div>
 
-            <dl className="mx-auto mt-14 grid max-w-2xl grid-cols-3 gap-6 border-t border-border pt-8">
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-fg-subtle">Areas</dt>
-                <dd className="mt-1 text-2xl font-semibold text-fg">10+</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-fg-subtle">Coverage</dt>
-                <dd className="mt-1 text-2xl font-semibold text-fg">Dubai</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-fg-subtle">ROI Models</dt>
-                <dd className="mt-1 text-2xl font-semibold text-fg">Live</dd>
-              </div>
+            <p
+              className="mt-4 animate-fade-up text-xs text-fg-subtle"
+              style={{ animationDelay: '280ms' }}
+            >
+              No signup · Free forever · Live market data
+            </p>
+
+            <dl
+              className="mx-auto mt-16 grid max-w-3xl animate-fade-up grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-4"
+              style={{ animationDelay: '360ms' }}
+            >
+              <Stat
+                label="Dubai Areas"
+                value={<AnimatedCounter value={total} />}
+                hint="Curated & tracked"
+              />
+              <Stat
+                label="Avg Net Yield"
+                value={<AnimatedCounter value={6.5} decimals={1} suffix="%" />}
+                hint="Across tracked areas"
+              />
+              <Stat
+                label="ROI Modeling"
+                value={
+                  <>
+                    &lt;<AnimatedCounter value={60} />
+                    <span className="text-fg-muted">s</span>
+                  </>
+                }
+                hint="From inputs to result"
+              />
+              <Stat
+                label="Data Latency"
+                value={
+                  <>
+                    <AnimatedCounter value={24} />
+                    <span className="text-fg-muted">/7</span>
+                  </>
+                }
+                hint="Live API uptime"
+              />
             </dl>
+          </div>
+
+          <div
+            aria-hidden
+            className="relative -mt-4 mb-16 overflow-hidden rounded-xl border border-border bg-bg-card/40 py-3 backdrop-blur"
+          >
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-bg to-transparent"
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-bg to-transparent"
+            />
+            <div className="flex w-max animate-marquee items-center gap-10 pr-10 text-xs font-medium uppercase tracking-wider text-fg-subtle">
+              {tickerNames.map((name, i) => (
+                <span key={`${name}-${i}`} className="flex items-center gap-3">
+                  <span className="h-1 w-1 rounded-full bg-accent/60" />
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
         </Container>
       </section>
@@ -177,5 +305,27 @@ export default function HomePage() {
         </Container>
       </section>
     </>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint: string;
+}) {
+  return (
+    <div className="bg-bg-card/80 p-5 backdrop-blur transition-colors hover:bg-bg-elev/80">
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+        {label}
+      </dt>
+      <dd className="mt-1 text-3xl font-semibold tabular-nums text-fg sm:text-4xl">
+        {value}
+      </dd>
+      <p className="mt-1 text-xs text-fg-subtle">{hint}</p>
+    </div>
   );
 }
