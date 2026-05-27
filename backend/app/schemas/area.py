@@ -1,7 +1,7 @@
 """Area Pydantic schemas."""
 from datetime import datetime
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Dict, List
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -35,7 +35,14 @@ class AreaUpdate(BaseModel):
 class AreaResponse(AreaBase):
     """Schema for area response."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class AreaStatsResponse(BaseModel):
+    """Schema for aggregated area stats."""
+    total_count: int
+    count_by_type: Dict[str, int]
+    area_names: List[str]
