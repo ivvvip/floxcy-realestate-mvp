@@ -132,6 +132,9 @@ export interface AdvisorQueryRequest {
   budget_aed: number;
   goal: AdvisorGoal;
   risk: AdvisorRisk;
+  preferred_city?: string;
+  user_question?: string;
+  fresh?: boolean;
 }
 
 export interface AdvisorRecommendation {
@@ -154,6 +157,35 @@ export interface AdvisorQueryResponse {
   risk: string;
   budget_aed: number;
   recommendations: AdvisorRecommendation[];
+  // LLM-augmented fields (optional)
+  analysis?: string | null;
+  confidence_score?: number | null;
+  model_used?: string | null;
+  tokens_used?: number | null;
+  cost_usd?: number | null;
+  latency_ms?: number | null;
+  cached?: boolean;
+  fallback_used?: boolean;
+  ai_error?: string | null;
+}
+
+export interface AIAnalyticsBucket {
+  queries: number;
+  successful: number;
+  errors: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_latency_ms: number;
+  fallback_count: number;
+  cached_count: number;
+}
+
+export interface AIAnalyticsResponse {
+  as_of: string;
+  today: AIAnalyticsBucket;
+  week: AIAnalyticsBucket;
+  month: AIAnalyticsBucket;
+  by_model: Record<string, number>;
 }
 
 // ---------- Confidence ----------

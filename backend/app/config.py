@@ -59,5 +59,20 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "Floxcy MVP"
 
+    # OpenRouter (LLM advisor)
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_DEFAULT_MODEL: str = "openrouter/free"
+    OPENROUTER_PREMIUM_MODEL: str = "anthropic/claude-sonnet-4.6"
+    OPENROUTER_FALLBACK_MODEL: str = "deepseek/deepseek-v4-flash:free"
+    OPENROUTER_APP_NAME: str = "floxcy"
+    OPENROUTER_APP_URL: str = "https://floxcy.com"
+    OPENROUTER_MAX_TOKENS: int = 1000
+    OPENROUTER_TIMEOUT_S: float = 30.0
+    OPENROUTER_CACHE_TTL_S: int = 3600
+
+    # AI advisor rate limits (per hour)
+    AI_RATE_LIMIT_ANONYMOUS_PER_HOUR: int = 5
+    AI_RATE_LIMIT_USER_PER_HOUR: int = 50
+
 
 settings = Settings()

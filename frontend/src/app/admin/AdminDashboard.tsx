@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock, Sparkles } from 'lucide-react';
 import {
   ApiError,
+  adminAiAnalytics,
   adminListApiKeys,
   adminListAuditLog,
   adminListUsers,
@@ -15,6 +16,7 @@ import {
   authMe,
 } from '@/lib/api';
 import type {
+  AIAnalyticsResponse,
   ApiKeyCreateResponse,
   ApiKeyPublic,
   AuditLogEntry,
@@ -29,6 +31,7 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<MeResponse[]>([]);
   const [keys, setKeys] = useState<ApiKeyPublic[]>([]);
   const [audit, setAudit] = useState<AuditLogEntry[]>([]);
+  const [aiStats, setAiStats] = useState<AIAnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
@@ -56,14 +59,16 @@ export function AdminDashboard() {
   async function refresh() {
     setError(null);
     try {
-      const [u, k, a] = await Promise.all([
+      const [u, k, a, ai] = await Promise.all([
         adminListUsers().catch(() => []),
         adminListApiKeys().catch(() => []),
         adminListAuditLog({ limit: 50 }).catch(() => []),
+        adminAiAnalytics().catch(() => null),
       ]);
       setUsers(u);
       setKeys(k);
       setAudit(a);
+      setAiStats(ai);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed');
     }
@@ -188,6 +193,77 @@ export function AdminDashboard() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* AI analytics */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+            AI analyst — usage &amp; cost
+          </span>
+          {aiStats && (
+            <span className="text-[11px] text-fg-subtle tabular">
+              as of {new Date(aiStats.as_of).toISOString().slice(0, 16).replace('T', ' ')}
+            </span>
+          )}
+        </div>
+        {!aiStats ? (
+          <div className="p-5 text-center text-xs text-fg-subtle">
+            No AI analytics yet.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border">
+              {(['today', 'week', 'month'] as const).map((bucket) => {
+                const b = aiStats[bucket];
+                return (
+                  <div key={bucket} className="bg-bg-card p-4">
+                    <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                      {bucket}
+                    </div>
+                    <div className="mt-1 text-2xl tabular text-fg">
+                      {b.queries}
+                      <span className="text-xs text-fg-subtle ml-1">queries</span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] tabular">
+                      <div className="flex justify-between col-span-2 text-fg-muted">
+                        <dt>Tokens</dt>
+                        <dd>{b.total_tokens.toLocaleString()}</dd>
+                      </div>
+                      <div className="flex justify-between col-span-2 text-fg-muted">
+                        <dt>Cost (USD)</dt>
+                        <dd>${b.total_cost_usd.toFixed(5)}</dd>
+                      </div>
+                      <div className="flex justify-between col-span-2 text-fg-muted">
+                        <dt>Avg latency</dt>
+                        <dd>{b.avg_latency_ms} ms</dd>
+                      </div>
+                      <div className="flex justify-between col-span-2 text-fg-muted">
+                        <dt>Cached / Fallback / Errors</dt>
+                        <dd>{b.cached_count} · {b.fallback_count} · {b.errors}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                );
+              })}
+            </div>
+            {Object.keys(aiStats.by_model).length > 0 && (
+              <div className="border-t border-border px-4 py-3">
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
+                  Model usage (30 days)
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(aiStats.by_model).map(([m, n]) => (
+                    <span key={m} className="pill tabular">
+                      {m.split('/').pop()} · {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* API keys */}

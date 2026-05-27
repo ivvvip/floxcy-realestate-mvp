@@ -1,10 +1,10 @@
 """Admin endpoints — role-gated. Replaces legacy X-Admin-Token mechanism."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import write_audit
@@ -190,6 +190,68 @@ async def revoke_api_key(
         revoked_at=rec.revoked_at,
         created_at=rec.created_at,
     )
+
+
+# ---------- AI analytics ----------
+
+@router.get("/ai-analytics")
+async def ai_analytics(
+    db: AsyncSession = Depends(get_db),
+    _: AuthPrincipal = Depends(require_analyst),
+):
+    """Aggregate stats on AI advisor usage from the audit log."""
+    now = datetime.utcnow()
+    cutoffs = {
+        "today": now - timedelta(days=1),
+        "week": now - timedelta(days=7),
+        "month": now - timedelta(days=30),
+    }
+    rows = (
+        await db.execute(
+            select(AuditLog)
+            .where(AuditLog.action == "ai_query")
+            .where(AuditLog.created_at >= cutoffs["month"])
+            .order_by(AuditLog.created_at.desc())
+        )
+    ).scalars().all()
+
+    def agg(after: datetime) -> dict:
+        relevant = [r for r in rows if r.created_at >= after]
+        ok = [r for r in relevant if (r.status or "ok") == "ok"]
+        tokens = sum((r.payload or {}).get("total_tokens", 0) or 0 for r in ok)
+        cost = sum(float((r.payload or {}).get("cost_usd", 0) or 0) for r in ok)
+        latencies = [
+            (r.payload or {}).get("latency_ms", 0) or 0 for r in ok
+        ]
+        avg_latency = round(sum(latencies) / len(latencies)) if latencies else 0
+        fallback = sum(1 for r in ok if (r.payload or {}).get("fallback_used"))
+        cached = sum(1 for r in ok if (r.payload or {}).get("cached"))
+        errors = len(relevant) - len(ok)
+        return {
+            "queries": len(relevant),
+            "successful": len(ok),
+            "errors": errors,
+            "total_tokens": tokens,
+            "total_cost_usd": round(cost, 6),
+            "avg_latency_ms": avg_latency,
+            "fallback_count": fallback,
+            "cached_count": cached,
+        }
+
+    # Model usage breakdown
+    by_model: dict[str, int] = {}
+    for r in rows:
+        m = (r.payload or {}).get("model")
+        if m:
+            by_model[m] = by_model.get(m, 0) + 1
+
+    return {
+        "as_of": now.isoformat() + "Z",
+        "today": agg(cutoffs["today"]),
+        "week": agg(cutoffs["week"]),
+        "month": agg(cutoffs["month"]),
+        "by_model": dict(sorted(by_model.items(), key=lambda kv: -kv[1])),
+    }
 
 
 # ---------- Audit log ----------

@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ChevronDown, ChevronRight, ArrowUpRight, Sparkles, Loader2 } from 'lucide-react';
 import { advisorQuery } from '@/lib/api';
 import type {
   AdvisorGoal,
@@ -31,10 +33,14 @@ const RISKS: {
 
 const BUDGET_PRESETS = [500_000, 1_000_000, 2_000_000, 5_000_000];
 
+const CITIES = ['', 'Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah'];
+
 export function AdvisorClient() {
   const [budget, setBudget] = useState(1_500_000);
   const [goal, setGoal] = useState<AdvisorGoal>('balanced');
   const [risk, setRisk] = useState<AdvisorRisk>('med');
+  const [city, setCity] = useState('');
+  const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AdvisorQueryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +51,13 @@ export function AdvisorClient() {
     setLoading(true);
     setError(null);
     try {
-      const res = await advisorQuery({ budget_aed: budget, goal, risk });
+      const res = await advisorQuery({
+        budget_aed: budget,
+        goal,
+        risk,
+        preferred_city: city || undefined,
+        user_question: question.trim() || undefined,
+      });
       setResult(res);
       setExpanded(res.recommendations[0]?.area_id ?? null);
     } catch (err) {
@@ -54,6 +66,8 @@ export function AdvisorClient() {
       setLoading(false);
     }
   };
+
+  const questionLen = question.length;
 
   return (
     <div className="grid gap-5 lg:grid-cols-12">
@@ -148,12 +162,60 @@ export function AdvisorClient() {
             </div>
           </div>
 
+          <div>
+            <label className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+              Preferred city <span className="normal-case text-fg-subtle">(optional)</span>
+            </label>
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="input-field mt-2"
+            >
+              {CITIES.map((c) => (
+                <option key={c} value={c}>
+                  {c || 'Any'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                Question for the analyst <span className="normal-case text-fg-subtle">(optional)</span>
+              </label>
+              <span className={cn(
+                'text-[10px] tabular',
+                questionLen > 500 ? 'text-negative' : 'text-fg-subtle'
+              )}>
+                {questionLen}/500
+              </span>
+            </div>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value.slice(0, 500))}
+              rows={3}
+              placeholder="e.g. should I prioritize JVC or Business Bay for cash flow?"
+              className="input-field mt-2 resize-y leading-relaxed"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex h-9 w-full items-center justify-center rounded-md bg-accent text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-md bg-accent text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Analyzing…' : 'Get recommendations'}
+            {loading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.5} />
+                Analyzing UAE market with AI…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                Get AI recommendations
+              </>
+            )}
           </button>
 
           {error && (
@@ -163,58 +225,160 @@ export function AdvisorClient() {
       </form>
 
       {/* Results */}
-      <div className="lg:col-span-8">
+      <div className="lg:col-span-8 space-y-5">
         {!result ? (
           <div className="border border-border rounded-lg bg-bg-card p-10 text-center">
             <h3 className="text-base font-semibold text-fg">
               Ready when you are
             </h3>
             <p className="mt-1 text-xs text-fg-muted">
-              Set parameters and we&apos;ll rank the top UAE areas matched to your profile.
+              Set parameters and we&apos;ll rank the top UAE areas matched to your profile,
+              plus an AI-generated analysis of the picks.
             </p>
           </div>
         ) : (
-          <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
-            <div className="chart-header">
-              <span className="chart-header-label">
-                Ranked recommendations · {result.recommendations.length}
-              </span>
-              <span className="text-[11px] text-fg-subtle tabular">
-                Goal: {result.goal} · Risk: {result.risk}
-              </span>
+          <>
+            {/* AI analysis panel (markdown) */}
+            {result.analysis && (
+              <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+                <div className="chart-header">
+                  <span className="chart-header-label inline-flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                    AI analysis
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {result.cached && (
+                      <span className="pill">cached</span>
+                    )}
+                    {result.fallback_used && (
+                      <span className="pill pill-negative">fallback</span>
+                    )}
+                    {result.model_used && (
+                      <span className="pill" title={`Latency ${result.latency_ms ?? 0}ms`}>
+                        {result.model_used.split('/').pop()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {result.confidence_score != null && (
+                  <div className="border-b border-border px-4 py-2.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="uppercase tracking-wide text-fg-subtle font-medium">
+                        AI confidence
+                      </span>
+                      <span className="tabular text-fg">
+                        {Math.round(result.confidence_score * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1 bg-bg-elev rounded">
+                      <div
+                        className={cn(
+                          'h-1 rounded transition-all',
+                          result.confidence_score >= 0.8
+                            ? 'bg-positive'
+                            : result.confidence_score >= 0.5
+                              ? 'bg-accent'
+                              : 'bg-negative'
+                        )}
+                        style={{ width: `${Math.round(result.confidence_score * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-5">
+                  <article className="prose-floxcy">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      skipHtml
+                      components={{
+                        h2: (p) => <h2 className="text-base font-semibold text-fg mt-5 first:mt-0 mb-2" {...p} />,
+                        h3: (p) => <h3 className="text-sm font-medium text-fg mt-4 mb-1.5" {...p} />,
+                        p: (p) => <p className="text-sm text-fg-muted leading-relaxed mb-2" {...p} />,
+                        ul: (p) => <ul className="space-y-1 text-sm text-fg-muted list-disc pl-5 mb-2" {...p} />,
+                        ol: (p) => <ol className="space-y-1 text-sm text-fg-muted list-decimal pl-5 mb-2" {...p} />,
+                        strong: (p) => <strong className="text-fg font-medium" {...p} />,
+                        code: (p) => <code className="font-mono text-[12px] bg-bg-elev/60 px-1 py-0.5 rounded" {...p} />,
+                        a: (p) => <a className="text-accent hover:underline" {...p} />,
+                        hr: () => <hr className="border-border my-3" />,
+                      }}
+                    >
+                      {result.analysis}
+                    </ReactMarkdown>
+                  </article>
+                </div>
+
+                <div className="border-t border-border bg-bg-elev/20 px-4 py-2 text-[11px] text-fg-subtle flex items-center justify-between flex-wrap gap-2">
+                  <span>
+                    AI-generated · model{' '}
+                    <code className="font-mono text-fg">
+                      {result.model_used ?? '—'}
+                    </code>
+                    {result.tokens_used != null && (
+                      <> · <span className="tabular">{result.tokens_used}</span> tokens</>
+                    )}
+                    {result.cost_usd != null && result.cost_usd > 0 && (
+                      <> · <span className="tabular">${result.cost_usd.toFixed(5)}</span></>
+                    )}
+                  </span>
+                  <span className="italic">
+                    Informational only · not financial advice
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Error notice when LLM failed */}
+            {result.ai_error && !result.analysis && (
+              <div className="border border-warning/30 bg-warning/10 rounded-md px-3 py-2 text-xs text-warning">
+                AI analyst unavailable ({result.ai_error}). Showing rules-based ranking only.
+              </div>
+            )}
+
+            {/* Rules-based ranked table */}
+            <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+              <div className="chart-header">
+                <span className="chart-header-label">
+                  Ranked recommendations · {result.recommendations.length}
+                </span>
+                <span className="text-[11px] text-fg-subtle tabular">
+                  Goal: {result.goal} · Risk: {result.risk}
+                </span>
+              </div>
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-8 text-right">#</th>
+                      <th>Area</th>
+                      <th className="text-right">Score</th>
+                      <th className="text-right">AED/sqft</th>
+                      <th className="text-right">Yield</th>
+                      <th className="text-right">1Y</th>
+                      <th className="text-right">Risk</th>
+                      <th className="text-right">Affordable sqft</th>
+                      <th className="w-6"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.recommendations.map((r) => (
+                      <RecRow
+                        key={r.area_id}
+                        rec={r}
+                        expanded={expanded === r.area_id}
+                        onToggle={() =>
+                          setExpanded((cur) =>
+                            cur === r.area_id ? null : r.area_id
+                          )
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-8 text-right">#</th>
-                    <th>Area</th>
-                    <th className="text-right">Score</th>
-                    <th className="text-right">AED/sqft</th>
-                    <th className="text-right">Yield</th>
-                    <th className="text-right">1Y</th>
-                    <th className="text-right">Risk</th>
-                    <th className="text-right">Affordable sqft</th>
-                    <th className="w-6"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.recommendations.map((r) => (
-                    <RecRow
-                      key={r.area_id}
-                      rec={r}
-                      expanded={expanded === r.area_id}
-                      onToggle={() =>
-                        setExpanded((cur) =>
-                          cur === r.area_id ? null : r.area_id
-                        )
-                      }
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -284,7 +448,7 @@ function RecRow({
           <td colSpan={9} className="border-b border-border">
             <div className="px-5 py-4">
               <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
-                Reasoning
+                Reasoning (rules-based)
               </div>
               <ul className="space-y-1.5 text-xs text-fg-muted">
                 {rec.reasoning.map((reason, i) => (

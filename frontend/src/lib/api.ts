@@ -20,6 +20,7 @@ import type {
   ApiKeyPublic,
   ApiKeyCreateResponse,
   ApiKeyCreateRequest,
+  AIAnalyticsResponse,
 } from './types';
 
 export const API_BASE_URL =
@@ -237,6 +238,13 @@ export async function adminCreateApiKey(
 export async function adminRevokeApiKey(id: string): Promise<ApiKeyPublic> {
   return request<ApiKeyPublic>(`/api/v1/admin/api-keys/${id}/revoke`, {
     method: 'POST',
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminAiAnalytics(): Promise<AIAnalyticsResponse> {
+  return request<AIAnalyticsResponse>('/api/v1/admin/ai-analytics', {
     revalidate: false,
     withCredentials: true,
   });
