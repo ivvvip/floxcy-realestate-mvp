@@ -46,3 +46,33 @@ class AreaStatsResponse(BaseModel):
     total_count: int
     count_by_type: Dict[str, int]
     area_names: List[str]
+
+
+class AreaSnapshotPoint(BaseModel):
+    """One point in an area's price/yield history."""
+    snapshot_date: str  # YYYY-MM-DD
+    avg_price_per_sqft: float
+    avg_sale_price: float
+    rental_yield: float
+
+
+class AreaLatestSnapshot(BaseModel):
+    """Latest snapshot metrics for an area."""
+    snapshot_date: str
+    avg_sale_price: float
+    avg_price_per_sqft: float
+    avg_annual_rent: float
+    rental_yield: float
+    occupancy_rate: Optional[float] = None
+    appreciation_1y: Optional[float] = None
+    appreciation_3y: Optional[float] = None
+    transaction_volume: Optional[int] = None
+    demand_score: Optional[float] = None
+    risk_score: Optional[float] = None
+    investment_score: Optional[float] = None
+
+
+class AreaDetailResponse(AreaResponse):
+    """Area detail: base info + latest snapshot + 12-month history."""
+    latest: Optional[AreaLatestSnapshot] = None
+    history: List[AreaSnapshotPoint] = []

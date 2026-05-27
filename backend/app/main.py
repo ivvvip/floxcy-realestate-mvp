@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api.routes import health, areas, roi
+from app.api.routes import health, areas, roi, dashboard, compare, advisor, admin
 
 
 @asynccontextmanager
@@ -33,10 +33,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routers (compare before areas so /areas/compare matches first)
 app.include_router(health.router)
+app.include_router(compare.router)
 app.include_router(areas.router)
 app.include_router(roi.router)
+app.include_router(dashboard.router)
+app.include_router(advisor.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
@@ -49,6 +53,11 @@ async def root():
         "health": "/health",
         "endpoints": {
             "areas": "/api/v1/areas",
+            "areas_compare": "/api/v1/areas/compare?ids=...",
+            "areas_stats": "/api/v1/areas/stats",
             "roi": "/api/v1/roi/calculate",
+            "dashboard": "/api/v1/dashboard/summary",
+            "advisor": "/api/v1/advisor/query",
+            "admin_seed": "/api/v1/admin/seed",
         }
     }
