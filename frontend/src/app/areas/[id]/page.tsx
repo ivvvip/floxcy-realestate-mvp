@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Container } from '@/components/Container';
 import { ApiError, getArea } from '@/lib/api';
+import { PriceTrend } from '@/components/charts/PriceTrend';
+import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 
 export const revalidate = 60;
 
@@ -129,6 +131,47 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         </div>
       </header>
 
+      {area.latest && (
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <MetricCard
+            label="Price / sqft"
+            value={formatAED(area.latest.avg_price_per_sqft)}
+            hint="Latest snapshot"
+          />
+          <MetricCard
+            label="Rental yield"
+            value={formatPercent(area.latest.rental_yield)}
+            accent
+          />
+          <MetricCard
+            label="1y appreciation"
+            value={formatPercent(area.latest.appreciation_1y ?? 0)}
+          />
+          <MetricCard
+            label="Investment score"
+            value={`${area.latest.investment_score?.toFixed(1) ?? '—'}/10`}
+            hint="Internal rating"
+          />
+        </div>
+      )}
+
+      {area.history && area.history.length > 1 && (
+        <div className="surface-card mb-6 p-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+            12-month price & yield
+          </h2>
+          <div className="mt-4">
+            <PriceTrend
+              data={area.history.map((h) => ({
+                label: h.snapshot_date.slice(0, 7),
+                price: h.avg_price_per_sqft,
+                yield: h.rental_yield,
+              }))}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 pb-20 lg:grid-cols-3">
         <div className="surface-card p-7 lg:col-span-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
@@ -137,6 +180,46 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-fg">
             {area.description ?? 'No description available for this area yet.'}
           </p>
+          {area.latest && (
+            <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-border pt-6 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-fg-subtle">Avg sale price</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {formatAED(area.latest.avg_sale_price, { compact: true })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-subtle">Annual rent</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {formatAED(area.latest.avg_annual_rent, { compact: true })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-subtle">Occupancy</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {formatPercent(area.latest.occupancy_rate ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-subtle">3y appreciation</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {formatPercent(area.latest.appreciation_3y ?? 0)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-subtle">Demand score</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {area.latest.demand_score?.toFixed(1) ?? '—'}/10
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-subtle">Risk score</dt>
+                <dd className="mt-0.5 font-mono text-fg">
+                  {area.latest.risk_score?.toFixed(1) ?? '—'}/10
+                </dd>
+              </div>
+            </dl>
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
@@ -204,5 +287,29 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         </div>
       </div>
     </Container>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="surface-card p-4">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+        {label}
+      </div>
+      <div className={`mt-1.5 font-mono text-xl ${accent ? 'text-accent' : 'text-fg'}`}>
+        {value}
+      </div>
+      {hint && <div className="mt-0.5 text-[11px] text-fg-muted">{hint}</div>}
+    </div>
   );
 }

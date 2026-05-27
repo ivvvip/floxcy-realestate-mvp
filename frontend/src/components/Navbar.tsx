@@ -7,9 +7,11 @@ import { Container } from './Container';
 import { cn } from '@/lib/cn';
 
 const LINKS = [
-  { href: '/', label: 'Home' },
+  { href: '/dashboard', label: 'Dashboard' },
   { href: '/areas', label: 'Areas' },
-  { href: '/roi-calculator', label: 'ROI Calculator' },
+  { href: '/compare', label: 'Compare' },
+  { href: '/advisor', label: 'Advisor' },
+  { href: '/roi-calculator', label: 'ROI' },
 ];
 
 export function Navbar() {

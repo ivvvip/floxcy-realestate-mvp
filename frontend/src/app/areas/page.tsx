@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Container } from '@/components/Container';
-import { AreaCard } from '@/components/AreaCard';
+import { AreasFilterClient } from './AreasFilterClient';
 import { getAreas } from '@/lib/api';
 import type { Area } from '@/lib/types';
 
@@ -56,11 +56,7 @@ export default async function AreasPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-5 pb-20 sm:grid-cols-2 lg:grid-cols-3">
-          {areas.map((area) => (
-            <AreaCard key={area.id} area={area} />
-          ))}
-        </div>
+        <AreasFilterClient areas={areas} />
       )}
     </Container>
   );

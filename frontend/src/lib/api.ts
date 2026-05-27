@@ -1,8 +1,13 @@
 import type {
   Area,
+  AreaDetail,
   AreaStats,
   ROICalculateRequest,
   ROICalculateResponse,
+  DashboardSummary,
+  CompareResponse,
+  AdvisorQueryRequest,
+  AdvisorQueryResponse,
 } from './types';
 
 export const API_BASE_URL =
@@ -66,8 +71,8 @@ export async function getAreaStats(): Promise<AreaStats> {
   return request<AreaStats>('/api/v1/areas/stats', { revalidate: 300 });
 }
 
-export async function getArea(id: string): Promise<Area> {
-  return request<Area>(`/api/v1/areas/${id}`, { revalidate: 60 });
+export async function getArea(id: string): Promise<AreaDetail> {
+  return request<AreaDetail>(`/api/v1/areas/${id}`, { revalidate: 60 });
 }
 
 export async function calculateROI(
@@ -76,6 +81,33 @@ export async function calculateROI(
   return request<ROICalculateResponse>('/api/v1/roi/calculate', {
     method: 'POST',
     body: JSON.stringify(data),
+    revalidate: false,
+  });
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  return request<DashboardSummary>('/api/v1/dashboard/summary', { revalidate: 300 });
+}
+
+export async function compareAreas(ids: string[]): Promise<CompareResponse> {
+  const q = encodeURIComponent(ids.join(','));
+  return request<CompareResponse>(`/api/v1/areas/compare?ids=${q}`, { revalidate: 60 });
+}
+
+export async function advisorQuery(
+  data: AdvisorQueryRequest
+): Promise<AdvisorQueryResponse> {
+  return request<AdvisorQueryResponse>('/api/v1/advisor/query', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    revalidate: false,
+  });
+}
+
+export async function adminSeed(token: string): Promise<{ status: string; areas?: number; snapshots?: number; error?: string }> {
+  return request('/api/v1/admin/seed', {
+    method: 'POST',
+    headers: { 'X-Admin-Token': token },
     revalidate: false,
   });
 }

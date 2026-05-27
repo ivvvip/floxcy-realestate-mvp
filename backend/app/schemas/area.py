@@ -41,6 +41,14 @@ class AreaResponse(AreaBase):
     updated_at: datetime
 
 
+class AreaListItem(AreaResponse):
+    """Area in list view with latest snapshot metrics inline."""
+    latest_price_per_sqft: Optional[float] = None
+    latest_yield: Optional[float] = None
+    appreciation_1y: Optional[float] = None
+    investment_score: Optional[float] = None
+
+
 class AreaStatsResponse(BaseModel):
     """Schema for aggregated area stats."""
     total_count: int

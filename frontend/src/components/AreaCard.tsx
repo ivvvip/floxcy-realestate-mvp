@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Area } from '@/lib/types';
 import { cn } from '@/lib/cn';
+import { formatAED, formatPercent } from '@/lib/format';
 
 interface AreaCardProps {
   area: Area;
@@ -45,9 +46,32 @@ export function AreaCard({ area, className }: AreaCardProps) {
       </div>
 
       {area.description && (
-        <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-fg-muted">
+        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-fg-muted">
           {area.description}
         </p>
+      )}
+
+      {(area.latest_yield != null || area.latest_price_per_sqft != null) && (
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-border bg-bg-elev/50 p-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">Yield</div>
+            <div className="mt-0.5 font-mono text-sm text-accent">
+              {area.latest_yield != null ? formatPercent(area.latest_yield, 1) : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">Price/sqft</div>
+            <div className="mt-0.5 font-mono text-sm text-fg">
+              {area.latest_price_per_sqft != null ? formatAED(area.latest_price_per_sqft) : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">1y App.</div>
+            <div className="mt-0.5 font-mono text-sm text-fg">
+              {area.appreciation_1y != null ? formatPercent(area.appreciation_1y, 1) : '—'}
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="mt-6 flex items-end justify-between gap-3 pt-4">

@@ -14,17 +14,63 @@ from app.schemas.area import (
     AreaDetailResponse,
     AreaLatestSnapshot,
     AreaSnapshotPoint,
+    AreaListItem,
 )
 
 router = APIRouter(prefix="/api/v1/areas", tags=["areas"])
 
 
-@router.get("", response_model=List[AreaResponse])
+@router.get("", response_model=List[AreaListItem])
 async def list_areas(db: AsyncSession = Depends(get_db)):
-    """Get all areas."""
-    result = await db.execute(select(Area).order_by(Area.name))
-    areas = result.scalars().all()
-    return areas
+    """Get all areas with their latest market snapshot inline."""
+    latest_date_subq = (
+        select(
+            MarketSnapshot.area_id,
+            func.max(MarketSnapshot.snapshot_date).label("latest_date"),
+        )
+        .group_by(MarketSnapshot.area_id)
+        .subquery()
+    )
+    q = (
+        select(Area, MarketSnapshot)
+        .outerjoin(MarketSnapshot, MarketSnapshot.area_id == Area.id)
+        .outerjoin(
+            latest_date_subq,
+            (latest_date_subq.c.area_id == MarketSnapshot.area_id)
+            & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
+        )
+        .where(
+            (latest_date_subq.c.latest_date.isnot(None))
+            | (MarketSnapshot.id.is_(None))
+        )
+        .order_by(Area.name)
+    )
+    rows = (await db.execute(q)).all()
+
+    items = []
+    seen = set()
+    for area, snap in rows:
+        if area.id in seen:
+            continue
+        seen.add(area.id)
+        items.append(AreaListItem(
+            id=area.id,
+            name=area.name,
+            name_arabic=area.name_arabic,
+            city=area.city,
+            emirate=area.emirate,
+            description=area.description,
+            area_type=area.area_type,
+            latitude=area.latitude,
+            longitude=area.longitude,
+            created_at=area.created_at,
+            updated_at=area.updated_at,
+            latest_price_per_sqft=float(snap.avg_price_per_sqft) if snap else None,
+            latest_yield=float(snap.rental_yield) if snap else None,
+            appreciation_1y=float(snap.appreciation_1y) if snap and snap.appreciation_1y else None,
+            investment_score=float(snap.investment_score) if snap and snap.investment_score else None,
+        ))
+    return items
 
 
 @router.get("/stats", response_model=AreaStatsResponse)
