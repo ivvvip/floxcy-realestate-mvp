@@ -48,10 +48,10 @@ export function YieldBar({ data, height = 320, unit = '%' }: Props) {
           />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            cursor={{ fill: 'rgba(0,212,170,0.08)' }}
+            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
             formatter={(v) => [`${Number(v).toFixed(2)}${unit}`, 'Value']}
           />
-          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+          <Bar dataKey="value" radius={[2, 2, 0, 0]}>
             {data.map((_, i) => (
               <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
             ))}

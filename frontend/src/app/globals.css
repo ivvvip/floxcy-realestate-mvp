@@ -8,79 +8,92 @@
   }
   body {
     @apply bg-bg text-fg antialiased;
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
-    background-image:
-      radial-gradient(ellipse 60% 40% at 50% -5%, rgba(0, 212, 170, 0.10), transparent 60%),
-      radial-gradient(ellipse 50% 35% at 100% 10%, rgba(99, 102, 241, 0.06), transparent 60%);
-    background-attachment: fixed;
+    font-feature-settings: 'cv11', 'ss01', 'tnum';
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 {
+    font-feature-settings: 'cv11', 'ss01';
   }
   ::selection {
-    background: rgba(0, 212, 170, 0.35);
+    background: rgba(255, 255, 255, 0.15);
     color: #ffffff;
   }
 }
 
 @layer components {
   .surface-card {
-    @apply rounded-2xl border border-border bg-bg-card shadow-card backdrop-blur-sm;
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 60%);
-  }
-  .text-gradient {
-    background: linear-gradient(180deg, #ffffff 0%, #B8C2D6 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    @apply rounded-lg border border-border bg-bg-card;
   }
   .pill {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elev px-2.5 py-1 text-xs font-medium text-fg-muted;
+    @apply inline-flex items-center gap-1 rounded-md border border-border bg-bg-elev px-2 py-0.5 text-[11px] font-medium text-fg-muted uppercase tracking-wide;
   }
   .pill-accent {
     @apply border-accent/30 bg-accent-muted text-accent;
   }
-  .grid-bg {
-    background-image:
-      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-    mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, black 40%, transparent 80%);
-    -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, black 40%, transparent 80%);
+  .pill-positive {
+    @apply border-positive/30 bg-positive/10 text-positive;
+  }
+  .pill-negative {
+    @apply border-negative/30 bg-negative/10 text-negative;
+  }
+  .data-table {
+    @apply w-full text-sm border-collapse;
+  }
+  .data-table thead th {
+    @apply text-[11px] uppercase tracking-wide text-fg-subtle font-medium px-3 py-2 border-b border-border bg-bg-elev/40 text-left;
+  }
+  .data-table tbody td {
+    @apply px-3 py-2 border-b border-border/60 align-middle;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-bg-elev/40;
+  }
+  .data-table .num {
+    @apply text-right tabular;
+  }
+  .section-divider {
+    @apply border-t border-border;
+  }
+  .chart-header {
+    @apply flex items-center justify-between px-4 py-2.5 border-b border-border;
+  }
+  .chart-header-label {
+    @apply text-[11px] uppercase tracking-wide text-fg-subtle font-medium;
+  }
+  .input-field {
+    @apply w-full bg-bg-elev/60 border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 tabular;
+  }
+  .segmented {
+    @apply inline-flex border border-border rounded-md overflow-hidden;
+  }
+  .segmented > button {
+    @apply px-3 py-1.5 text-sm text-fg-muted bg-bg-card hover:bg-bg-elev transition-colors border-r border-border last:border-r-0;
+  }
+  .segmented > button[data-active="true"] {
+    @apply bg-accent/10 text-accent;
   }
 }
 
 @layer utilities {
-  @keyframes floxcy-float-slow {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50% { transform: translate3d(0, -22px, 0); }
-  }
-  @keyframes floxcy-float-slower {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50% { transform: translate3d(0, 28px, 0); }
-  }
-  @keyframes floxcy-pulse-ring {
-    0% { transform: scale(0.8); opacity: 0.7; }
-    100% { transform: scale(2.4); opacity: 0; }
-  }
-  @keyframes floxcy-marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-  @keyframes floxcy-fade-up {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
   }
 
-  .animate-float-slow { animation: floxcy-float-slow 9s ease-in-out infinite; }
-  .animate-float-slower { animation: floxcy-float-slower 13s ease-in-out infinite; }
-  .animate-pulse-ring { animation: floxcy-pulse-ring 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
-  .animate-marquee { animation: floxcy-marquee 40s linear infinite; }
-  .animate-fade-up { animation: floxcy-fade-up 0.7s ease-out both; }
+  @keyframes floxcy-skeleton-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+  }
+  .animate-skeleton {
+    animation: floxcy-skeleton-pulse 1.6s ease-in-out infinite;
+  }
 
-  @media (prefers-reduced-motion: reduce) {
-    .animate-float-slow,
-    .animate-float-slower,
-    .animate-pulse-ring,
-    .animate-marquee,
-    .animate-fade-up { animation: none; }
+  .scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
   }
 }
 

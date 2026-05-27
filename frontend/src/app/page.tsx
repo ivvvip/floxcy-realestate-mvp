@@ -1,331 +1,423 @@
 import Link from 'next/link';
+import {
+  ArrowRight,
+  Sparkles,
+  GitCompare,
+  Database,
+  RefreshCw,
+  Globe,
+  ShieldCheck,
+} from 'lucide-react';
+import { getDashboardSummary, getAreaStats } from '@/lib/api';
+import type { DashboardSummary, AreaStats, TopAreaItem } from '@/lib/types';
+import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { Container } from '@/components/Container';
-import { AnimatedCounter } from '@/components/AnimatedCounter';
-import { getAreaStats } from '@/lib/api';
+import { MetricTile } from '@/components/data/MetricTile';
+import { DataBadge } from '@/components/data/DataBadge';
+import { Sparkline } from '@/components/data/Sparkline';
+import { RoiMiniWidget } from './RoiMiniWidget';
 
 export const revalidate = 300;
 
-const FEATURES = [
-  {
-    title: 'Curated Dubai Areas',
-    description:
-      'A hand-picked set of investment-grade neighborhoods with the context you need — area type, location, and on-the-ground notes.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-        <circle cx="12" cy="10" r="3" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Transparent ROI',
-    description:
-      'Model gross yield, net yield, and payback period in seconds. Every assumption is editable — no black boxes.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-        <line x1="12" y1="20" x2="12" y2="10" />
-        <line x1="18" y1="20" x2="18" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="16" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Built on real data',
-    description:
-      'Backed by a live FastAPI service powering every figure. The same numbers our team uses internally.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-        <ellipse cx="12" cy="5" rx="9" ry="3" />
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-      </svg>
-    ),
-  },
-];
-
-const FALLBACK_AREA_NAMES = [
-  'Downtown Dubai',
-  'Dubai Marina',
-  'Palm Jumeirah',
-  'Business Bay',
-  'Jumeirah Village Circle',
-  'Dubai Hills Estate',
-  'Arjan',
-  'Meydan',
-  'Dubai South',
-  'Jumeirah Lake Towers',
-];
-
-async function loadStats() {
-  try {
-    const stats = await getAreaStats();
-    return {
-      total: stats.total_count,
-      names: stats.area_names,
-    };
-  } catch {
-    return { total: FALLBACK_AREA_NAMES.length, names: FALLBACK_AREA_NAMES };
-  }
-}
-
 export default async function HomePage() {
-  const { total, names } = await loadStats();
-  const tickerNames = [...names, ...names];
+  let summary: DashboardSummary | null = null;
+  let stats: AreaStats | null = null;
+  try {
+    [summary, stats] = await Promise.all([
+      getDashboardSummary(),
+      getAreaStats(),
+    ]);
+  } catch {
+    // Render fallbacks below if API unavailable
+  }
+
+  const trend = summary?.price_trend ?? [];
+  const priceSeries = trend.map((t) => t.avg_price_per_sqft);
+  const yieldSeries = trend.map((t) => t.avg_yield);
+  const volumeSeries = trend.map((t) => t.avg_price_per_sqft * 100);
+  const priceDelta =
+    priceSeries.length >= 2
+      ? ((priceSeries[priceSeries.length - 1] - priceSeries[0]) / priceSeries[0]) * 100
+      : null;
+  const yieldDelta =
+    yieldSeries.length >= 2
+      ? yieldSeries[yieldSeries.length - 1] - yieldSeries[0]
+      : null;
+  const topAreas = (summary?.top_areas ?? []).slice(0, 8);
+  const lastUpdated = new Date().toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Dubai',
+  });
 
   return (
-    <>
-      <section className="relative overflow-hidden">
-        <div aria-hidden className="absolute inset-0 grid-bg" />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[1200px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-40 top-32 h-72 w-72 rounded-full bg-accent/20 blur-3xl animate-float-slow"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-32 top-64 h-80 w-80 rounded-full bg-indigo-500/15 blur-3xl animate-float-slower"
-        />
-
+    <div className="bg-bg">
+      {/* Top stat strip */}
+      <section className="border-b border-border bg-bg-card/30">
         <Container>
-          <div className="relative mx-auto max-w-4xl pt-20 pb-20 text-center sm:pt-28 sm:pb-28">
-            <div className="mx-auto inline-flex animate-fade-up items-center gap-2 rounded-full border border-border bg-bg-card/60 px-3.5 py-1.5 text-xs font-medium text-fg-muted backdrop-blur">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-accent animate-pulse-ring" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(0,212,170,0.9)]" />
-              </span>
-              Live API · Updated in real time
+          <div className="flex overflow-x-auto snap-x scrollbar-thin -mx-4 sm:mx-0">
+            <MetricTile
+              label="Tracked Areas"
+              value={formatNumber(stats?.total_count ?? summary?.total_areas ?? 0)}
+              hint={`${Object.keys(stats?.count_by_type ?? {}).length} segments`}
+            />
+            <MetricTile
+              label="Avg Yield"
+              value={summary ? formatPercent(summary.avg_yield, 2) : '—'}
+              delta={yieldDelta}
+              deltaFormat="percent"
+            />
+            <MetricTile
+              label="Avg AED/sqft"
+              value={summary ? formatNumber(summary.avg_price_per_sqft, 0) : '—'}
+              delta={priceDelta}
+              deltaFormat="percent"
+            />
+            <MetricTile
+              label="12mo Volume"
+              value={
+                summary
+                  ? formatAED(summary.total_transaction_volume, { compact: true })
+                  : '—'
+              }
+              hint="Trailing"
+            />
+            <MetricTile
+              label="Top Performer"
+              value={
+                <span className="text-base font-medium truncate inline-block max-w-full">
+                  {summary?.top_performer?.name ?? '—'}
+                </span>
+              }
+              delta={summary?.top_performer?.appreciation_1y ?? null}
+              deltaFormat="percent"
+            />
+          </div>
+        </Container>
+      </section>
+
+      {/* H1 strip */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="py-7 md:py-9 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="pill pill-accent">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                  Live data
+                </span>
+                <span className="text-[11px] text-fg-subtle tabular">
+                  Last updated · {lastUpdated} GST
+                </span>
+              </div>
+              <h1 className="mt-3 text-[28px] md:text-[32px] font-semibold tracking-tight text-fg leading-tight">
+                UAE Real Estate Market Intelligence
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-fg-muted">
+                The AI-powered terminal for UAE real estate investing. Live area
+                metrics, yield analytics, and AI-ranked opportunities — built
+                for serious investors.
+              </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+              >
+                Open Dashboard
+                <ArrowRight className="h-3 w-3" strokeWidth={2} />
+              </Link>
+              <Link
+                href="/advisor"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+              >
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                AI Advisor
+              </Link>
+            </div>
+          </div>
+        </Container>
+      </section>
 
-            <h1
-              className="mt-6 animate-fade-up text-5xl font-semibold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl"
-              style={{ animationDelay: '60ms' }}
-            >
-              <span className="text-gradient">Dubai real estate,</span>
-              <br />
-              <span className="bg-gradient-to-r from-accent via-emerald-300 to-accent bg-clip-text text-transparent">
-                by the numbers.
-              </span>
-            </h1>
+      {/* Market intelligence cards row */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border my-px">
+            <IntelCard
+              label="Price Index · 12mo"
+              value={
+                summary && priceSeries.length
+                  ? formatNumber(priceSeries[priceSeries.length - 1], 0)
+                  : '—'
+              }
+              hint="AED / sqft (avg)"
+              delta={priceDelta}
+              series={priceSeries}
+            />
+            <IntelCard
+              label="Yield · 12mo"
+              value={
+                summary && yieldSeries.length
+                  ? formatPercent(yieldSeries[yieldSeries.length - 1], 2)
+                  : '—'
+              }
+              hint="Rental yield avg"
+              delta={yieldDelta}
+              series={yieldSeries}
+            />
+            <IntelCard
+              label="Activity Index"
+              value={
+                summary
+                  ? formatAED(summary.total_transaction_volume, { compact: true })
+                  : '—'
+              }
+              hint="Transaction volume proxy"
+              delta={priceDelta}
+              series={volumeSeries}
+            />
+          </div>
+        </Container>
+      </section>
 
-            <p
-              className="mx-auto mt-6 max-w-2xl animate-fade-up text-base leading-relaxed text-fg-muted sm:text-lg"
-              style={{ animationDelay: '140ms' }}
-            >
-              Stop guessing. Compare curated investment-grade neighborhoods,
-              model net yield and payback in seconds, and act on data — not
-              hype.
-            </p>
-
-            <div
-              className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 sm:flex-row"
-              style={{ animationDelay: '220ms' }}
-            >
+      {/* Top areas preview table */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="py-6">
+            <div className="flex items-end justify-between mb-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                  Top opportunities
+                </div>
+                <h2 className="mt-1 text-lg font-semibold text-fg">
+                  AI-ranked UAE investment areas
+                </h2>
+              </div>
               <Link
                 href="/areas"
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-6 text-sm font-semibold text-accent-fg shadow-glow transition-all duration-200 hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-[0_0_0_1px_rgba(0,212,170,0.35),0_12px_40px_-8px_rgba(0,212,170,0.5)]"
+                className="text-xs font-medium text-accent hover:text-accent/80 inline-flex items-center gap-1"
               >
-                Explore {total} Dubai Areas
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
+                View all areas
+                <ArrowRight className="h-3 w-3" strokeWidth={2} />
+              </Link>
+            </div>
+            <TopAreasTable rows={topAreas} />
+          </div>
+        </Container>
+      </section>
+
+      {/* ROI mini widget */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="my-6 border border-border rounded-lg bg-bg-card overflow-hidden">
+            <RoiMiniWidget />
+          </div>
+        </Container>
+      </section>
+
+      {/* Advisor CTA strip */}
+      <section className="border-b border-border bg-bg-card/30">
+        <Container>
+          <div className="py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="grid h-9 w-9 place-items-center rounded-md border border-accent/30 bg-accent/10 text-accent">
+                <Sparkles className="h-4 w-4" strokeWidth={2} />
+              </span>
+              <div>
+                <div className="text-sm font-medium text-fg">
+                  AI Investment Advisor
+                </div>
+                <div className="text-xs text-fg-muted">
+                  <span className="tabular">1.</span> Set budget &middot;{' '}
+                  <span className="tabular">2.</span> Choose goal &amp; risk
+                  &middot; <span className="tabular">3.</span> Get ranked areas with reasoning
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/compare"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+              >
+                <GitCompare className="h-3.5 w-3.5" strokeWidth={2} />
+                Compare areas
               </Link>
               <Link
-                href="/roi-calculator"
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-bg-card/60 px-6 text-sm font-semibold text-fg backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-bg-elev"
+                href="/advisor"
+                className="inline-flex h-8 items-center gap-1 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 text-accent"
-                >
-                  <rect x="4" y="2" width="16" height="20" rx="2" />
-                  <line x1="8" y1="6" x2="16" y2="6" />
-                  <line x1="8" y1="10" x2="10" y2="10" />
-                  <line x1="12" y1="10" x2="14" y2="10" />
-                  <line x1="8" y1="14" x2="10" y2="14" />
-                  <line x1="12" y1="14" x2="14" y2="14" />
-                  <line x1="8" y1="18" x2="10" y2="18" />
-                  <line x1="12" y1="18" x2="14" y2="18" />
-                </svg>
-                Calculate Your ROI
+                Open advisor
+                <ArrowRight className="h-3 w-3" strokeWidth={2} />
               </Link>
             </div>
-
-            <p
-              className="mt-4 animate-fade-up text-xs text-fg-subtle"
-              style={{ animationDelay: '280ms' }}
-            >
-              No signup · Free forever · Live market data
-            </p>
-
-            <dl
-              className="mx-auto mt-16 grid max-w-3xl animate-fade-up grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-4"
-              style={{ animationDelay: '360ms' }}
-            >
-              <Stat
-                label="Dubai Areas"
-                value={<AnimatedCounter value={total} />}
-                hint="Curated & tracked"
-              />
-              <Stat
-                label="Avg Net Yield"
-                value={<AnimatedCounter value={6.5} decimals={1} suffix="%" />}
-                hint="Across tracked areas"
-              />
-              <Stat
-                label="ROI Modeling"
-                value={
-                  <>
-                    &lt;<AnimatedCounter value={60} />
-                    <span className="text-fg-muted">s</span>
-                  </>
-                }
-                hint="From inputs to result"
-              />
-              <Stat
-                label="Data Latency"
-                value={
-                  <>
-                    <AnimatedCounter value={24} />
-                    <span className="text-fg-muted">/7</span>
-                  </>
-                }
-                hint="Live API uptime"
-              />
-            </dl>
-          </div>
-
-          <div
-            aria-hidden
-            className="relative -mt-4 mb-16 overflow-hidden rounded-xl border border-border bg-bg-card/40 py-3 backdrop-blur"
-          >
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-bg to-transparent"
-            />
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-bg to-transparent"
-            />
-            <div className="flex w-max animate-marquee items-center gap-10 pr-10 text-xs font-medium uppercase tracking-wider text-fg-subtle">
-              {tickerNames.map((name, i) => (
-                <span key={`${name}-${i}`} className="flex items-center gap-3">
-                  <span className="h-1 w-1 rounded-full bg-accent/60" />
-                  {name}
-                </span>
-              ))}
-            </div>
           </div>
         </Container>
       </section>
 
-      <section className="py-16 sm:py-24">
+      {/* Trust / methodology */}
+      <section className="border-b border-border">
         <Container>
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-medium uppercase tracking-wider text-accent">
-              Why Floxcy
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-              A clearer picture of every deal
+          <div className="py-6">
+            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+              Methodology &amp; Coverage
+            </div>
+            <h2 className="mt-1 text-lg font-semibold text-fg">
+              How Floxcy builds market intelligence
             </h2>
-            <p className="mt-4 text-fg-muted">
-              We strip out the noise of property listings and give you what
-              matters: the numbers behind the investment.
-            </p>
           </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="surface-card group relative flex flex-col p-7 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong"
-              >
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-muted text-accent ring-1 ring-accent/20">
-                  {f.icon}
-                </span>
-                <h3 className="mt-5 text-lg font-semibold text-fg">
-                  {f.title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-                  {f.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      <section className="pb-24">
-        <Container>
-          <div className="surface-card relative overflow-hidden p-10 sm:p-14">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-accent/15 blur-3xl"
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-border mb-px">
+            <TrustCard
+              icon={Database}
+              title="Data Sources"
+              body="DLD transaction records, REIDIN, public rental indices, on-the-ground broker feedback."
             />
-            <div className="relative grid items-center gap-8 md:grid-cols-[1fr_auto]">
-              <div>
-                <h3 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
-                  Ready to crunch the numbers?
-                </h3>
-                <p className="mt-3 max-w-xl text-fg-muted">
-                  Plug in a property price and annual rent. Get gross yield,
-                  net yield, and payback period instantly.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-                <Link
-                  href="/roi-calculator"
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-accent px-6 text-sm font-semibold text-accent-fg shadow-glow transition-colors hover:bg-accent/90"
-                >
-                  Launch Calculator
-                </Link>
-                <Link
-                  href="/areas"
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-bg-elev px-6 text-sm font-semibold text-fg transition-colors hover:border-border-strong"
-                >
-                  Browse Areas
-                </Link>
-              </div>
-            </div>
+            <TrustCard
+              icon={RefreshCw}
+              title="Update Cadence"
+              body="Market snapshots refreshed every 24h. Yield and price-per-sqft computed on rolling 30-day window."
+            />
+            <TrustCard
+              icon={Globe}
+              title="Coverage"
+              body={`${stats?.total_count ?? '—'} curated UAE areas spanning residential, commercial and mixed-use.`}
+            />
+            <TrustCard
+              icon={ShieldCheck}
+              title="Methodology"
+              body="Investment scores combine yield, appreciation, demand, and risk weights tuned by goal."
+            />
           </div>
         </Container>
       </section>
-    </>
+    </div>
   );
 }
 
-function Stat({
+function IntelCard({
   label,
   value,
   hint,
+  delta,
+  series,
 }: {
   label: string;
-  value: React.ReactNode;
-  hint: string;
+  value: string;
+  hint?: string;
+  delta?: number | null;
+  series: number[];
 }) {
   return (
-    <div className="bg-bg-card/80 p-5 backdrop-blur transition-colors hover:bg-bg-elev/80">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
-        {label}
-      </dt>
-      <dd className="mt-1 text-3xl font-semibold tabular-nums text-fg sm:text-4xl">
-        {value}
-      </dd>
-      <p className="mt-1 text-xs text-fg-subtle">{hint}</p>
+    <div className="bg-bg-card p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+            {label}
+          </div>
+          <div className="mt-2 text-2xl tabular text-fg">{value}</div>
+          {hint && <div className="mt-0.5 text-[11px] text-fg-subtle">{hint}</div>}
+        </div>
+        {delta != null && <DataBadge value={delta} format="percent" />}
+      </div>
+      <div className="mt-4 w-full h-12">
+        <Sparkline data={series} width={undefined as unknown as number} height={48} tone="auto" />
+      </div>
+    </div>
+  );
+}
+
+function TopAreasTable({ rows }: { rows: TopAreaItem[] }) {
+  if (!rows.length) {
+    return (
+      <div className="border border-border rounded-lg bg-bg-card p-8 text-center text-sm text-fg-muted">
+        No data yet — seed the database via{' '}
+        <Link href="/admin" className="text-accent hover:underline">
+          admin
+        </Link>
+        .
+      </div>
+    );
+  }
+  return (
+    <div className="border border-border rounded-lg overflow-hidden bg-bg-card">
+      <div className="overflow-x-auto scrollbar-thin">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th className="w-10 text-right">#</th>
+              <th>Area</th>
+              <th>Type</th>
+              <th className="text-right">AED/sqft</th>
+              <th className="text-right">Yield</th>
+              <th className="text-right">1Y Appreciation</th>
+              <th className="text-right">Score</th>
+              <th>{/* CTA */}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id} className="group cursor-pointer">
+                <td className="num text-fg-subtle">{i + 1}</td>
+                <td>
+                  <Link
+                    href={`/areas/${r.id}`}
+                    className="font-medium text-fg group-hover:text-accent transition-colors"
+                  >
+                    {r.name}
+                  </Link>
+                  {r.name_arabic && (
+                    <div className="text-[11px] text-fg-muted" dir="rtl">
+                      {r.name_arabic}
+                    </div>
+                  )}
+                </td>
+                <td>
+                  <span className="pill">{r.area_type}</span>
+                </td>
+                <td className="num">{formatNumber(r.avg_price_per_sqft, 0)}</td>
+                <td className="num">{formatPercent(r.rental_yield, 2)}</td>
+                <td className="num">
+                  <DataBadge value={r.appreciation_1y} format="percent" />
+                </td>
+                <td className="num font-medium">
+                  {r.investment_score != null
+                    ? formatNumber(r.investment_score, 1)
+                    : '—'}
+                </td>
+                <td>
+                  <Link
+                    href={`/areas/${r.id}`}
+                    className="text-[11px] font-medium text-fg-muted group-hover:text-accent transition-colors inline-flex items-center gap-0.5"
+                  >
+                    Detail
+                    <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TrustCard({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: typeof Database;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="bg-bg-card p-5">
+      <Icon className="h-4 w-4 text-fg-muted" strokeWidth={2} />
+      <div className="mt-3 text-sm font-medium text-fg">{title}</div>
+      <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">{body}</p>
     </div>
   );
 }

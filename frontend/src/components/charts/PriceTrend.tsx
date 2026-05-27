@@ -48,9 +48,12 @@ export function PriceTrend({ data, height = 280, showYield = true }: Props) {
           )}
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
+            cursor={{ stroke: 'rgba(255,255,255,0.08)' }}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: '#A0A8B8' }} />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: '#9CA3AF', paddingTop: 8 }}
+            iconType="plainline"
+          />
           <Line
             yAxisId="price"
             type="monotone"

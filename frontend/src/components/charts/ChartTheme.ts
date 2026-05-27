@@ -1,16 +1,22 @@
 export const CHART_COLORS = [
-  '#00D4AA', // accent
-  '#6366F1', // indigo
-  '#F59E0B', // amber
-  '#EC4899', // pink
+  '#9CA3AF', // neutral grey
+  '#60A5FA', // blue
+  '#A78BFA', // violet
+  '#34D399', // mint
 ];
 
-export const AXIS_COLOR = 'rgba(255,255,255,0.4)';
-export const GRID_COLOR = 'rgba(255,255,255,0.06)';
+export const CHART_PRIMARY = '#9CA3AF';
+export const CHART_ACCENT = '#00D4AA';
+export const POSITIVE = '#10B981';
+export const NEGATIVE = '#EF4444';
+export const AXIS_COLOR = '#4B5563';
+export const GRID_COLOR = 'rgba(255,255,255,0.04)';
 export const TOOLTIP_STYLE: React.CSSProperties = {
   background: '#131725',
-  border: '1px solid rgba(255,255,255,0.14)',
-  borderRadius: '0.75rem',
+  border: '1px solid #1F2937',
+  borderRadius: '0.5rem',
   color: '#F8F9FA',
-  fontSize: '0.875rem',
+  fontSize: '12px',
+  padding: '8px 10px',
+  fontVariantNumeric: 'tabular-nums',
 };

@@ -1,12 +1,14 @@
+import { Suspense } from 'react';
 import { Container } from '@/components/Container';
+import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { CompareClient } from './CompareClient';
 import { getAreas } from '@/lib/api';
 import type { Area } from '@/lib/types';
 
 export const revalidate = 300;
 export const metadata = {
-  title: 'Compare Areas · Floxcy',
-  description: 'Side-by-side comparison of Dubai areas across price, yield, and risk.',
+  title: 'Compare Areas',
+  description: 'Side-by-side comparison of UAE areas across price, yield, and risk.',
 };
 
 async function loadAreas(): Promise<Area[]> {
@@ -21,20 +23,32 @@ export default async function ComparePage() {
   const areas = await loadAreas();
 
   return (
-    <section className="py-12">
-      <Container>
-        <header className="mb-8">
-          <span className="pill pill-accent">Side-by-side</span>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Compare Areas
-          </h1>
-          <p className="mt-2 max-w-2xl text-fg-muted">
-            Pick 2 to 4 areas to compare their latest metrics and 12-month history.
-          </p>
-        </header>
+    <div className="bg-bg">
+      <div className="border-b border-border">
+        <Container>
+          <div className="pt-4 pb-3">
+            <Breadcrumbs items={[{ label: 'Compare' }]} />
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-semibold text-fg tracking-tight">
+                  Compare Areas
+                </h1>
+                <p className="mt-1 text-xs text-fg-muted">
+                  Side-by-side metrics, radar profile, and 12-month price overlay
+                </p>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </div>
 
-        <CompareClient areas={areas} />
+      <Container>
+        <div className="py-5">
+          <Suspense fallback={<div className="text-xs text-fg-subtle">Loading…</div>}>
+            <CompareClient areas={areas} />
+          </Suspense>
+        </div>
       </Container>
-    </section>
+    </div>
   );
 }

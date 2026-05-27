@@ -40,9 +40,12 @@ export function MultiLine({
           />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
+            cursor={{ stroke: 'rgba(255,255,255,0.08)' }}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: '#A0A8B8' }} />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: '#9CA3AF', paddingTop: 8 }}
+            iconType="plainline"
+          />
           {series.map((s, i) => (
             <Line
               key={s}

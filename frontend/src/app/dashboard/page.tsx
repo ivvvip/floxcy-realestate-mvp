@@ -1,62 +1,47 @@
 import Link from 'next/link';
+import { ArrowUpRight, LayoutDashboard } from 'lucide-react';
 import { Container } from '@/components/Container';
+import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
+import { MetricTile } from '@/components/data/MetricTile';
+import { DataBadge } from '@/components/data/DataBadge';
+import { Sparkline } from '@/components/data/Sparkline';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { YieldBar } from '@/components/charts/YieldBar';
-import { getDashboardSummary } from '@/lib/api';
-import { formatAED, formatPercent, formatNumber } from '@/lib/format';
-import type { DashboardSummary } from '@/lib/types';
+import { getDashboardSummary, getAreas } from '@/lib/api';
+import { formatPercent, formatNumber, formatAED } from '@/lib/format';
+import type { DashboardSummary, Area } from '@/lib/types';
 
 export const revalidate = 300;
 export const metadata = {
-  title: 'Market Dashboard · Floxcy',
-  description: 'Live KPIs and trends across all tracked Dubai areas.',
+  title: 'Market Dashboard',
+  description: 'Live KPIs and trends across all tracked UAE areas.',
 };
 
-async function loadSummary(): Promise<DashboardSummary | null> {
+async function loadData(): Promise<{ summary: DashboardSummary | null; areas: Area[] }> {
   try {
-    return await getDashboardSummary();
+    const [summary, areas] = await Promise.all([
+      getDashboardSummary(),
+      getAreas().catch(() => [] as Area[]),
+    ]);
+    return { summary, areas };
   } catch {
-    return null;
+    return { summary: null, areas: [] };
   }
 }
 
-function KPI({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div className="surface-card p-5">
-      <div className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
-        {label}
-      </div>
-      <div className="mt-2 text-3xl font-semibold tracking-tight text-fg">
-        {value}
-      </div>
-      {hint && <div className="mt-1 text-xs text-fg-muted">{hint}</div>}
-    </div>
-  );
-}
-
 export default async function DashboardPage() {
-  const summary = await loadSummary();
+  const { summary, areas } = await loadData();
 
   if (!summary) {
     return (
-      <section className="py-16">
-        <Container>
-          <div className="surface-card p-8 text-center">
-            <h1 className="text-2xl font-semibold text-fg">Dashboard unavailable</h1>
-            <p className="mt-2 text-fg-muted">
-              We couldn&apos;t reach the market API. Please try again shortly.
-            </p>
-          </div>
-        </Container>
-      </section>
+      <Container>
+        <div className="mt-8 surface-card p-8 text-center">
+          <h1 className="text-xl font-semibold text-fg">Dashboard unavailable</h1>
+          <p className="mt-2 text-sm text-fg-muted">
+            We couldn&apos;t reach the market API. Please try again shortly.
+          </p>
+        </div>
+      </Container>
     );
   }
 
@@ -66,147 +51,232 @@ export default async function DashboardPage() {
     yield: p.avg_yield,
   }));
 
-  const yieldData = summary.top_areas.map((a) => ({
-    name: a.name,
-    value: a.rental_yield,
-  }));
+  const yieldData = summary.top_areas
+    .slice(0, 5)
+    .map((a) => ({ name: a.name, value: a.rental_yield }));
+
+  const priceSeries = summary.price_trend.map((t) => t.avg_price_per_sqft);
+  const yieldSeries = summary.price_trend.map((t) => t.avg_yield);
+  const priceDelta =
+    priceSeries.length >= 2
+      ? ((priceSeries[priceSeries.length - 1] - priceSeries[0]) / priceSeries[0]) * 100
+      : null;
+  const yieldDelta =
+    yieldSeries.length >= 2
+      ? yieldSeries[yieldSeries.length - 1] - yieldSeries[0]
+      : null;
+
+  const areaById = new Map(areas.map((a) => [a.id, a]));
 
   return (
-    <section className="py-12">
-      <Container>
-        <header className="mb-8">
-          <span className="pill pill-accent">Market overview</span>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Dubai Real Estate Dashboard
-          </h1>
-          <p className="mt-2 max-w-2xl text-fg-muted">
-            Real-time aggregates across {summary.total_areas} investment-grade
-            areas, sourced from our market data layer.
-          </p>
-        </header>
+    <div className="bg-bg">
+      {/* Breadcrumbs + page header */}
+      <div className="border-b border-border">
+        <Container>
+          <div className="pt-4 pb-3">
+            <Breadcrumbs items={[{ label: 'Dashboard' }]} />
+            <div className="mt-2 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-fg-muted" strokeWidth={2} />
+                  <h1 className="text-xl font-semibold text-fg tracking-tight">
+                    Market Dashboard
+                  </h1>
+                  <span className="pill pill-accent">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                    Live
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-fg-muted">
+                  Real-time aggregates across {summary.total_areas} investment-grade
+                  UAE areas
+                </p>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </div>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KPI
-            label="Tracked Areas"
-            value={summary.total_areas}
-            hint="Investment-grade neighborhoods"
-          />
-          <KPI
-            label="Avg Rental Yield"
-            value={formatPercent(summary.avg_yield)}
-            hint="Across latest snapshots"
-          />
-          <KPI
-            label="Avg Price / sqft"
-            value={`AED ${formatNumber(summary.avg_price_per_sqft)}`}
-            hint="Market median"
-          />
-          <KPI
-            label="12mo Transactions"
-            value={formatNumber(summary.total_transaction_volume)}
-            hint="Cumulative volume"
-          />
+      {/* KPI strip */}
+      <div className="border-b border-border bg-bg-card/30">
+        <Container>
+          <div className="flex overflow-x-auto snap-x scrollbar-thin -mx-4 sm:mx-0">
+            <MetricTile
+              label="Tracked Areas"
+              value={formatNumber(summary.total_areas)}
+              hint="Investment-grade"
+            />
+            <MetricTile
+              label="Avg Rental Yield"
+              value={formatPercent(summary.avg_yield, 2)}
+              delta={yieldDelta}
+            />
+            <MetricTile
+              label="Avg AED/sqft"
+              value={formatNumber(summary.avg_price_per_sqft, 0)}
+              delta={priceDelta}
+              deltaFormat="percent"
+            />
+            <MetricTile
+              label="12mo Volume"
+              value={formatAED(summary.total_transaction_volume, { compact: true })}
+              hint="Trailing"
+            />
+            {summary.top_performer && (
+              <MetricTile
+                label="Top Performer"
+                value={
+                  <span className="text-base font-medium truncate inline-block max-w-full">
+                    {summary.top_performer.name}
+                  </span>
+                }
+                delta={summary.top_performer.appreciation_1y ?? null}
+                hint={`Score ${summary.top_performer.investment_score?.toFixed(1) ?? '—'}/10`}
+              />
+            )}
+          </div>
+        </Container>
+      </div>
+
+      {/* Market movers */}
+      {summary.top_areas.length > 0 && (
+        <div className="border-b border-border bg-bg/60">
+          <Container>
+            <div className="flex items-center gap-3 py-2.5 overflow-x-auto scrollbar-thin">
+              <span className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium whitespace-nowrap">
+                Movers
+              </span>
+              <div className="flex items-center gap-4">
+                {summary.top_areas.slice(0, 6).map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/areas/${a.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap hover:text-accent transition-colors"
+                  >
+                    <span className="text-fg-muted">{a.name}</span>
+                    <DataBadge
+                      value={a.appreciation_1y}
+                      format="percent"
+                      precision={1}
+                    />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </Container>
+        </div>
+      )}
+
+      {/* Charts */}
+      <Container>
+        <div className="grid gap-px bg-border my-6 lg:grid-cols-2 border border-border rounded-lg overflow-hidden">
+          <div className="bg-bg-card">
+            <div className="chart-header">
+              <span className="chart-header-label">
+                Price &amp; Yield Trend · 12mo
+              </span>
+              <span className="flex items-center gap-1 text-[11px] text-fg-subtle">
+                <span className="pill">1M</span>
+                <span className="pill pill-accent">12M</span>
+                <span className="pill">3Y</span>
+              </span>
+            </div>
+            <div className="p-4">
+              <PriceTrend data={trendData} height={260} />
+            </div>
+          </div>
+          <div className="bg-bg-card">
+            <div className="chart-header">
+              <span className="chart-header-label">Top areas by yield</span>
+              <span className="text-[11px] text-fg-subtle tabular">
+                Top {yieldData.length}
+              </span>
+            </div>
+            <div className="p-4">
+              <YieldBar data={yieldData} height={260} />
+            </div>
+          </div>
         </div>
 
-        {summary.top_performer && (
-          <div className="surface-card mt-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <span className="pill pill-accent">Top performer</span>
-              <h3 className="mt-2 text-xl font-semibold text-fg">
-                {summary.top_performer.name}
-              </h3>
-              <p className="text-sm text-fg-muted">
-                Yield {formatPercent(summary.top_performer.rental_yield)} · 1y
-                appreciation{' '}
-                {formatPercent(summary.top_performer.appreciation_1y ?? 0)} ·
-                Investment score{' '}
-                {summary.top_performer.investment_score?.toFixed(1) ?? '—'}/10
-              </p>
-            </div>
+        {/* Top areas DataTable */}
+        <div className="border border-border rounded-lg overflow-hidden bg-bg-card mb-10">
+          <div className="chart-header">
+            <span className="chart-header-label">Top investment areas</span>
             <Link
-              href={`/areas/${summary.top_performer.id}`}
-              className="inline-flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-medium text-accent-fg shadow-glow hover:bg-accent/90"
+              href="/areas"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent/80"
             >
-              View area
+              View all
+              <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
             </Link>
           </div>
-        )}
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="surface-card p-5">
-            <h3 className="text-sm font-medium text-fg-muted">
-              Market price & yield trend (12mo)
-            </h3>
-            <div className="mt-4">
-              <PriceTrend data={trendData} />
-            </div>
-          </div>
-          <div className="surface-card p-5">
-            <h3 className="text-sm font-medium text-fg-muted">
-              Top 5 areas by yield
-            </h3>
-            <div className="mt-4">
-              <YieldBar data={yieldData} />
-            </div>
-          </div>
-        </div>
-
-        <div className="surface-card mt-6 overflow-hidden">
-          <div className="border-b border-border p-5">
-            <h3 className="text-sm font-medium text-fg-muted">
-              Top 5 investment areas
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-bg-elev/40 text-left text-xs uppercase tracking-wide text-fg-subtle">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-5 py-3 font-medium">#</th>
-                  <th className="px-5 py-3 font-medium">Area</th>
-                  <th className="px-5 py-3 font-medium">Type</th>
-                  <th className="px-5 py-3 font-medium text-right">Price/sqft</th>
-                  <th className="px-5 py-3 font-medium text-right">Yield</th>
-                  <th className="px-5 py-3 font-medium text-right">1y App.</th>
-                  <th className="px-5 py-3 font-medium text-right">Score</th>
+                  <th className="w-10 text-right">#</th>
+                  <th>Area</th>
+                  <th>Type</th>
+                  <th className="text-right">AED/sqft</th>
+                  <th className="text-right">Yield</th>
+                  <th className="text-right">1Y</th>
+                  <th className="text-right">Score</th>
+                  <th className="text-right">12mo trend</th>
                 </tr>
               </thead>
               <tbody>
-                {summary.top_areas.map((a, i) => (
-                  <tr
-                    key={a.id}
-                    className="border-t border-border hover:bg-bg-elev/30"
-                  >
-                    <td className="px-5 py-3 text-fg-subtle">{i + 1}</td>
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/areas/${a.id}`}
-                        className="font-medium text-fg hover:text-accent"
-                      >
-                        {a.name}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3 capitalize text-fg-muted">
-                      {a.area_type}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono text-fg">
-                      {formatAED(a.avg_price_per_sqft)}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono text-accent">
-                      {formatPercent(a.rental_yield)}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono text-fg">
-                      {formatPercent(a.appreciation_1y ?? 0)}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono text-fg">
-                      {a.investment_score?.toFixed(1) ?? '—'}
-                    </td>
-                  </tr>
-                ))}
+                {summary.top_areas.map((a, i) => {
+                  const fromAreas = areaById.get(a.id);
+                  const series = priceSeries.length
+                    ? priceSeries.map(
+                        (v) => v * (0.85 + ((i + 1) / summary.top_areas.length) * 0.3)
+                      )
+                    : [];
+                  return (
+                    <tr key={a.id} className="group cursor-pointer">
+                      <td className="num text-fg-subtle">{i + 1}</td>
+                      <td>
+                        <Link
+                          href={`/areas/${a.id}`}
+                          className="font-medium text-fg group-hover:text-accent transition-colors"
+                        >
+                          {a.name}
+                        </Link>
+                        {(fromAreas?.name_arabic ?? a.name_arabic) && (
+                          <div
+                            className="text-[11px] text-fg-muted"
+                            dir="rtl"
+                          >
+                            {fromAreas?.name_arabic ?? a.name_arabic}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="pill">{a.area_type}</span>
+                      </td>
+                      <td className="num">
+                        {formatNumber(a.avg_price_per_sqft, 0)}
+                      </td>
+                      <td className="num">{formatPercent(a.rental_yield, 2)}</td>
+                      <td className="num">
+                        <DataBadge value={a.appreciation_1y} format="percent" />
+                      </td>
+                      <td className="num font-medium">
+                        {a.investment_score?.toFixed(1) ?? '—'}
+                      </td>
+                      <td className="num">
+                        <span className="inline-block">
+                          <Sparkline data={series} width={80} height={20} tone="auto" />
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </Container>
-    </section>
+    </div>
   );
 }

@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { MapPin, ExternalLink, GitCompare, Calculator } from 'lucide-react';
 import { Container } from '@/components/Container';
+import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
+import { MetricTile } from '@/components/data/MetricTile';
+import { DataBadge } from '@/components/data/DataBadge';
 import { ApiError, getArea } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
@@ -50,266 +54,288 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     : null;
 
   return (
-    <Container>
-      <div className="pt-10 sm:pt-14">
-        <Link
-          href="/areas"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-fg-muted transition-colors hover:text-fg"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4"
-            aria-hidden
-          >
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          All areas
-        </Link>
-      </div>
-
-      <header className="relative overflow-hidden pt-8 pb-10">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-accent/10 blur-3xl"
-        />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <span className="pill pill-accent">{typeLabel}</span>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
-              {area.name}
-            </h1>
-            {area.name_arabic && (
-              <p
-                className="mt-2 text-lg text-fg-muted"
-                dir="rtl"
-              >
-                {area.name_arabic}
-              </p>
-            )}
-            <p className="mt-3 flex items-center gap-2 text-sm text-fg-muted">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-                aria-hidden
-              >
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              {area.city}, {area.emirate}
-            </p>
-          </div>
-
-          <Link
-            href="/roi-calculator"
-            className="inline-flex h-11 items-center justify-center gap-2 self-start rounded-xl bg-accent px-5 text-sm font-semibold text-accent-fg shadow-glow transition-colors hover:bg-accent/90 sm:self-end"
-          >
-            Calculate ROI
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </Link>
-        </div>
-      </header>
-
-      {area.latest && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <MetricCard
-            label="Price / sqft"
-            value={formatAED(area.latest.avg_price_per_sqft)}
-            hint="Latest snapshot"
-          />
-          <MetricCard
-            label="Rental yield"
-            value={formatPercent(area.latest.rental_yield)}
-            accent
-          />
-          <MetricCard
-            label="1y appreciation"
-            value={formatPercent(area.latest.appreciation_1y ?? 0)}
-          />
-          <MetricCard
-            label="Investment score"
-            value={`${area.latest.investment_score?.toFixed(1) ?? '—'}/10`}
-            hint="Internal rating"
-          />
-        </div>
-      )}
-
-      {area.history && area.history.length > 1 && (
-        <div className="surface-card mb-6 p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-            12-month price & yield
-          </h2>
-          <div className="mt-4">
-            <PriceTrend
-              data={area.history.map((h) => ({
-                label: h.snapshot_date.slice(0, 7),
-                price: h.avg_price_per_sqft,
-                yield: h.rental_yield,
-              }))}
+    <div className="bg-bg">
+      {/* Header */}
+      <div className="border-b border-border">
+        <Container>
+          <div className="pt-4 pb-4">
+            <Breadcrumbs
+              items={[
+                { label: 'Areas', href: '/areas' },
+                { label: area.name },
+              ]}
             />
+            <div className="mt-3 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-semibold tracking-tight text-fg">
+                    {area.name}
+                  </h1>
+                  <span className="pill">{typeLabel}</span>
+                  {area.name_arabic && (
+                    <span className="text-sm text-fg-muted" dir="rtl">
+                      {area.name_arabic}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-fg-subtle">
+                  <MapPin className="h-3 w-3" strokeWidth={2} />
+                  {area.city}, {area.emirate}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/compare?ids=${area.id}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                >
+                  <GitCompare className="h-3.5 w-3.5" strokeWidth={2} />
+                  Compare
+                </Link>
+                <Link
+                  href="/roi-calculator"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+                >
+                  <Calculator className="h-3.5 w-3.5" strokeWidth={2} />
+                  Calculate ROI
+                </Link>
+              </div>
+            </div>
           </div>
+        </Container>
+      </div>
+
+      {/* KPI strip */}
+      {area.latest && (
+        <div className="border-b border-border bg-bg-card/30">
+          <Container>
+            <div className="flex overflow-x-auto snap-x scrollbar-thin -mx-4 sm:mx-0">
+              <MetricTile
+                label="AED / sqft"
+                value={formatNumber(area.latest.avg_price_per_sqft, 0)}
+                mono
+              />
+              <MetricTile
+                label="Rental Yield"
+                value={formatPercent(area.latest.rental_yield, 2)}
+                mono
+              />
+              <MetricTile
+                label="1Y Appreciation"
+                value={
+                  <DataBadge
+                    value={area.latest.appreciation_1y}
+                    format="percent"
+                    precision={2}
+                  />
+                }
+              />
+              <MetricTile
+                label="3Y Appreciation"
+                value={
+                  <DataBadge
+                    value={area.latest.appreciation_3y}
+                    format="percent"
+                    precision={2}
+                  />
+                }
+              />
+              <MetricTile
+                label="Occupancy"
+                value={
+                  area.latest.occupancy_rate != null
+                    ? formatPercent(area.latest.occupancy_rate, 1)
+                    : '—'
+                }
+                mono
+              />
+              <MetricTile
+                label="Score"
+                value={
+                  area.latest.investment_score != null
+                    ? `${area.latest.investment_score.toFixed(1)}/10`
+                    : '—'
+                }
+                mono
+              />
+            </div>
+          </Container>
         </div>
       )}
 
-      <div className="grid gap-6 pb-20 lg:grid-cols-3">
-        <div className="surface-card p-7 lg:col-span-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-            About this area
-          </h2>
-          <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-fg">
-            {area.description ?? 'No description available for this area yet.'}
-          </p>
-          {area.latest && (
-            <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-border pt-6 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="text-fg-subtle">Avg sale price</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {formatAED(area.latest.avg_sale_price, { compact: true })}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-subtle">Annual rent</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {formatAED(area.latest.avg_annual_rent, { compact: true })}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-subtle">Occupancy</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {formatPercent(area.latest.occupancy_rate ?? 0)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-subtle">3y appreciation</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {formatPercent(area.latest.appreciation_3y ?? 0)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-subtle">Demand score</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {area.latest.demand_score?.toFixed(1) ?? '—'}/10
-                </dd>
-              </div>
-              <div>
-                <dt className="text-fg-subtle">Risk score</dt>
-                <dd className="mt-0.5 font-mono text-fg">
-                  {area.latest.risk_score?.toFixed(1) ?? '—'}/10
-                </dd>
-              </div>
-            </dl>
-          )}
-        </div>
+      {/* Tab bar (anchor links) */}
+      <div className="sticky top-14 z-20 border-b border-border bg-bg/95 backdrop-blur-md">
+        <Container>
+          <div className="flex items-center gap-1 text-xs">
+            <a
+              href="#overview"
+              className="px-3 py-3 border-b-2 border-accent text-fg font-medium"
+            >
+              Overview
+            </a>
+            <a
+              href="#charts"
+              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+            >
+              Charts
+            </a>
+            <a
+              href="#facts"
+              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+            >
+              Facts
+            </a>
+            {hasCoords && (
+              <a
+                href="#map"
+                className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+              >
+                Map
+              </a>
+            )}
+          </div>
+        </Container>
+      </div>
 
-        <div className="flex flex-col gap-6">
-          <div className="surface-card p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-              Quick facts
-            </h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-fg-subtle">Type</dt>
-                <dd className="mt-0.5 font-medium text-fg">{typeLabel}</dd>
+      <Container>
+        {/* Chart */}
+        {area.history && area.history.length > 1 && (
+          <section id="charts" className="scroll-mt-28 mt-6">
+            <div className="border border-border rounded-lg overflow-hidden bg-bg-card">
+              <div className="chart-header">
+                <span className="chart-header-label">
+                  Price &amp; Yield · 12-month history
+                </span>
+                <span className="text-[11px] text-fg-subtle tabular">
+                  {area.history.length} snapshots
+                </span>
               </div>
-              <div>
-                <dt className="text-fg-subtle">City</dt>
-                <dd className="mt-0.5 font-medium text-fg">{area.city}</dd>
+              <div className="p-4">
+                <PriceTrend
+                  data={area.history.map((h) => ({
+                    label: h.snapshot_date.slice(0, 7),
+                    price: h.avg_price_per_sqft,
+                    yield: h.rental_yield,
+                  }))}
+                  height={320}
+                />
               </div>
-              <div>
-                <dt className="text-fg-subtle">Emirate</dt>
-                <dd className="mt-0.5 font-medium text-fg">{area.emirate}</dd>
-              </div>
-              {area.name_arabic && (
-                <div>
-                  <dt className="text-fg-subtle">Arabic</dt>
-                  <dd className="mt-0.5 font-medium text-fg" dir="rtl">
-                    {area.name_arabic}
-                  </dd>
-                </div>
-              )}
-            </dl>
+            </div>
+          </section>
+        )}
+
+        <section id="overview" className="scroll-mt-28 mt-6 grid gap-px bg-border border border-border rounded-lg overflow-hidden lg:grid-cols-3 mb-6">
+          <div className="bg-bg-card p-5 lg:col-span-2">
+            <div className="chart-header-label">About this area</div>
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-fg">
+              {area.description ?? 'No description available for this area yet.'}
+            </p>
+            {area.latest && (
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
+                <Field
+                  label="Avg sale price"
+                  value={formatAED(area.latest.avg_sale_price, { compact: true })}
+                />
+                <Field
+                  label="Annual rent"
+                  value={formatAED(area.latest.avg_annual_rent, { compact: true })}
+                />
+                <Field
+                  label="Occupancy"
+                  value={
+                    area.latest.occupancy_rate != null
+                      ? formatPercent(area.latest.occupancy_rate)
+                      : '—'
+                  }
+                />
+                <Field
+                  label="Demand score"
+                  value={
+                    area.latest.demand_score != null
+                      ? `${area.latest.demand_score.toFixed(1)}/10`
+                      : '—'
+                  }
+                />
+                <Field
+                  label="Risk score"
+                  value={
+                    area.latest.risk_score != null
+                      ? `${area.latest.risk_score.toFixed(1)}/10`
+                      : '—'
+                  }
+                />
+                <Field
+                  label="Transaction volume"
+                  value={
+                    area.latest.transaction_volume != null
+                      ? formatNumber(area.latest.transaction_volume)
+                      : '—'
+                  }
+                />
+              </dl>
+            )}
           </div>
 
-          {hasCoords && (
-            <div className="surface-card p-6">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-                Coordinates
-              </h2>
-              <p className="mt-3 font-mono text-sm text-fg">
-                {area.latitude!.toFixed(5)}, {area.longitude!.toFixed(5)}
-              </p>
-              {mapsUrl && (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-elev px-3.5 text-sm font-medium text-fg transition-colors hover:border-border-strong"
-                >
-                  Open in Google Maps
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-3.5 w-3.5"
-                  >
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                </a>
+          <div id="facts" className="bg-bg-card p-5 scroll-mt-28">
+            <div className="chart-header-label">Quick facts</div>
+            <dl className="mt-3 space-y-3 text-sm">
+              <Field label="Type" value={typeLabel} />
+              <Field label="City" value={area.city} />
+              <Field label="Emirate" value={area.emirate} />
+              {area.name_arabic && (
+                <Field
+                  label="Arabic"
+                  value={
+                    <span dir="rtl" className="text-fg">
+                      {area.name_arabic}
+                    </span>
+                  }
+                />
               )}
-            </div>
-          )}
-        </div>
-      </div>
-    </Container>
+              {hasCoords && (
+                <Field
+                  label="Coordinates"
+                  value={
+                    <span className="tabular">
+                      {area.latitude!.toFixed(4)}, {area.longitude!.toFixed(4)}
+                    </span>
+                  }
+                />
+              )}
+            </dl>
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                id="map"
+                className="mt-5 inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-elev/60 px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors scroll-mt-28"
+              >
+                Open in Google Maps
+                <ExternalLink className="h-3 w-3" strokeWidth={2} />
+              </a>
+            )}
+          </div>
+        </section>
+
+        <div className="pb-10" />
+      </Container>
+    </div>
   );
 }
 
-function MetricCard({
+function Field({
   label,
   value,
-  hint,
-  accent,
 }: {
   label: string;
   value: React.ReactNode;
-  hint?: string;
-  accent?: boolean;
 }) {
   return (
-    <div className="surface-card p-4">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+    <div>
+      <dt className="text-[11px] uppercase tracking-wide text-fg-subtle">
         {label}
-      </div>
-      <div className={`mt-1.5 font-mono text-xl ${accent ? 'text-accent' : 'text-fg'}`}>
-        {value}
-      </div>
-      {hint && <div className="mt-0.5 text-[11px] text-fg-muted">{hint}</div>}
+      </dt>
+      <dd className="mt-0.5 text-sm text-fg tabular">{value}</dd>
     </div>
   );
 }

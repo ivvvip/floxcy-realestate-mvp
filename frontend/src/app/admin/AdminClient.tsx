@@ -26,43 +26,48 @@ export function AdminClient() {
   };
 
   return (
-    <form onSubmit={run} className="surface-card space-y-5 p-6">
-      <div>
-        <label className="text-sm font-medium text-fg-muted">
-          Admin token (X-Admin-Token)
-        </label>
-        <input
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="Enter admin token"
-          className="mt-2 w-full rounded-xl border border-border bg-bg-elev px-4 py-2.5 text-sm text-fg outline-none focus:border-accent"
-        />
+    <form onSubmit={run} className="border border-border rounded-lg bg-bg-card">
+      <div className="chart-header">
+        <span className="chart-header-label">Seed market snapshots</span>
       </div>
+      <div className="p-5 space-y-4">
+        <div>
+          <label className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+            Admin token (X-Admin-Token)
+          </label>
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="Enter admin token"
+            className="input-field mt-1"
+          />
+        </div>
 
-      <button
-        type="submit"
-        disabled={!token || loading}
-        className="inline-flex h-11 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-fg shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? 'Re-seeding…' : 'Re-seed market snapshots'}
-      </button>
+        <button
+          type="submit"
+          disabled={!token || loading}
+          className="inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? 'Re-seeding…' : 'Re-seed market snapshots'}
+        </button>
 
-      {result && !result.error && (
-        <div className="rounded-xl border border-accent/30 bg-accent-muted px-4 py-3 text-sm text-accent">
-          ✓ Seeded {result.snapshots} snapshots across {result.areas} areas.
-        </div>
-      )}
-      {result?.error && (
-        <div className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm text-warn">
-          {result.error}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm text-warn">
-          {error}
-        </div>
-      )}
+        {result && !result.error && (
+          <div className="rounded-md border border-positive/30 bg-positive/10 px-3 py-2 text-xs text-positive tabular">
+            ✓ Seeded {result.snapshots} snapshots across {result.areas} areas.
+          </div>
+        )}
+        {result?.error && (
+          <div className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-negative">
+            {result.error}
+          </div>
+        )}
+        {error && (
+          <div className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-negative">
+            {error}
+          </div>
+        )}
+      </div>
     </form>
   );
 }

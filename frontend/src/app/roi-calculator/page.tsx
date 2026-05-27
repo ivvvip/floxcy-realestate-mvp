@@ -1,31 +1,44 @@
 import type { Metadata } from 'next';
+import { Calculator } from 'lucide-react';
 import { Container } from '@/components/Container';
+import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { RoiCalculator } from './RoiCalculator';
 
 export const metadata: Metadata = {
   title: 'ROI Calculator',
   description:
-    'Model gross yield, net yield, and payback period for any Dubai property in seconds.',
+    'Model gross yield, net yield, and payback period for any UAE property in seconds.',
 };
 
 export default function RoiCalculatorPage() {
   return (
-    <Container size="lg">
-      <header className="pt-14 pb-8 sm:pt-20">
-        <p className="text-sm font-medium uppercase tracking-wider text-accent">
-          Investment Modeling
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-fg sm:text-4xl md:text-5xl">
-          ROI Calculator
-        </h1>
-        <p className="mt-4 max-w-2xl text-fg-muted">
-          Plug in the headline price, annual rent, and ongoing costs. We’ll
-          return gross yield, net yield, and an estimated payback period —
-          straight from our pricing engine.
-        </p>
-      </header>
+    <div className="bg-bg">
+      <div className="border-b border-border">
+        <Container>
+          <div className="pt-4 pb-3">
+            <Breadcrumbs items={[{ label: 'ROI Calculator' }]} />
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-fg-muted" strokeWidth={2} />
+                  <h1 className="text-xl font-semibold text-fg tracking-tight">
+                    ROI Calculator
+                  </h1>
+                </div>
+                <p className="mt-1 text-xs text-fg-muted">
+                  Model gross yield, net yield, and payback for any UAE property
+                </p>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </div>
 
-      <RoiCalculator />
-    </Container>
+      <Container>
+        <div className="py-5">
+          <RoiCalculator />
+        </div>
+      </Container>
+    </div>
   );
 }

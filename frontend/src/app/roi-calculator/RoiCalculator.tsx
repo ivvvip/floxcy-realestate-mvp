@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { Button } from '@/components/Button';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { calculateROI } from '@/lib/api';
-import { formatAED, formatPercent } from '@/lib/format';
+import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { MetricTile } from '@/components/data/MetricTile';
 import type { ROICalculateResponse } from '@/lib/types';
 
 interface FieldProps {
@@ -21,13 +21,12 @@ function Field({ id, label, hint, value, onChange, required, min }: FieldProps) 
   return (
     <label htmlFor={id} className="block">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-fg">{label}</span>
-        {hint && <span className="text-xs text-fg-subtle">{hint}</span>}
-      </div>
-      <div className="relative mt-2">
-        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-fg-subtle">
-          AED
+        <span className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+          {label}
         </span>
+        {hint && <span className="text-[11px] text-fg-subtle">{hint}</span>}
+      </div>
+      <div className="relative mt-1">
         <input
           id={id}
           name={id}
@@ -38,13 +37,12 @@ function Field({ id, label, hint, value, onChange, required, min }: FieldProps) 
           required={required}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            'h-12 w-full rounded-xl border border-border bg-bg-elev/60 pl-14 pr-4 text-base font-medium text-fg',
-            'placeholder:text-fg-subtle outline-none transition-colors',
-            'focus:border-accent/50 focus:bg-bg-elev focus:ring-2 focus:ring-accent/20'
-          )}
+          className="input-field pr-12"
           placeholder="0"
         />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-fg-subtle">
+          AED
+        </span>
       </div>
     </label>
   );
@@ -63,6 +61,7 @@ export function RoiCalculator() {
   const [result, setResult] = useState<ROICalculateResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function update(key: keyof typeof DEFAULTS) {
     return (v: string) => setForm((f) => ({ ...f, [key]: v }));
@@ -74,25 +73,19 @@ export function RoiCalculator() {
     setError(null);
   }
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
+  async function runCalc() {
     const propertyPrice = Number(form.property_price);
     const annualRent = Number(form.annual_rent);
-
     if (!Number.isFinite(propertyPrice) || propertyPrice <= 0) {
       setError('Property price must be greater than 0.');
-      setLoading(false);
       return;
     }
     if (!Number.isFinite(annualRent) || annualRent <= 0) {
       setError('Annual rent must be greater than 0.');
-      setLoading(false);
       return;
     }
-
+    setLoading(true);
+    setError(null);
     try {
       const res = await calculateROI({
         property_price: propertyPrice,
@@ -113,18 +106,41 @@ export function RoiCalculator() {
     }
   }
 
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      runCalc();
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    runCalc();
+  }
+
   return (
-    <div className="grid gap-6 pb-20 lg:grid-cols-5">
+    <div className="grid gap-5 lg:grid-cols-12">
+      {/* Form */}
       <form
         onSubmit={onSubmit}
-        className="surface-card p-7 lg:col-span-3"
+        className="lg:col-span-5 border border-border rounded-lg bg-bg-card h-fit"
         noValidate
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-          Property inputs
-        </h2>
-
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="chart-header">
+          <span className="chart-header-label">Property inputs</span>
+          <button
+            type="button"
+            onClick={reset}
+            className="text-[11px] text-fg-muted hover:text-fg"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
           <Field
             id="property_price"
             label="Property price"
@@ -143,198 +159,164 @@ export function RoiCalculator() {
             required
             min={1}
           />
-          <Field
-            id="service_charges"
-            label="Service charges"
-            hint="Per year"
-            value={form.service_charges}
-            onChange={update('service_charges')}
-          />
-          <Field
-            id="maintenance_cost"
-            label="Maintenance"
-            hint="Per year"
-            value={form.maintenance_cost}
-            onChange={update('maintenance_cost')}
-          />
-          <div className="sm:col-span-2">
+          <div className="grid grid-cols-2 gap-3">
             <Field
-              id="other_costs"
-              label="Other costs"
-              hint="Per year — insurance, agent fees, etc."
-              value={form.other_costs}
-              onChange={update('other_costs')}
+              id="service_charges"
+              label="Service charges"
+              hint="/yr"
+              value={form.service_charges}
+              onChange={update('service_charges')}
+            />
+            <Field
+              id="maintenance_cost"
+              label="Maintenance"
+              hint="/yr"
+              value={form.maintenance_cost}
+              onChange={update('maintenance_cost')}
             />
           </div>
-        </div>
+          <Field
+            id="other_costs"
+            label="Other costs"
+            hint="Insurance, agent, etc."
+            value={form.other_costs}
+            onChange={update('other_costs')}
+          />
 
-        {error && (
-          <div className="mt-5 rounded-xl border border-warn/30 bg-warn-muted px-4 py-3 text-sm text-warn">
-            {error}
+          {error && (
+            <div className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-negative">
+              {error}
+            </div>
+          )}
+
+          <div className="text-[11px] text-fg-subtle">
+            {loading ? 'Recalculating…' : 'Auto-updates on input change'}
           </div>
-        )}
-
-        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={reset}
-            disabled={loading}
-          >
-            Reset
-          </Button>
-          <Button type="submit" loading={loading}>
-            Calculate ROI
-          </Button>
         </div>
       </form>
 
-      <aside className="lg:col-span-2">
-        <ResultPanel result={result} loading={loading} />
-      </aside>
+      {/* Results */}
+      <div className="lg:col-span-7">
+        {!result ? (
+          <div className="border border-border rounded-lg bg-bg-card p-10 text-center min-h-[300px] flex flex-col items-center justify-center">
+            <p className="text-sm text-fg-muted">
+              Fill in inputs to see live yield, payback, and net income.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+              <div className="chart-header">
+                <span className="chart-header-label">Computed metrics</span>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-border">
+                <MetricTile
+                  label="Gross yield"
+                  value={formatPercent(result.gross_yield, 2)}
+                  mono
+                  hint="Rent ÷ price"
+                />
+                <MetricTile
+                  label="Net yield"
+                  value={formatPercent(result.net_yield, 2)}
+                  mono
+                  hint="After costs"
+                  tone={
+                    result.net_yield >= 7
+                      ? 'positive'
+                      : result.net_yield < 4
+                        ? 'negative'
+                        : 'default'
+                  }
+                />
+                <MetricTile
+                  label="Payback"
+                  value={
+                    result.payback_years != null
+                      ? `${result.payback_years.toFixed(1)} yrs`
+                      : '—'
+                  }
+                  mono
+                  hint="Years to recover"
+                />
+                <MetricTile
+                  label="Annual net income"
+                  value={formatAED(result.annual_net_income, { compact: true })}
+                  mono
+                  hint="Per year"
+                />
+              </div>
+            </div>
+
+            <div className="border border-border rounded-lg bg-bg-card p-5">
+              <div className="chart-header-label">Interpretation</div>
+              <p className="mt-2 text-sm leading-relaxed text-fg font-mono">
+                {result.interpretation}
+              </p>
+            </div>
+
+            <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+              <div className="chart-header">
+                <span className="chart-header-label">Cash flow summary</span>
+              </div>
+              <table className="data-table">
+                <tbody>
+                  <Row
+                    label="Property price"
+                    value={formatAED(result.property_price)}
+                  />
+                  <Row
+                    label="Annual rent (gross)"
+                    value={formatAED(result.annual_rent)}
+                  />
+                  <Row
+                    label="Total annual costs"
+                    value={
+                      <span className="text-negative">
+                        −{formatNumber(result.total_costs, 0)}
+                      </span>
+                    }
+                  />
+                  <Row
+                    label="Annual net income"
+                    value={
+                      <span
+                        className={cn(
+                          result.annual_net_income >= 0
+                            ? 'text-positive'
+                            : 'text-negative'
+                        )}
+                      >
+                        {formatNumber(result.annual_net_income, 0)}
+                      </span>
+                    }
+                    emphasize
+                  />
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function MetricCard({
+function Row({
   label,
   value,
-  helper,
-  tone = 'default',
+  emphasize,
 }: {
   label: string;
-  value: string;
-  helper?: string;
-  tone?: 'default' | 'accent' | 'warn';
+  value: React.ReactNode;
+  emphasize?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-border bg-bg-elev/50 p-4',
-        tone === 'accent' && 'border-accent/30 bg-accent-muted',
-        tone === 'warn' && 'border-warn/30 bg-warn-muted'
-      )}
-    >
-      <p className="text-xs font-medium uppercase tracking-wider text-fg-subtle">
+    <tr>
+      <td className={cn('text-fg-muted', emphasize && 'font-medium text-fg')}>
         {label}
-      </p>
-      <p
-        className={cn(
-          'mt-2 text-2xl font-semibold tracking-tight',
-          tone === 'accent' && 'text-accent',
-          tone === 'warn' && 'text-warn',
-          tone === 'default' && 'text-fg'
-        )}
-      >
-        {value}
-      </p>
-      {helper && <p className="mt-1 text-xs text-fg-muted">{helper}</p>}
-    </div>
-  );
-}
-
-function ResultPanel({
-  result,
-  loading,
-}: {
-  result: ROICalculateResponse | null;
-  loading: boolean;
-}) {
-  if (!result && !loading) {
-    return (
-      <div className="surface-card flex h-full min-h-[400px] flex-col items-center justify-center p-7 text-center">
-        <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent-muted text-accent ring-1 ring-accent/20">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            <line x1="12" y1="20" x2="12" y2="10" />
-            <line x1="18" y1="20" x2="18" y2="4" />
-            <line x1="6" y1="20" x2="6" y2="16" />
-          </svg>
-        </span>
-        <h3 className="mt-4 text-lg font-semibold text-fg">Awaiting inputs</h3>
-        <p className="mt-2 max-w-xs text-sm text-fg-muted">
-          Fill in the form and hit <span className="font-medium text-fg">Calculate ROI</span> to
-          see your investment metrics.
-        </p>
-      </div>
-    );
-  }
-
-  if (loading && !result) {
-    return (
-      <div className="surface-card flex h-full min-h-[400px] flex-col items-center justify-center p-7 text-center">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-r-transparent" />
-        <p className="mt-4 text-sm text-fg-muted">Crunching the numbers…</p>
-      </div>
-    );
-  }
-
-  const r = result!;
-  const netTone: 'accent' | 'warn' | 'default' =
-    r.net_yield >= 7 ? 'accent' : r.net_yield < 4 ? 'warn' : 'default';
-
-  return (
-    <div className="surface-card flex h-full flex-col p-7">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-        Results
-      </h2>
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <MetricCard
-          label="Gross yield"
-          value={formatPercent(r.gross_yield)}
-          helper="Annual rent ÷ price"
-        />
-        <MetricCard
-          label="Net yield"
-          value={formatPercent(r.net_yield)}
-          helper="After costs"
-          tone={netTone}
-        />
-        <MetricCard
-          label="Payback"
-          value={
-            r.payback_years != null
-              ? `${r.payback_years.toFixed(1)} yrs`
-              : '—'
-          }
-          helper="Years to recover"
-        />
-        <MetricCard
-          label="Net income"
-          value={formatAED(r.annual_net_income, { compact: true })}
-          helper="Per year"
-        />
-      </div>
-
-      <div className="mt-6 rounded-xl border border-border bg-bg-elev/40 p-4 text-sm">
-        <p className="text-xs font-medium uppercase tracking-wider text-fg-subtle">
-          Interpretation
-        </p>
-        <p className="mt-2 leading-relaxed text-fg">{r.interpretation}</p>
-      </div>
-
-      <dl className="mt-6 grid gap-3 border-t border-border pt-5 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-fg-muted">Property price</dt>
-          <dd className="font-medium text-fg">{formatAED(r.property_price)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-fg-muted">Annual rent</dt>
-          <dd className="font-medium text-fg">{formatAED(r.annual_rent)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-fg-muted">Total annual costs</dt>
-          <dd className="font-medium text-fg">{formatAED(r.total_costs)}</dd>
-        </div>
-      </dl>
-    </div>
+      </td>
+      <td className={cn('num', emphasize && 'font-medium')}>{value}</td>
+    </tr>
   );
 }
