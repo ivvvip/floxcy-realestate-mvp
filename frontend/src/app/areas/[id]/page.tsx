@@ -1,7 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MapPin, ExternalLink, GitCompare, Calculator } from 'lucide-react';
+import {
+  MapPin,
+  ExternalLink,
+  GitCompare,
+  Calculator,
+  Sparkles,
+  ShieldAlert,
+  Target,
+  Info,
+} from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
@@ -9,6 +18,12 @@ import { DataBadge } from '@/components/data/DataBadge';
 import { ApiError, getArea } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
+import {
+  buildInvestmentSummary,
+  interpretRisk,
+  describeOpportunity,
+} from '@/lib/insights';
+import { cn } from '@/lib/cn';
 
 export const revalidate = 60;
 
@@ -51,6 +66,32 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   const hasCoords = area.latitude != null && area.longitude != null;
   const mapsUrl = hasCoords
     ? `https://www.google.com/maps/search/?api=1&query=${area.latitude},${area.longitude}`
+    : null;
+
+  const summary = area.latest
+    ? buildInvestmentSummary(area.name, {
+        rental_yield: area.latest.rental_yield,
+        appreciation_1y: area.latest.appreciation_1y,
+        appreciation_3y: area.latest.appreciation_3y,
+        risk_score: area.latest.risk_score,
+        demand_score: area.latest.demand_score,
+        investment_score: area.latest.investment_score,
+        occupancy_rate: area.latest.occupancy_rate,
+        avg_price_per_sqft: area.latest.avg_price_per_sqft,
+      })
+    : null;
+  const risk = area.latest ? interpretRisk(area.latest.risk_score) : null;
+  const opp = area.latest
+    ? describeOpportunity({
+        rental_yield: area.latest.rental_yield,
+        appreciation_1y: area.latest.appreciation_1y,
+        appreciation_3y: area.latest.appreciation_3y,
+        risk_score: area.latest.risk_score,
+        demand_score: area.latest.demand_score,
+        investment_score: area.latest.investment_score,
+        occupancy_rate: area.latest.occupancy_rate,
+        avg_price_per_sqft: area.latest.avg_price_per_sqft,
+      })
     : null;
 
   return (
@@ -165,29 +206,36 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
       {/* Tab bar (anchor links) */}
       <div className="sticky top-14 z-20 border-b border-border bg-bg/95 backdrop-blur-md">
         <Container>
-          <div className="flex items-center gap-1 text-xs">
+          <div className="flex items-center gap-1 text-xs overflow-x-auto scrollbar-thin">
             <a
-              href="#overview"
-              className="px-3 py-3 border-b-2 border-accent text-fg font-medium"
+              href="#ai-insights"
+              className="px-3 py-3 border-b-2 border-accent text-fg font-medium inline-flex items-center gap-1 whitespace-nowrap"
             >
-              Overview
+              <Sparkles className="h-3 w-3" strokeWidth={2} />
+              AI Insights
             </a>
             <a
               href="#charts"
-              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors whitespace-nowrap"
             >
               Charts
             </a>
             <a
+              href="#overview"
+              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors whitespace-nowrap"
+            >
+              Overview
+            </a>
+            <a
               href="#facts"
-              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+              className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors whitespace-nowrap"
             >
               Facts
             </a>
             {hasCoords && (
               <a
                 href="#map"
-                className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors"
+                className="px-3 py-3 border-b-2 border-transparent text-fg-muted hover:text-fg transition-colors whitespace-nowrap"
               >
                 Map
               </a>
@@ -197,6 +245,117 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
       </div>
 
       <Container>
+        {/* AI Insights panel */}
+        {summary && opp && risk && (
+          <section id="ai-insights" className="scroll-mt-28 mt-6">
+            <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+              <div className="chart-header">
+                <span className="chart-header-label inline-flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                  AI Investment Analysis
+                </span>
+                <span className="text-[11px] text-fg-subtle tabular">
+                  Generated · {new Date().toISOString().slice(0, 10)}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-border">
+                {/* Summary */}
+                <div className="bg-bg-card p-5 lg:col-span-7">
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={cn(
+                        'pill mt-0.5',
+                        opp.tier === 'standout' && 'pill-positive',
+                        opp.tier === 'strong' && 'pill-accent',
+                        opp.tier === 'fair' && 'pill',
+                        opp.tier === 'soft' && 'pill-negative'
+                      )}
+                    >
+                      {opp.label}
+                    </span>
+                  </div>
+                  <h2 className="mt-3 text-lg font-semibold text-fg leading-tight">
+                    {summary.headline}
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+                    {summary.body}
+                  </p>
+                  <ul className="mt-4 space-y-1.5 text-xs">
+                    {summary.bullets.map((b, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-fg-muted"
+                      >
+                        <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                        <span className="tabular">{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Risk + Opportunity panels */}
+                <div className="lg:col-span-5 grid grid-cols-1 divide-y divide-border bg-bg-card">
+                  <div className="p-5">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert
+                        className={cn(
+                          'h-3.5 w-3.5',
+                          risk.tier === 'low' && 'text-positive',
+                          risk.tier === 'moderate' && 'text-fg-muted',
+                          risk.tier === 'elevated' && 'text-warning',
+                          risk.tier === 'high' && 'text-negative'
+                        )}
+                        strokeWidth={2}
+                      />
+                      <span className="chart-header-label">
+                        Risk Interpretation
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-2">
+                      <span
+                        className={cn(
+                          'text-base font-semibold',
+                          risk.tier === 'low' && 'text-positive',
+                          risk.tier === 'moderate' && 'text-fg',
+                          risk.tier === 'elevated' && 'text-warning',
+                          risk.tier === 'high' && 'text-negative'
+                        )}
+                      >
+                        {risk.label}
+                      </span>
+                      {risk.score != null && (
+                        <span className="text-xs tabular text-fg-subtle">
+                          {risk.score.toFixed(1)}/10
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
+                      {risk.rationale}
+                    </p>
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                      <span className="chart-header-label">
+                        Opportunity Drivers
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+                      {opp.rationale}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-border bg-bg-elev/30 px-5 py-2.5 flex items-center gap-2 text-[11px] text-fg-subtle">
+                <Info className="h-3 w-3" strokeWidth={2} />
+                <span>
+                  Analysis is rules-derived from latest market snapshot. Not
+                  investment advice. Methodology v0.1.
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Chart */}
         {area.history && area.history.length > 1 && (
           <section id="charts" className="scroll-mt-28 mt-6">

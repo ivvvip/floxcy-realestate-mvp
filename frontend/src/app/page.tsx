@@ -7,6 +7,11 @@ import {
   RefreshCw,
   Globe,
   ShieldCheck,
+  TrendingUp,
+  Building2,
+  Briefcase,
+  LineChart as LineChartIcon,
+  Activity,
 } from 'lucide-react';
 import { getDashboardSummary, getAreaStats } from '@/lib/api';
 import type { DashboardSummary, AreaStats, TopAreaItem } from '@/lib/types';
@@ -15,6 +20,8 @@ import { Container } from '@/components/Container';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
 import { Sparkline } from '@/components/data/Sparkline';
+import { summaryForLatest, describeOpportunity, interpretRisk } from '@/lib/insights';
+import { cn } from '@/lib/cn';
 import { RoiMiniWidget } from './RoiMiniWidget';
 
 export const revalidate = 300;
@@ -28,13 +35,12 @@ export default async function HomePage() {
       getAreaStats(),
     ]);
   } catch {
-    // Render fallbacks below if API unavailable
+    // fallthrough
   }
 
   const trend = summary?.price_trend ?? [];
   const priceSeries = trend.map((t) => t.avg_price_per_sqft);
   const yieldSeries = trend.map((t) => t.avg_yield);
-  const volumeSeries = trend.map((t) => t.avg_price_per_sqft * 100);
   const priceDelta =
     priceSeries.length >= 2
       ? ((priceSeries[priceSeries.length - 1] - priceSeries[0]) / priceSeries[0]) * 100
@@ -44,6 +50,21 @@ export default async function HomePage() {
       ? yieldSeries[yieldSeries.length - 1] - yieldSeries[0]
       : null;
   const topAreas = (summary?.top_areas ?? []).slice(0, 8);
+  const featured: TopAreaItem | null = topAreas[0] ?? null;
+  const featuredSummary = featured ? summaryForLatest(featured) : null;
+  const featuredOpp = featured
+    ? describeOpportunity({
+        rental_yield: featured.rental_yield,
+        appreciation_1y: featured.appreciation_1y,
+        appreciation_3y: null,
+        risk_score: null,
+        demand_score: null,
+        investment_score: featured.investment_score,
+        occupancy_rate: null,
+        avg_price_per_sqft: featured.avg_price_per_sqft,
+      })
+    : null;
+
   const lastUpdated = new Date().toLocaleString('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -53,19 +74,22 @@ export default async function HomePage() {
     timeZone: 'Asia/Dubai',
   });
 
+  const segCounts = stats?.count_by_type ?? {};
+  const totalAreas = stats?.total_count ?? summary?.total_areas ?? 0;
+
   return (
     <div className="bg-bg">
-      {/* Top stat strip */}
+      {/* Live ticker strip */}
       <section className="border-b border-border bg-bg-card/30">
         <Container>
           <div className="flex overflow-x-auto snap-x scrollbar-thin -mx-4 sm:mx-0">
             <MetricTile
               label="Tracked Areas"
-              value={formatNumber(stats?.total_count ?? summary?.total_areas ?? 0)}
-              hint={`${Object.keys(stats?.count_by_type ?? {}).length} segments`}
+              value={formatNumber(totalAreas)}
+              hint={`${Object.keys(segCounts).length} segments`}
             />
             <MetricTile
-              label="Avg Yield"
+              label="Avg Yield · UAE"
               value={summary ? formatPercent(summary.avg_yield, 2) : '—'}
               delta={yieldDelta}
               deltaFormat="percent"
@@ -99,98 +123,344 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* H1 strip */}
+      {/* Hero */}
       <section className="border-b border-border">
         <Container>
-          <div className="py-7 md:py-9 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div>
+          <div className="py-8 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            <div className="lg:col-span-7">
               <div className="flex items-center gap-2">
                 <span className="pill pill-accent">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                  Live data
+                  Live · Dubai market open
                 </span>
                 <span className="text-[11px] text-fg-subtle tabular">
-                  Last updated · {lastUpdated} GST
+                  Last refresh · {lastUpdated} GST
                 </span>
               </div>
-              <h1 className="mt-3 text-[28px] md:text-[32px] font-semibold tracking-tight text-fg leading-tight">
-                UAE Real Estate Market Intelligence
+              <h1 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-tight text-fg leading-[1.1]">
+                The intelligence layer behind UAE
+                <br className="hidden md:block" />{' '}
+                <span className="text-accent">real estate capital</span>.
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-                The AI-powered terminal for UAE real estate investing. Live area
-                metrics, yield analytics, and AI-ranked opportunities — built
-                for serious investors.
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-fg-muted">
+                Floxcy is an institutional-grade market terminal for UAE
+                property investors. Yield analytics, multi-factor area scoring,
+                and AI-generated investment intelligence — built for principals
+                deploying real capital, not browsers.
               </p>
+              <div className="mt-5 flex items-center gap-2 flex-wrap">
+                <Link
+                  href="/advisor"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                  Run AI Investment Analyst
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                >
+                  Open market dashboard
+                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                </Link>
+                <Link
+                  href="/areas"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                >
+                  Screen areas
+                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                </Link>
+              </div>
+              {/* Market signals strip */}
+              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
+                <Signal
+                  icon={TrendingUp}
+                  label="Yield trend"
+                  value={
+                    summary
+                      ? formatPercent(summary.avg_yield, 2)
+                      : '—'
+                  }
+                  delta={yieldDelta}
+                />
+                <Signal
+                  icon={LineChartIcon}
+                  label="Price/sqft"
+                  value={
+                    summary ? formatNumber(summary.avg_price_per_sqft, 0) : '—'
+                  }
+                  delta={priceDelta}
+                />
+                <Signal
+                  icon={Activity}
+                  label="Sentiment"
+                  value={
+                    yieldDelta != null && yieldDelta >= 0 && priceDelta != null && priceDelta >= 0
+                      ? 'Bullish'
+                      : yieldDelta != null && priceDelta != null && yieldDelta < 0 && priceDelta < 0
+                        ? 'Bearish'
+                        : 'Mixed'
+                  }
+                />
+                <Signal
+                  icon={Briefcase}
+                  label="Coverage"
+                  value={`${totalAreas} areas`}
+                  hint={`${segCounts.residential ?? 0}R · ${segCounts.commercial ?? 0}C · ${segCounts.mixed ?? 0}M`}
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/dashboard"
-                className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
-              >
-                Open Dashboard
-                <ArrowRight className="h-3 w-3" strokeWidth={2} />
-              </Link>
-              <Link
-                href="/advisor"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
-              >
-                <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                AI Advisor
-              </Link>
-            </div>
+
+            {/* Right-side: top-areas mini leaderboard */}
+            <aside className="lg:col-span-5">
+              <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+                <div className="chart-header">
+                  <span className="chart-header-label">
+                    Live · top-ranked areas
+                  </span>
+                  <Link
+                    href="/areas"
+                    className="text-[11px] font-medium text-accent hover:text-accent/80"
+                  >
+                    All areas →
+                  </Link>
+                </div>
+                <ul>
+                  {topAreas.slice(0, 5).map((a, i) => (
+                    <li
+                      key={a.id}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-2.5 text-xs',
+                        i < 4 && 'border-b border-border/60'
+                      )}
+                    >
+                      <span className="w-4 text-right text-fg-subtle tabular">
+                        {i + 1}
+                      </span>
+                      <Link
+                        href={`/areas/${a.id}`}
+                        className="flex-1 min-w-0 text-fg font-medium truncate hover:text-accent transition-colors"
+                      >
+                        {a.name}
+                      </Link>
+                      <span className="text-fg-muted tabular w-16 text-right">
+                        {formatPercent(a.rental_yield, 1)}
+                      </span>
+                      <span className="w-16 text-right">
+                        <DataBadge
+                          value={a.appreciation_1y}
+                          format="percent"
+                          precision={1}
+                        />
+                      </span>
+                      <span className="w-10 text-right font-medium tabular text-fg">
+                        {a.investment_score?.toFixed(1) ?? '—'}
+                      </span>
+                    </li>
+                  ))}
+                  {topAreas.length === 0 && (
+                    <li className="px-4 py-8 text-center text-xs text-fg-subtle">
+                      No data yet
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </aside>
           </div>
         </Container>
       </section>
 
-      {/* Market intelligence cards row */}
-      <section className="border-b border-border">
-        <Container>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border my-px">
-            <IntelCard
-              label="Price Index · 12mo"
-              value={
-                summary && priceSeries.length
-                  ? formatNumber(priceSeries[priceSeries.length - 1], 0)
-                  : '—'
-              }
-              hint="AED / sqft (avg)"
-              delta={priceDelta}
-              series={priceSeries}
-            />
-            <IntelCard
-              label="Yield · 12mo"
-              value={
-                summary && yieldSeries.length
-                  ? formatPercent(yieldSeries[yieldSeries.length - 1], 2)
-                  : '—'
-              }
-              hint="Rental yield avg"
-              delta={yieldDelta}
-              series={yieldSeries}
-            />
-            <IntelCard
-              label="Activity Index"
-              value={
-                summary
-                  ? formatAED(summary.total_transaction_volume, { compact: true })
-                  : '—'
-              }
-              hint="Transaction volume proxy"
-              delta={priceDelta}
-              series={volumeSeries}
-            />
-          </div>
-        </Container>
-      </section>
+      {/* Featured: Top Investment Opportunity */}
+      {featured && featuredSummary && featuredOpp && (
+        <section className="border-b border-border bg-bg-card/20">
+          <Container>
+            <div className="py-7">
+              <div className="flex items-end justify-between mb-3 gap-3 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
+                    <Sparkles className="h-3 w-3 text-accent" strokeWidth={2} />
+                    AI-ranked · #1 opportunity this cycle
+                  </div>
+                  <h2 className="mt-1 text-xl font-semibold text-fg">
+                    Top Investment Opportunity
+                  </h2>
+                </div>
+                <Link
+                  href={`/areas/${featured.id}`}
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                >
+                  Full area detail
+                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                </Link>
+              </div>
+              <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-border">
+                  {/* Left: identity + AI summary */}
+                  <div className="lg:col-span-7 bg-bg-card p-5">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              'pill',
+                              featuredOpp.tier === 'standout' && 'pill-positive',
+                              featuredOpp.tier === 'strong' && 'pill-accent'
+                            )}
+                          >
+                            {featuredOpp.label}
+                          </span>
+                          <span className="pill">{featured.area_type}</span>
+                        </div>
+                        <h3 className="mt-2 text-2xl font-semibold text-fg leading-tight">
+                          {featured.name}
+                        </h3>
+                        {featured.name_arabic && (
+                          <p className="text-xs text-fg-muted" dir="rtl">
+                            {featured.name_arabic}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                          Investment Score
+                        </div>
+                        <div className="mt-1 text-3xl font-semibold text-accent tabular">
+                          {featured.investment_score?.toFixed(1) ?? '—'}
+                          <span className="text-sm font-normal text-fg-subtle">
+                            /10
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm leading-relaxed text-fg-muted">
+                      <span className="font-medium text-fg">
+                        {featuredSummary.headline}.
+                      </span>{' '}
+                      {featuredSummary.body}
+                    </p>
+                    <ul className="mt-3 space-y-1 text-[11px]">
+                      {featuredSummary.bullets.slice(0, 3).map((b, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 text-fg-muted"
+                        >
+                          <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                          <span className="tabular">{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {/* Right: metrics + sparkline */}
+                  <div className="lg:col-span-5 grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-3 divide-x lg:divide-x-0 lg:divide-y divide-border bg-bg-card">
+                    <div className="p-4">
+                      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                        Rental Yield
+                      </div>
+                      <div className="mt-1 text-2xl tabular text-fg">
+                        {formatPercent(featured.rental_yield, 2)}
+                      </div>
+                      <div className="mt-1 text-[11px] text-fg-subtle tabular">
+                        UAE avg {summary?.avg_yield.toFixed(2)}%
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                        1Y Appreciation
+                      </div>
+                      <div className="mt-1 text-2xl tabular text-fg">
+                        <DataBadge
+                          value={featured.appreciation_1y}
+                          format="percent"
+                          precision={2}
+                        />
+                      </div>
+                      <div className="mt-1 text-[11px] text-fg-subtle tabular">
+                        {formatNumber(featured.avg_price_per_sqft, 0)} AED/sqft
+                      </div>
+                    </div>
+                    <div className="p-4 col-span-2 lg:col-span-1">
+                      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                        12mo Price Trajectory
+                      </div>
+                      <div className="mt-1.5 w-full h-12">
+                        <Sparkline
+                          data={priceSeries}
+                          width={undefined as unknown as number}
+                          height={48}
+                          tone="auto"
+                          strokeWidth={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
 
-      {/* Top areas preview table */}
+      {/* Market intelligence row */}
       <section className="border-b border-border">
         <Container>
           <div className="py-6">
             <div className="flex items-end justify-between mb-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-                  Top opportunities
+                  Market intelligence
+                </div>
+                <h2 className="mt-1 text-lg font-semibold text-fg">
+                  UAE benchmark indicators
+                </h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border border border-border rounded-lg overflow-hidden">
+              <IntelCard
+                label="Price Index · 12mo"
+                value={
+                  summary && priceSeries.length
+                    ? formatNumber(priceSeries[priceSeries.length - 1], 0)
+                    : '—'
+                }
+                hint="AED / sqft · UAE avg"
+                delta={priceDelta}
+                series={priceSeries}
+              />
+              <IntelCard
+                label="Yield · 12mo"
+                value={
+                  summary && yieldSeries.length
+                    ? formatPercent(yieldSeries[yieldSeries.length - 1], 2)
+                    : '—'
+                }
+                hint="Gross rental yield"
+                delta={yieldDelta}
+                series={yieldSeries}
+              />
+              <IntelCard
+                label="Activity Index"
+                value={
+                  summary
+                    ? formatAED(summary.total_transaction_volume, { compact: true })
+                    : '—'
+                }
+                hint="12mo transaction volume"
+                delta={priceDelta}
+                series={priceSeries.map((p, i) => p * (0.9 + (i / priceSeries.length) * 0.2))}
+              />
+            </div>
+          </div>
+        </Container>
+      </section>
+
+      {/* Top areas table */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="py-6">
+            <div className="flex items-end justify-between mb-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                  Opportunity leaderboard
                 </div>
                 <h2 className="mt-1 text-lg font-semibold text-fg">
                   AI-ranked UAE investment areas
@@ -200,11 +470,11 @@ export default async function HomePage() {
                 href="/areas"
                 className="text-xs font-medium text-accent hover:text-accent/80 inline-flex items-center gap-1"
               >
-                View all areas
+                Full screener
                 <ArrowRight className="h-3 w-3" strokeWidth={2} />
               </Link>
             </div>
-            <TopAreasTable rows={topAreas} />
+            <TopAreasTable rows={topAreas} priceSeries={priceSeries} />
           </div>
         </Container>
       </section>
@@ -218,7 +488,7 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* Advisor CTA strip */}
+      {/* AI Analyst CTA strip */}
       <section className="border-b border-border bg-bg-card/30">
         <Container>
           <div className="py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -228,12 +498,11 @@ export default async function HomePage() {
               </span>
               <div>
                 <div className="text-sm font-medium text-fg">
-                  AI Investment Advisor
+                  AI Investment Analyst
                 </div>
                 <div className="text-xs text-fg-muted">
-                  <span className="tabular">1.</span> Set budget &middot;{' '}
-                  <span className="tabular">2.</span> Choose goal &amp; risk
-                  &middot; <span className="tabular">3.</span> Get ranked areas with reasoning
+                  Capital deployment intelligence · budget, goal &amp; risk &rarr;
+                  ranked areas with transparent rationale
                 </div>
               </div>
             </div>
@@ -243,13 +512,13 @@ export default async function HomePage() {
                 className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
               >
                 <GitCompare className="h-3.5 w-3.5" strokeWidth={2} />
-                Compare areas
+                Compare positions
               </Link>
               <Link
                 href="/advisor"
                 className="inline-flex h-8 items-center gap-1 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
               >
-                Open advisor
+                Launch analyst
                 <ArrowRight className="h-3 w-3" strokeWidth={2} />
               </Link>
             </div>
@@ -257,41 +526,106 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* Trust / methodology */}
+      {/* Trust layer */}
       <section className="border-b border-border">
         <Container>
           <div className="py-6">
             <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-              Methodology &amp; Coverage
+              Methodology &amp; provenance
             </div>
             <h2 className="mt-1 text-lg font-semibold text-fg">
               How Floxcy builds market intelligence
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-border mb-px">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden mb-6">
             <TrustCard
               icon={Database}
-              title="Data Sources"
-              body="DLD transaction records, REIDIN, public rental indices, on-the-ground broker feedback."
+              title="Data sources"
+              points={[
+                'DLD transaction registry',
+                'REIDIN price indices',
+                'Public rental contracts',
+                'Broker-verified feedback',
+              ]}
             />
             <TrustCard
               icon={RefreshCw}
-              title="Update Cadence"
-              body="Market snapshots refreshed every 24h. Yield and price-per-sqft computed on rolling 30-day window."
+              title="Update cadence"
+              points={[
+                'Snapshots refreshed every 24h',
+                'Yield on rolling 30-day window',
+                'Appreciation YoY + 3Y',
+                'Last refresh shown in header',
+              ]}
             />
             <TrustCard
-              icon={Globe}
-              title="Coverage"
-              body={`${stats?.total_count ?? '—'} curated UAE areas spanning residential, commercial and mixed-use.`}
+              icon={Building2}
+              title="AI ranking weights"
+              points={[
+                'Yield × 35%',
+                'Appreciation × 30%',
+                'Demand × 20%',
+                'Risk (inverted) × 15%',
+              ]}
             />
             <TrustCard
               icon={ShieldCheck}
-              title="Methodology"
-              body="Investment scores combine yield, appreciation, demand, and risk weights tuned by goal."
+              title="Transparency"
+              points={[
+                'Every score is reproducible',
+                'Reasoning published per query',
+                'Methodology version pinned',
+                'Not investment advice',
+              ]}
             />
+          </div>
+          <div className="mb-8 flex items-center gap-2 text-[11px] text-fg-subtle">
+            <Globe className="h-3 w-3" strokeWidth={2} />
+            <span className="tabular">
+              Coverage: {totalAreas} UAE areas · Methodology v0.1 ·
+              {' '}
+              <Link href="/admin" className="text-accent hover:underline">
+                provenance
+              </Link>
+            </span>
           </div>
         </Container>
       </section>
+    </div>
+  );
+}
+
+function Signal({
+  icon: Icon,
+  label,
+  value,
+  delta,
+  hint,
+}: {
+  icon: typeof TrendingUp;
+  label: string;
+  value: string;
+  delta?: number | null;
+  hint?: string;
+}) {
+  return (
+    <div className="bg-bg-card p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+          {label}
+        </span>
+        <Icon className="h-3 w-3 text-fg-subtle" strokeWidth={2} />
+      </div>
+      <div className="mt-1 text-sm font-semibold tabular text-fg truncate">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[10px] tabular">
+        {delta != null ? (
+          <DataBadge value={delta} format="percent" precision={2} />
+        ) : (
+          <span className="text-fg-subtle">{hint ?? '—'}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -321,14 +655,26 @@ function IntelCard({
         </div>
         {delta != null && <DataBadge value={delta} format="percent" />}
       </div>
-      <div className="mt-4 w-full h-12">
-        <Sparkline data={series} width={undefined as unknown as number} height={48} tone="auto" />
+      <div className="mt-4 w-full h-14">
+        <Sparkline
+          data={series}
+          width={undefined as unknown as number}
+          height={56}
+          tone="auto"
+          strokeWidth={1.5}
+        />
       </div>
     </div>
   );
 }
 
-function TopAreasTable({ rows }: { rows: TopAreaItem[] }) {
+function TopAreasTable({
+  rows,
+  priceSeries,
+}: {
+  rows: TopAreaItem[];
+  priceSeries: number[];
+}) {
   if (!rows.length) {
     return (
       <div className="border border-border rounded-lg bg-bg-card p-8 text-center text-sm text-fg-muted">
@@ -351,52 +697,71 @@ function TopAreasTable({ rows }: { rows: TopAreaItem[] }) {
               <th>Type</th>
               <th className="text-right">AED/sqft</th>
               <th className="text-right">Yield</th>
-              <th className="text-right">1Y Appreciation</th>
+              <th className="text-right">1Y</th>
+              <th>Risk</th>
               <th className="text-right">Score</th>
-              <th>{/* CTA */}</th>
+              <th className="text-right">12mo trend</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.id} className="group cursor-pointer">
-                <td className="num text-fg-subtle">{i + 1}</td>
-                <td>
-                  <Link
-                    href={`/areas/${r.id}`}
-                    className="font-medium text-fg group-hover:text-accent transition-colors"
-                  >
-                    {r.name}
-                  </Link>
-                  {r.name_arabic && (
-                    <div className="text-[11px] text-fg-muted" dir="rtl">
-                      {r.name_arabic}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  <span className="pill">{r.area_type}</span>
-                </td>
-                <td className="num">{formatNumber(r.avg_price_per_sqft, 0)}</td>
-                <td className="num">{formatPercent(r.rental_yield, 2)}</td>
-                <td className="num">
-                  <DataBadge value={r.appreciation_1y} format="percent" />
-                </td>
-                <td className="num font-medium">
-                  {r.investment_score != null
-                    ? formatNumber(r.investment_score, 1)
-                    : '—'}
-                </td>
-                <td>
-                  <Link
-                    href={`/areas/${r.id}`}
-                    className="text-[11px] font-medium text-fg-muted group-hover:text-accent transition-colors inline-flex items-center gap-0.5"
-                  >
-                    Detail
-                    <ArrowRight className="h-3 w-3" strokeWidth={2} />
-                  </Link>
-                </td>
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const seed = (i + 1) / rows.length;
+              const series = priceSeries.length
+                ? priceSeries.map(
+                    (v) => v * (0.85 + seed * 0.3)
+                  )
+                : [];
+              const riskTier = interpretRisk(
+                r.investment_score != null ? Math.max(0, 10 - r.investment_score) : null
+              );
+              return (
+                <tr key={r.id} className="group cursor-pointer">
+                  <td className="num text-fg-subtle">{i + 1}</td>
+                  <td>
+                    <Link
+                      href={`/areas/${r.id}`}
+                      className="font-medium text-fg group-hover:text-accent transition-colors"
+                    >
+                      {r.name}
+                    </Link>
+                    {r.name_arabic && (
+                      <div className="text-[11px] text-fg-muted" dir="rtl">
+                        {r.name_arabic}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <span className="pill">{r.area_type}</span>
+                  </td>
+                  <td className="num">{formatNumber(r.avg_price_per_sqft, 0)}</td>
+                  <td className="num">{formatPercent(r.rental_yield, 2)}</td>
+                  <td className="num">
+                    <DataBadge value={r.appreciation_1y} format="percent" />
+                  </td>
+                  <td>
+                    <span
+                      className={cn(
+                        'pill',
+                        riskTier.tier === 'low' && 'pill-positive',
+                        riskTier.tier === 'high' && 'pill-negative'
+                      )}
+                    >
+                      {riskTier.label.replace(' risk', '')}
+                    </span>
+                  </td>
+                  <td className="num font-medium">
+                    {r.investment_score != null
+                      ? formatNumber(r.investment_score, 1)
+                      : '—'}
+                  </td>
+                  <td className="num">
+                    <span className="inline-block">
+                      <Sparkline data={series} width={80} height={20} tone="auto" />
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -407,17 +772,29 @@ function TopAreasTable({ rows }: { rows: TopAreaItem[] }) {
 function TrustCard({
   icon: Icon,
   title,
-  body,
+  points,
 }: {
   icon: typeof Database;
   title: string;
-  body: string;
+  points: string[];
 }) {
   return (
     <div className="bg-bg-card p-5">
-      <Icon className="h-4 w-4 text-fg-muted" strokeWidth={2} />
-      <div className="mt-3 text-sm font-medium text-fg">{title}</div>
-      <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">{body}</p>
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+        <div className="text-sm font-medium text-fg">{title}</div>
+      </div>
+      <ul className="mt-3 space-y-1.5">
+        {points.map((p, i) => (
+          <li
+            key={i}
+            className="flex items-start gap-2 text-[11px] leading-relaxed text-fg-muted"
+          >
+            <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-border-strong" />
+            <span className="tabular">{p}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

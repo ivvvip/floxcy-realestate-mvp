@@ -28,7 +28,7 @@ export function Footer() {
               <li><Link href="/dashboard" className="text-fg-muted hover:text-fg transition-colors">Dashboard</Link></li>
               <li><Link href="/areas" className="text-fg-muted hover:text-fg transition-colors">Areas</Link></li>
               <li><Link href="/compare" className="text-fg-muted hover:text-fg transition-colors">Compare</Link></li>
-              <li><Link href="/advisor" className="text-fg-muted hover:text-fg transition-colors">Advisor</Link></li>
+              <li><Link href="/advisor" className="text-fg-muted hover:text-fg transition-colors">AI Investment Analyst</Link></li>
               <li><Link href="/roi-calculator" className="text-fg-muted hover:text-fg transition-colors">ROI Calculator</Link></li>
             </ul>
           </div>

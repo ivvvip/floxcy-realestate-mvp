@@ -11,7 +11,7 @@ const LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/areas', label: 'Areas' },
   { href: '/compare', label: 'Compare' },
-  { href: '/advisor', label: 'Advisor' },
+  { href: '/advisor', label: 'AI Analyst' },
   { href: '/roi-calculator', label: 'ROI' },
 ];
 

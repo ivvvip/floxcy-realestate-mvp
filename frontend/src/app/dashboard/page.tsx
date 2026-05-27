@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, LayoutDashboard } from 'lucide-react';
+import { ArrowUpRight, LayoutDashboard, TrendingUp } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
@@ -7,6 +7,7 @@ import { DataBadge } from '@/components/data/DataBadge';
 import { Sparkline } from '@/components/data/Sparkline';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { YieldBar } from '@/components/charts/YieldBar';
+import { AppreciationArea } from '@/components/charts/AppreciationArea';
 import { getDashboardSummary, getAreas } from '@/lib/api';
 import { formatPercent, formatNumber, formatAED } from '@/lib/format';
 import type { DashboardSummary, Area } from '@/lib/types';
@@ -52,8 +53,16 @@ export default async function DashboardPage() {
   }));
 
   const yieldData = summary.top_areas
-    .slice(0, 5)
+    .slice(0, 8)
     .map((a) => ({ name: a.name, value: a.rental_yield }));
+
+  const appreciationData = summary.price_trend.length >= 2
+    ? summary.price_trend.map((p, i, arr) => {
+        const ref = arr[Math.max(0, i - 12)]?.avg_price_per_sqft ?? arr[0].avg_price_per_sqft;
+        const change = ref ? ((p.avg_price_per_sqft - ref) / ref) * 100 : 0;
+        return { label: p.month, value: Number(change.toFixed(2)) };
+      })
+    : [];
 
   const priceSeries = summary.price_trend.map((t) => t.avg_price_per_sqft);
   const yieldSeries = summary.price_trend.map((t) => t.avg_yield);
@@ -167,34 +176,75 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
+      {/* Charts — institutional dashboard layout */}
       <Container>
-        <div className="grid gap-px bg-border my-6 lg:grid-cols-2 border border-border rounded-lg overflow-hidden">
-          <div className="bg-bg-card">
+        {/* Row 1: big Price/Yield + Appreciation side panel */}
+        <div className="grid gap-px bg-border mt-6 lg:grid-cols-12 border border-border rounded-lg overflow-hidden">
+          <div className="bg-bg-card lg:col-span-8">
             <div className="chart-header">
-              <span className="chart-header-label">
-                Price &amp; Yield Trend · 12mo
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
+                Price &amp; Yield Trend
               </span>
               <span className="flex items-center gap-1 text-[11px] text-fg-subtle">
                 <span className="pill">1M</span>
+                <span className="pill">3M</span>
                 <span className="pill pill-accent">12M</span>
                 <span className="pill">3Y</span>
               </span>
             </div>
             <div className="p-4">
-              <PriceTrend data={trendData} height={260} />
+              <PriceTrend data={trendData} height={360} />
+            </div>
+            <div className="px-4 py-2 border-t border-border text-[11px] text-fg-subtle tabular flex items-center justify-between">
+              <span>Series: AED/sqft (L) · Yield % (R)</span>
+              <span>n={trendData.length} snapshots</span>
             </div>
           </div>
-          <div className="bg-bg-card">
+          <div className="bg-bg-card lg:col-span-4">
             <div className="chart-header">
-              <span className="chart-header-label">Top areas by yield</span>
-              <span className="text-[11px] text-fg-subtle tabular">
-                Top {yieldData.length}
+              <span className="chart-header-label">
+                Appreciation Trend · 12mo
               </span>
+              <span className="text-[11px] text-fg-subtle tabular">YoY</span>
             </div>
             <div className="p-4">
-              <YieldBar data={yieldData} height={260} />
+              <AppreciationArea data={appreciationData} height={240} />
             </div>
+            <div className="px-4 py-2 border-t border-border text-[11px] text-fg-subtle">
+              <p className="leading-relaxed">
+                Derived from rolling 12-month price change against trailing window.
+                {summary.top_performer && (
+                  <>
+                    {' '}
+                    Top mover:{' '}
+                    <Link
+                      href={`/areas/${summary.top_performer.id}`}
+                      className="text-accent hover:underline"
+                    >
+                      {summary.top_performer.name}
+                    </Link>
+                    .
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Yield distribution */}
+        <div className="mt-px border border-border rounded-lg overflow-hidden bg-bg-card mt-6">
+          <div className="chart-header">
+            <span className="chart-header-label">Yield distribution · top areas</span>
+            <span className="text-[11px] text-fg-subtle tabular">
+              Top {yieldData.length}
+            </span>
+          </div>
+          <div className="p-4">
+            <YieldBar data={yieldData} height={320} />
+          </div>
+          <div className="px-4 py-2 border-t border-border text-[11px] text-fg-subtle">
+            Gross rental yield by area. UAE benchmark ~6.5%.
           </div>
         </div>
 
