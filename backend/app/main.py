@@ -1,19 +1,53 @@
 """FastAPI application entry point."""
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.api.routes import health, areas, roi, dashboard, compare, advisor, admin
+from app.core.middleware import RequestLogMiddleware, SecurityHeadersMiddleware
+from app.api.routes import (
+    health,
+    areas,
+    roi,
+    dashboard,
+    compare,
+    advisor,
+    admin,
+    auth,
+    opportunities,
+    rankings,
+    alerts,
+    methodology,
+)
+from app.services.bootstrap import ensure_bootstrap_admin
+
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("floxcy")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events."""
-    print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    print(f"📊 Environment: {settings.ENVIRONMENT}")
+    logger.info(
+        "Starting %s v%s [%s]",
+        settings.APP_NAME,
+        settings.APP_VERSION,
+        settings.ENVIRONMENT,
+    )
+    try:
+        await ensure_bootstrap_admin()
+    except Exception:
+        logger.exception("bootstrap admin failed — continuing without it")
     yield
-    print(f"👋 Shutting down {settings.APP_NAME}")
+    logger.info("Shutting down %s", settings.APP_NAME)
 
 
 app = FastAPI(
@@ -25,39 +59,89 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+
+# ---- Middleware (order: innermost added first) ----
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    enable_hsts=settings.ENVIRONMENT != "development",
+)
+app.add_middleware(RequestLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept", "X-API-Key", "X-Requested-With"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
-# Include routers (compare before areas so /areas/compare matches first)
+
+# ---- Error handlers — never leak stack traces ----
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.__class__.__name__, "detail": exc.detail},
+        headers=exc.headers or {},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "ValidationError",
+            "detail": "Request validation failed",
+            "errors": exc.errors(),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("unhandled exception path=%s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_error", "detail": "An unexpected error occurred."},
+    )
+
+
+# ---- Routers (compare before areas so /areas/compare matches first) ----
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(compare.router)
 app.include_router(areas.router)
 app.include_router(roi.router)
 app.include_router(dashboard.router)
 app.include_router(advisor.router)
+app.include_router(opportunities.router)
+app.include_router(rankings.router)
+app.include_router(alerts.router)
+app.include_router(methodology.router)
 app.include_router(admin.router)
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "docs": "/docs",
         "health": "/health",
         "endpoints": {
+            "auth_login": "/api/v1/auth/login",
             "areas": "/api/v1/areas",
             "areas_compare": "/api/v1/areas/compare?ids=...",
             "areas_stats": "/api/v1/areas/stats",
+            "area_confidence": "/api/v1/areas/{id}/confidence",
             "roi": "/api/v1/roi/calculate",
             "dashboard": "/api/v1/dashboard/summary",
             "advisor": "/api/v1/advisor/query",
-            "admin_seed": "/api/v1/admin/seed",
-        }
+            "opportunities": "/api/v1/opportunities",
+            "rankings": "/api/v1/rankings?by=yield|appreciation|score|low_risk|volume|price_low",
+            "alerts": "/api/v1/alerts",
+            "methodology": "/api/v1/methodology",
+        },
     }

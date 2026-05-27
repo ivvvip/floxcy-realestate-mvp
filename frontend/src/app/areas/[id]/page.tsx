@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -24,6 +24,8 @@ import {
   describeOpportunity,
 } from '@/lib/insights';
 import { cn } from '@/lib/cn';
+import { ConfidenceBadge, ConfidenceWarningBanner } from '@/components/data/ConfidenceBadge';
+import type { ConfidenceReport } from '@/lib/types';
 
 export const revalidate = 60;
 
@@ -60,6 +62,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
+  }
+
+  let confidence: ConfidenceReport | null = null;
+  try {
+    const c = await getAreaConfidence(params.id);
+    confidence = c;
+  } catch {
+    confidence = null;
   }
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
@@ -245,6 +255,20 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
       </div>
 
       <Container>
+        {/* Low-confidence banner (only if low) */}
+        {confidence && confidence.level === 'low' && (
+          <div className="mt-5">
+            <ConfidenceWarningBanner report={confidence} />
+          </div>
+        )}
+
+        {/* Confidence summary */}
+        {confidence && (
+          <div className="mt-5">
+            <ConfidenceBadge report={confidence} />
+          </div>
+        )}
+
         {/* AI Insights panel */}
         {summary && opp && risk && (
           <section id="ai-insights" className="scroll-mt-28 mt-6">

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
 from app.models.market_snapshot import MarketSnapshot
@@ -16,8 +17,13 @@ from app.schemas.area import (
     AreaSnapshotPoint,
     AreaListItem,
 )
+from app.services.confidence import build_confidence_report, confidence_to_dict
 
-router = APIRouter(prefix="/api/v1/areas", tags=["areas"])
+router = APIRouter(
+    prefix="/api/v1/areas",
+    tags=["areas"],
+    dependencies=[Depends(rate_limit_dependency)],
+)
 
 
 @router.get("", response_model=List[AreaListItem])
@@ -91,6 +97,27 @@ async def get_areas_stats(db: AsyncSession = Depends(get_db)):
         count_by_type=count_by_type,
         area_names=area_names,
     )
+
+
+@router.get("/{area_id}/confidence")
+async def area_confidence(area_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Data confidence breakdown for a single area."""
+    area = (await db.execute(select(Area).where(Area.id == area_id))).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+    snaps = (
+        await db.execute(
+            select(MarketSnapshot)
+            .where(MarketSnapshot.area_id == area_id)
+            .order_by(MarketSnapshot.snapshot_date)
+        )
+    ).scalars().all()
+    report = build_confidence_report(area, list(snaps))
+    return {
+        "area_id": str(area_id),
+        "area_name": area.name,
+        **confidence_to_dict(report),
+    }
 
 
 @router.get("/{area_id}", response_model=AreaDetailResponse)

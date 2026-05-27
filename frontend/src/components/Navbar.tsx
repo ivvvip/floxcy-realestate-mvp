@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 const LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/areas', label: 'Areas' },
+  { href: '/opportunities', label: 'Opportunities' },
   { href: '/compare', label: 'Compare' },
   { href: '/advisor', label: 'AI Analyst' },
   { href: '/roi-calculator', label: 'ROI' },

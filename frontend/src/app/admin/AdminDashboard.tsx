@@ -1,0 +1,461 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock } from 'lucide-react';
+import {
+  ApiError,
+  adminListApiKeys,
+  adminListAuditLog,
+  adminListUsers,
+  adminSeed,
+  adminCreateApiKey,
+  adminRevokeApiKey,
+  authLogout,
+  authMe,
+} from '@/lib/api';
+import type {
+  ApiKeyCreateResponse,
+  ApiKeyPublic,
+  AuditLogEntry,
+  MeResponse,
+} from '@/lib/types';
+import { cn } from '@/lib/cn';
+
+export function AdminDashboard() {
+  const router = useRouter();
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [users, setUsers] = useState<MeResponse[]>([]);
+  const [keys, setKeys] = useState<ApiKeyPublic[]>([]);
+  const [audit, setAudit] = useState<AuditLogEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [seedResult, setSeedResult] = useState<string | null>(null);
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [newKey, setNewKey] = useState<ApiKeyCreateResponse | null>(null);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyTier, setNewKeyTier] = useState<'free' | 'pro' | 'api' | 'enterprise'>('pro');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const m = await authMe();
+        setMe(m);
+        setAuthChecked(true);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace('/admin/login');
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Auth check failed');
+        setAuthChecked(true);
+      }
+    })();
+  }, [router]);
+
+  async function refresh() {
+    setError(null);
+    try {
+      const [u, k, a] = await Promise.all([
+        adminListUsers().catch(() => []),
+        adminListApiKeys().catch(() => []),
+        adminListAuditLog({ limit: 50 }).catch(() => []),
+      ]);
+      setUsers(u);
+      setKeys(k);
+      setAudit(a);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refresh failed');
+    }
+  }
+
+  useEffect(() => {
+    if (me) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
+  async function doSeed() {
+    setSeedLoading(true);
+    setSeedResult(null);
+    try {
+      const r = await adminSeed();
+      setSeedResult(`✓ Seeded ${r.snapshots} snapshots across ${r.areas} areas.`);
+      refresh();
+    } catch (err) {
+      setSeedResult(err instanceof Error ? err.message : 'Seed failed');
+    } finally {
+      setSeedLoading(false);
+    }
+  }
+
+  async function createKey() {
+    if (!newKeyName) return;
+    try {
+      const k = await adminCreateApiKey({ name: newKeyName, tier: newKeyTier });
+      setNewKey(k);
+      setNewKeyName('');
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Create key failed');
+    }
+  }
+
+  async function revokeKey(id: string) {
+    if (!confirm('Revoke this API key permanently?')) return;
+    try {
+      await adminRevokeApiKey(id);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Revoke failed');
+    }
+  }
+
+  async function logout() {
+    try {
+      await authLogout();
+    } catch {
+      // ignore
+    }
+    router.replace('/admin/login');
+    router.refresh();
+  }
+
+  if (!authChecked) {
+    return <div className="text-sm text-fg-muted">Checking session…</div>;
+  }
+
+  if (!me) {
+    return (
+      <div className="border border-border rounded-lg bg-bg-card p-6 text-center">
+        <p className="text-sm text-fg-muted">Not authenticated.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Session bar */}
+      <div className="flex items-center justify-between border border-border rounded-lg bg-bg-card px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="pill pill-accent">{me.role}</span>
+          <span className="text-sm text-fg">{me.username}</span>
+          {me.email && <span className="text-xs text-fg-muted">{me.email}</span>}
+        </div>
+        <button
+          type="button"
+          onClick={logout}
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-elev/40 px-2.5 text-xs text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+        >
+          <LogOut className="h-3 w-3" strokeWidth={2} />
+          Sign out
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-negative">
+          {error}
+        </div>
+      )}
+
+      {/* Data ops */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} />
+            Data operations
+          </span>
+        </div>
+        <div className="p-4 flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={doSeed}
+            disabled={seedLoading || me.role !== 'admin'}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {seedLoading ? 'Seeding…' : 'Re-seed market snapshots'}
+          </button>
+          <span className="text-[11px] text-fg-subtle">
+            Clears and re-inserts 12 monthly snapshots per area
+          </span>
+          {seedResult && (
+            <span
+              className={cn(
+                'text-[11px] tabular',
+                seedResult.startsWith('✓') ? 'text-positive' : 'text-negative'
+              )}
+            >
+              {seedResult}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* API keys */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" strokeWidth={2} />
+            API keys
+          </span>
+          <span className="text-[11px] text-fg-subtle tabular">
+            {keys.length} total
+          </span>
+        </div>
+        {newKey && (
+          <div className="border-b border-border bg-positive/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wide text-positive font-medium">
+              New key — copy now, you won&apos;t see it again
+            </div>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <code className="font-mono text-xs bg-bg/80 px-2 py-1 rounded border border-border text-fg break-all">
+                {newKey.full_key}
+              </code>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(newKey.full_key)}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-elev/60 px-2 text-[11px] text-fg-muted hover:text-fg"
+              >
+                <Copy className="h-3 w-3" strokeWidth={2} />
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewKey(null)}
+                className="text-[11px] text-fg-muted hover:text-fg ml-auto"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-end border-b border-border">
+          <div>
+            <label className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+              New key name
+            </label>
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="e.g. acme-corp-prod"
+              className="input-field mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+              Tier
+            </label>
+            <select
+              value={newKeyTier}
+              onChange={(e) => setNewKeyTier(e.target.value as typeof newKeyTier)}
+              className="input-field mt-1"
+            >
+              <option value="free">free</option>
+              <option value="pro">pro</option>
+              <option value="api">api</option>
+              <option value="enterprise">enterprise</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={createKey}
+            disabled={!newKeyName || me.role !== 'admin'}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Issue
+          </button>
+        </div>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Prefix</th>
+                <th>Name</th>
+                <th>Tier</th>
+                <th className="text-right">Rate/min</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {keys.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center text-fg-subtle py-6">
+                    No API keys yet.
+                  </td>
+                </tr>
+              ) : (
+                keys.map((k) => (
+                  <tr key={k.id}>
+                    <td>
+                      <code className="font-mono text-xs text-fg">{k.prefix}</code>
+                    </td>
+                    <td>{k.name}</td>
+                    <td>
+                      <span className="pill">{k.tier}</span>
+                    </td>
+                    <td className="num">
+                      {k.rate_limit_per_min ?? '—'}
+                    </td>
+                    <td>
+                      {k.revoked_at ? (
+                        <span className="pill pill-negative">revoked</span>
+                      ) : k.is_active ? (
+                        <span className="pill pill-positive">active</span>
+                      ) : (
+                        <span className="pill">inactive</span>
+                      )}
+                    </td>
+                    <td className="text-[11px] text-fg-muted tabular">
+                      {new Date(k.created_at).toISOString().slice(0, 10)}
+                    </td>
+                    <td className="text-right">
+                      {!k.revoked_at && (
+                        <button
+                          type="button"
+                          onClick={() => revokeKey(k.id)}
+                          className="inline-flex items-center gap-1 text-[11px] text-negative hover:text-negative/80"
+                        >
+                          <ShieldOff className="h-3 w-3" strokeWidth={2} />
+                          Revoke
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Users */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" strokeWidth={2} />
+            Users
+          </span>
+          <span className="text-[11px] text-fg-subtle tabular">
+            {users.length} total
+          </span>
+        </div>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last login</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center text-fg-subtle py-6">
+                    No users.
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id}>
+                    <td className="font-medium text-fg">{u.username}</td>
+                    <td className="text-fg-muted">{u.email ?? '—'}</td>
+                    <td>
+                      <span
+                        className={cn(
+                          'pill',
+                          u.role === 'admin' && 'pill-accent'
+                        )}
+                      >
+                        {u.role}
+                      </span>
+                    </td>
+                    <td>
+                      {u.is_active ? (
+                        <span className="pill pill-positive">active</span>
+                      ) : (
+                        <span className="pill pill-negative">disabled</span>
+                      )}
+                    </td>
+                    <td className="text-[11px] text-fg-muted tabular">
+                      {u.last_login_at
+                        ? new Date(u.last_login_at).toISOString().slice(0, 16).replace('T', ' ')
+                        : 'never'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Audit log */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <FileClock className="h-3.5 w-3.5" strokeWidth={2} />
+            Audit log
+          </span>
+          <span className="text-[11px] text-fg-subtle tabular">
+            last {audit.length}
+          </span>
+        </div>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center text-fg-subtle py-6">
+                    No audit entries yet.
+                  </td>
+                </tr>
+              ) : (
+                audit.map((a) => (
+                  <tr key={a.id}>
+                    <td className="text-[11px] text-fg-muted tabular whitespace-nowrap">
+                      {new Date(a.created_at).toISOString().replace('T', ' ').slice(0, 19)}
+                    </td>
+                    <td>{a.actor_label}</td>
+                    <td>
+                      <code className="font-mono text-[11px] text-fg">{a.action}</code>
+                    </td>
+                    <td className="text-fg-muted text-[11px]">
+                      {a.target_type ? `${a.target_type}:${a.target_id ?? ''}` : '—'}
+                    </td>
+                    <td>
+                      <span
+                        className={cn(
+                          'pill',
+                          a.status === 'ok' && 'pill-positive',
+                          a.status === 'denied' && 'pill-negative'
+                        )}
+                      >
+                        {a.status}
+                      </span>
+                    </td>
+                    <td className="text-[11px] text-fg-muted tabular">{a.ip ?? '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

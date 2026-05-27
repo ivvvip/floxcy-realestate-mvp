@@ -15,6 +15,10 @@ from app.database import Base
 # Import all models to register them with Base
 from app.models.area import Area
 from app.models.market_snapshot import MarketSnapshot
+from app.models.user import User
+from app.models.api_key import ApiKey
+from app.models.audit_log import AuditLog
+from app.models.alert import Alert
 
 # this is the Alembic Config object
 config = context.config

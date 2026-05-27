@@ -155,3 +155,189 @@ export interface AdvisorQueryResponse {
   budget_aed: number;
   recommendations: AdvisorRecommendation[];
 }
+
+// ---------- Confidence ----------
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+export interface ConfidenceFactor {
+  name: string;
+  weight: number;
+  score: number;
+  note: string;
+}
+
+export interface ConfidenceReport {
+  score: number;
+  level: ConfidenceLevel;
+  sources: string[];
+  last_updated: string | null;
+  sample_size: number;
+  data_delay_minutes: number | null;
+  methodology: string;
+  factors: ConfidenceFactor[];
+}
+
+// ---------- Opportunities (undervaluation) ----------
+
+export type OpportunityTier = 'strong' | 'moderate' | 'neutral' | 'overpriced';
+
+export interface UndervaluationFactor {
+  name: string;
+  weight: number;
+  raw: number;
+  contribution: number;
+  note: string;
+}
+
+export interface OpportunityResult {
+  area_id: string;
+  area_name: string;
+  score: number;
+  tier: OpportunityTier;
+  headline: string;
+  reasons: string[];
+  risks: string[];
+  best_for: string[];
+  factors: UndervaluationFactor[];
+  confidence: ConfidenceReport;
+  snapshot: {
+    snapshot_date: string;
+    avg_price_per_sqft: number;
+    rental_yield: number;
+    appreciation_1y: number | null;
+    transaction_volume: number | null;
+    investment_score: number | null;
+  };
+}
+
+// ---------- Rankings ----------
+
+export interface RankingResult {
+  area_id: string;
+  area_name: string;
+  area_type: string;
+  metric: string;
+  value: number;
+  metric_display: {
+    yield: number;
+    appreciation_1y: number | null;
+    transaction_volume: number | null;
+    investment_score: number | null;
+    risk_score: number | null;
+    price_per_sqft: number;
+  };
+  confidence: ConfidenceReport;
+}
+
+// ---------- Alerts ----------
+
+export type AlertType =
+  | 'yield_above'
+  | 'yield_below'
+  | 'price_above'
+  | 'price_below'
+  | 'volume_spike'
+  | 'undervalued_appears'
+  | 'opportunity_appears';
+
+export interface AlertCreateRequest {
+  type: AlertType;
+  area_id?: string;
+  params: Record<string, unknown>;
+  delivery?: 'in_app' | 'email' | 'whatsapp' | 'telegram';
+}
+
+export interface AlertOut {
+  id: string;
+  type: AlertType;
+  type_label: string;
+  area_id: string | null;
+  area_name: string | null;
+  params: Record<string, unknown>;
+  is_active: boolean;
+  last_fired_at: string | null;
+  last_value: string | null;
+  delivery: string;
+  created_at: string;
+}
+
+export interface AlertTypesResponse {
+  types: Record<string, string>;
+}
+
+// ---------- Methodology ----------
+
+export interface Methodology {
+  version: string;
+  last_updated: string;
+  disclaimer: string;
+  data_sources: Record<
+    string,
+    { name: string; type: string; frequency: string; url?: string }
+  >;
+  metrics: Record<string, { formula: string; unit?: string; notes?: string }>;
+  scoring: Record<
+    string,
+    {
+      formula: string;
+      notes?: string;
+      tiers?: Record<string, string>;
+      levels?: Record<string, string>;
+    }
+  >;
+  update_cadence: Record<string, string>;
+  limitations: string[];
+}
+
+// ---------- Auth ----------
+
+export type Role = 'viewer' | 'analyst' | 'admin';
+
+export interface MeResponse {
+  id: string;
+  username: string;
+  email: string | null;
+  role: Role;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+// ---------- Admin ----------
+
+export interface AuditLogEntry {
+  id: string;
+  actor_label: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  payload: Record<string, unknown> | null;
+  ip: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface ApiKeyPublic {
+  id: string;
+  prefix: string;
+  name: string;
+  tier: string;
+  rate_limit_per_min: number | null;
+  is_active: boolean;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreateRequest {
+  name: string;
+  tier?: 'free' | 'pro' | 'api' | 'enterprise';
+  rate_limit_per_min?: number;
+  expires_at?: string;
+}
+
+export interface ApiKeyCreateResponse extends ApiKeyPublic {
+  full_key: string;
+}
