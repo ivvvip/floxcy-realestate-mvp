@@ -19,6 +19,11 @@ from app.models.user import User
 from app.models.api_key import ApiKey
 from app.models.audit_log import AuditLog
 from app.models.alert import Alert
+from app.models.broker import Broker
+from app.models.broker_application import BrokerApplication
+from app.models.consultation import Consultation
+from app.models.investment_opportunity import InvestmentOpportunity
+from app.models.investor_lead import InvestorLead
 
 # this is the Alembic Config object
 config = context.config
