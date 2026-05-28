@@ -274,6 +274,62 @@ export interface OpportunityExplanation {
   cached: boolean;
 }
 
+// ---------- Market insights (P2) ----------
+
+export interface MarketBriefBullet {
+  headline: string;
+  body: string;
+  area_name: string | null;
+}
+
+export interface MarketBrief {
+  as_of: string;
+  brief: MarketBriefBullet[];
+  model: string | null;
+  tokens: number;
+  cached: boolean;
+  fallback_used?: boolean;
+}
+
+export interface AreaInsight {
+  area_id: string;
+  area_name: string;
+  undervaluation_score: number;
+  tier: OpportunityTier;
+  opportunity_summary: string;
+  risk_summary: string;
+  investor_profile_recommendation: InvestorType | string;
+  trend_interpretation: string;
+  model: string;
+  tokens: number;
+  latency_ms?: number;
+  cached: boolean;
+  fallback_used?: boolean;
+}
+
+export interface MoverRow {
+  area_id: string;
+  name: string;
+  price_pct_3mo: number;
+  yield_pp_3mo: number;
+  volume_pct_3mo: number;
+  price_slope_pm: number;
+  latest_price: number;
+  latest_yield: number;
+}
+
+export interface TrendsResponse {
+  as_of: string;
+  price_up: MoverRow[];
+  price_down: MoverRow[];
+  yield_up: MoverRow[];
+  volume_up: MoverRow[];
+  narrative: string | null;
+  model: string | null;
+  tokens: number | null;
+  cached: boolean;
+}
+
 // ---------- Rankings ----------
 
 export interface RankingResult {

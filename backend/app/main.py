@@ -23,6 +23,7 @@ from app.api.routes import (
     rankings,
     alerts,
     methodology,
+    insights,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -120,6 +121,7 @@ app.include_router(opportunities.router)
 app.include_router(rankings.router)
 app.include_router(alerts.router)
 app.include_router(methodology.router)
+app.include_router(insights.router)
 app.include_router(admin.router)
 
 
@@ -143,5 +145,8 @@ async def root():
             "rankings": "/api/v1/rankings?by=yield|appreciation|score|low_risk|volume|price_low",
             "alerts": "/api/v1/alerts",
             "methodology": "/api/v1/methodology",
+            "market_brief": "/api/v1/insights/market-brief",
+            "area_insight": "/api/v1/insights/area/{id}",
+            "trends": "/api/v1/insights/trends",
         },
     }

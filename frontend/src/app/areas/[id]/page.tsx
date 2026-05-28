@@ -25,6 +25,7 @@ import {
 } from '@/lib/insights';
 import { cn } from '@/lib/cn';
 import { ConfidenceBadge, ConfidenceWarningBanner } from '@/components/data/ConfidenceBadge';
+import { AreaAiInsightCard } from '@/components/data/AreaAiInsightCard';
 import type { ConfidenceReport, OpportunityResult } from '@/lib/types';
 
 const TIER_LABEL_MAP: Record<string, string> = {
@@ -280,6 +281,11 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             <ConfidenceBadge report={confidence} />
           </div>
         )}
+
+        {/* AI insight card (P2) */}
+        <div className="mt-5">
+          <AreaAiInsightCard areaId={params.id} />
+        </div>
 
         {/* Undervaluation block (killer feature inline on area detail) */}
         {undervaluation && (

@@ -1,17 +1,23 @@
 """LLM-backed narrative insights.
 
-Two surfaces today:
-  * area_explanation(area, undervaluation) — short markdown explainer for a
-    single area's opportunity profile. Lazy-cached per area for 24h.
+Surfaces:
+  * area_explanation()        — markdown explainer for one area (P1)
+  * structured_area_insight() — JSON-structured per-area insight (P2)
+  * market_brief()            — 3-5 daily bullets across the market (P2)
+  * compute_trends()          — top movers + LLM commentary (P2)
 
-P2 will add market_brief() and trends() in this module.
+All LLM calls go through openrouter_service. Daily-refreshed surfaces are
+cached in Redis with a TTL — first request after expiry triggers a fresh
+generation (lazy cron pattern).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
-from typing import Optional
+import re
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from app.config import settings
 from app.redis_client import redis_client
@@ -22,6 +28,9 @@ logger = logging.getLogger("floxcy.insights")
 
 
 AREA_EXPLAIN_TTL_S = 24 * 3600
+MARKET_BRIEF_TTL_S = 24 * 3600
+AREA_INSIGHT_TTL_S = 24 * 3600
+TRENDS_TTL_S = 24 * 3600
 
 
 AREA_EXPLAIN_SYSTEM = """You are Floxcy's UAE real-estate analyst.
@@ -135,6 +144,406 @@ async def area_explanation(
     }
     try:
         await redis_client.setex(ck, AREA_EXPLAIN_TTL_S, json.dumps(payload))
+    except Exception:
+        pass
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# P2: STRUCTURED AREA INSIGHT (JSON)
+# ---------------------------------------------------------------------------
+
+AREA_INSIGHT_SYSTEM = """You are Floxcy's UAE real-estate analyst.
+
+You return STRICT JSON (no prose, no markdown fences) describing a single
+area's investment profile. Audience: property investors. Tone: institutional.
+
+OPERATING RULES
+- Ground every sentence in the numbers provided. Never invent figures.
+- 2-3 sentences max per text field.
+- Pick investor_profile from EXACTLY one of:
+  "Income-focused" | "Growth-focused" | "Balanced" | "Speculative".
+- Output a single JSON object with EXACTLY these keys, nothing else:
+  {
+    "opportunity_summary": "string (2-3 sentences)",
+    "risk_summary": "string (1-2 sentences)",
+    "investor_profile_recommendation": "Income-focused" | "Growth-focused" | "Balanced" | "Speculative",
+    "trend_interpretation": "string (1-2 sentences about momentum/direction)"
+  }
+- Do not include any wrapper, key, or comment outside that JSON object.
+"""
+
+
+def _extract_json_block(s: str) -> Optional[dict]:
+    """Best-effort: find the first valid JSON object in a string."""
+    # Strip markdown fences if present
+    s = re.sub(r"```(?:json)?\s*", "", s, flags=re.I).replace("```", "")
+    # Find first { ... } block
+    start = s.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    for i in range(start, len(s)):
+        c = s[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                blob = s[start : i + 1]
+                try:
+                    return json.loads(blob)
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+async def structured_area_insight(
+    *,
+    area_id: str,
+    area_name: str,
+    rental_yield: float,
+    price_per_sqft: float,
+    appreciation_1y: float | None,
+    appreciation_3y: float | None,
+    risk_score: float | None,
+    demand_score: float | None,
+    occupancy: float | None,
+    transaction_volume: int | None,
+    score: int,
+    tier: str,
+) -> Optional[dict]:
+    """Return {opportunity_summary, risk_summary, investor_profile_recommendation,
+    trend_interpretation, model, tokens, cached} or None on failure.
+
+    JSON parsing is tolerant; if the LLM emits non-strict JSON we return None
+    and the caller falls back to the markdown explainer."""
+    if not settings.OPENROUTER_API_KEY:
+        return None
+
+    blob = f"{area_id}|{score}|{tier}".encode()
+    ck = "ai:area_struct:" + hashlib.sha256(blob).hexdigest()
+    try:
+        cached_blob = await redis_client.get(ck)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob)
+            payload["cached"] = True
+            return payload
+        except Exception:
+            pass
+
+    user_msg = (
+        f"Area: {area_name}\n"
+        f"Undervaluation score: {score}/100 (tier: {tier})\n"
+        f"Latest rental yield: {rental_yield:.2f}%\n"
+        f"Price per sqft: AED {price_per_sqft:,.0f}\n"
+        f"1Y appreciation: "
+        f"{(appreciation_1y if appreciation_1y is not None else 0):+.2f}%\n"
+        f"3Y appreciation: "
+        f"{(appreciation_3y if appreciation_3y is not None else 0):+.2f}%\n"
+        f"Risk score: "
+        f"{(risk_score if risk_score is not None else 0):.1f}/10 (lower is safer)\n"
+        f"Demand score: "
+        f"{(demand_score if demand_score is not None else 0):.1f}/10\n"
+        f"Occupancy: "
+        f"{(occupancy if occupancy is not None else 0):.1f}%\n"
+        f"Transaction volume (latest snapshot): {transaction_volume or 0}\n"
+    )
+
+    result = await openrouter_chat(
+        system=AREA_INSIGHT_SYSTEM,
+        user=user_msg,
+        max_tokens=500,
+        temperature=0.15,
+    )
+    if not result.ok:
+        return None
+
+    parsed = _extract_json_block(result.content)
+    if not parsed:
+        # Caller can fall back to markdown
+        return None
+
+    # Sanitize: keep only expected keys, validate investor profile
+    valid_profiles = {"Income-focused", "Growth-focused", "Balanced", "Speculative"}
+    profile = parsed.get("investor_profile_recommendation", "Balanced")
+    if profile not in valid_profiles:
+        profile = "Balanced"
+
+    payload = {
+        "opportunity_summary": (parsed.get("opportunity_summary") or "")[:600],
+        "risk_summary": (parsed.get("risk_summary") or "")[:400],
+        "investor_profile_recommendation": profile,
+        "trend_interpretation": (parsed.get("trend_interpretation") or "")[:400],
+        "model": result.model,
+        "tokens": result.total_tokens,
+        "latency_ms": result.latency_ms,
+        "fallback_used": result.fallback_used,
+        "cached": False,
+    }
+    try:
+        await redis_client.setex(ck, AREA_INSIGHT_TTL_S, json.dumps(payload))
+    except Exception:
+        pass
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# P2: MARKET BRIEF (daily 3-5 bullets)
+# ---------------------------------------------------------------------------
+
+MARKET_BRIEF_SYSTEM = """You are Floxcy's UAE real-estate analyst writing
+the daily Market Brief for institutional investors. You return STRICT JSON
+(no prose, no markdown fences).
+
+OPERATING RULES
+- 3 to 5 bullets. Each is a self-contained insight grounded in the data
+  passed in the user message.
+- Each bullet has a short headline (<= 60 chars) and a 1-2 sentence body
+  citing specific numbers (AED/sqft, yield %, score, change %).
+- Prefer bullets that compare or surface change. Avoid generic statements.
+- If a bullet is about a specific area, include "area_name" with that
+  area's exact name (matching the data). If market-wide, omit area_name.
+
+Output EXACTLY this JSON shape, nothing else:
+{
+  "brief": [
+    {"headline": "string", "body": "string", "area_name": "string or null"},
+    ...
+  ]
+}
+"""
+
+
+async def market_brief(
+    *,
+    avg_yield: float,
+    avg_price_per_sqft: float,
+    total_areas: int,
+    top_opportunities: list[dict],  # [{name, score, tier, yield, price}]
+    top_movers: list[dict],         # [{name, change_pct, metric}]
+) -> Optional[dict]:
+    """Daily Market Brief: 3-5 LLM-generated bullets. Cached 24h by UTC date."""
+    if not settings.OPENROUTER_API_KEY:
+        return None
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ck = f"ai:market_brief:{today}"
+    try:
+        cached_blob = await redis_client.get(ck)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob)
+            payload["cached"] = True
+            return payload
+        except Exception:
+            pass
+
+    lines: list[str] = []
+    lines.append(f"As of: {today}")
+    lines.append(f"Tracked areas: {total_areas}")
+    lines.append(f"UAE avg rental yield: {avg_yield:.2f}%")
+    lines.append(f"UAE avg AED/sqft: {avg_price_per_sqft:,.0f}")
+    if top_opportunities:
+        lines.append("")
+        lines.append("Top opportunities (by undervaluation score):")
+        for o in top_opportunities[:5]:
+            lines.append(
+                f"  {o['name']}: score {o['score']} ({o.get('tier','-')}) "
+                f"· yield {o.get('yield',0):.2f}% · AED {o.get('price',0):,.0f}/sqft"
+            )
+    if top_movers:
+        lines.append("")
+        lines.append("Top movers (1Y appreciation):")
+        for m in top_movers[:5]:
+            lines.append(
+                f"  {m['name']}: {m.get('metric','1Y app')} {m['change_pct']:+.2f}%"
+            )
+    user_msg = "\n".join(lines)
+
+    result = await openrouter_chat(
+        system=MARKET_BRIEF_SYSTEM,
+        user=user_msg,
+        max_tokens=700,
+        temperature=0.25,
+    )
+    if not result.ok:
+        return None
+
+    parsed = _extract_json_block(result.content)
+    if not parsed or not isinstance(parsed.get("brief"), list):
+        return None
+
+    # Clean each bullet
+    clean: list[dict] = []
+    for b in parsed["brief"][:5]:
+        if not isinstance(b, dict):
+            continue
+        clean.append(
+            {
+                "headline": (b.get("headline") or "")[:80],
+                "body": (b.get("body") or "")[:300],
+                "area_name": b.get("area_name") or None,
+            }
+        )
+    if not clean:
+        return None
+
+    payload = {
+        "as_of": today,
+        "brief": clean,
+        "model": result.model,
+        "tokens": result.total_tokens,
+        "latency_ms": result.latency_ms,
+        "fallback_used": result.fallback_used,
+        "cached": False,
+    }
+    try:
+        await redis_client.setex(ck, MARKET_BRIEF_TTL_S, json.dumps(payload))
+    except Exception:
+        pass
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# P2: TRENDS (data + optional LLM narrative)
+# ---------------------------------------------------------------------------
+
+TRENDS_NARRATIVE_SYSTEM = """You are Floxcy's UAE real-estate analyst.
+
+Given today's top movers in price, yield, and volume, produce a 2-3
+sentence neutral narrative interpreting the direction of the market.
+Cite at least two numbers. Output plain text (no markdown).
+"""
+
+
+def _slope(values: list[float]) -> float:
+    """Linear slope normalized to %/step over the series mean."""
+    if len(values) < 2:
+        return 0.0
+    n = len(values)
+    xs = list(range(n))
+    mx = sum(xs) / n
+    my = sum(values) / n
+    num = sum((xs[i] - mx) * (values[i] - my) for i in range(n))
+    den = sum((xs[i] - mx) ** 2 for i in range(n))
+    if den == 0 or my == 0:
+        return 0.0
+    return (num / den / my) * 100
+
+
+async def compute_trends(
+    *,
+    universe: list[dict],  # list of {area_id, name, history: [snapshots]}
+) -> dict:
+    """Compute top movers + LLM narrative. Cached 24h."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ck = f"ai:trends:{today}"
+    try:
+        cached_blob = await redis_client.get(ck)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob)
+            payload["cached"] = True
+            return payload
+        except Exception:
+            pass
+
+    # ---- Pure-data trend computation ----
+    movers: list[dict] = []
+    for u in universe:
+        history = u.get("history") or []
+        if len(history) < 2:
+            continue
+        prices = [float(s["avg_price_per_sqft"]) for s in history]
+        yields = [float(s["rental_yield"]) for s in history]
+        vols = [int(s.get("transaction_volume") or 0) for s in history]
+        # Last vs 3-month-ago (or last vs first if shorter)
+        idx_ago = max(0, len(prices) - 4)
+        price_change = (
+            ((prices[-1] - prices[idx_ago]) / prices[idx_ago] * 100)
+            if prices[idx_ago]
+            else 0.0
+        )
+        yield_change = yields[-1] - yields[idx_ago]
+        vol_change = (
+            ((vols[-1] - vols[idx_ago]) / vols[idx_ago] * 100)
+            if vols[idx_ago]
+            else 0.0
+        )
+        price_slope = _slope(prices)
+        movers.append(
+            {
+                "area_id": u["area_id"],
+                "name": u["name"],
+                "price_pct_3mo": round(price_change, 2),
+                "yield_pp_3mo": round(yield_change, 2),
+                "volume_pct_3mo": round(vol_change, 2),
+                "price_slope_pm": round(price_slope, 3),
+                "latest_price": prices[-1],
+                "latest_yield": yields[-1],
+            }
+        )
+
+    movers_by_price_up = sorted(
+        movers, key=lambda m: m["price_pct_3mo"], reverse=True
+    )[:5]
+    movers_by_price_down = sorted(movers, key=lambda m: m["price_pct_3mo"])[:5]
+    movers_by_yield_up = sorted(
+        movers, key=lambda m: m["yield_pp_3mo"], reverse=True
+    )[:5]
+    movers_by_volume = sorted(
+        movers, key=lambda m: m["volume_pct_3mo"], reverse=True
+    )[:5]
+
+    # ---- LLM narrative (optional augmentation) ----
+    narrative: Optional[str] = None
+    model_used: Optional[str] = None
+    tokens_used: Optional[int] = None
+    if settings.OPENROUTER_API_KEY:
+        bullet_lines: list[str] = ["Top movers, last 3 months:"]
+        for m in movers_by_price_up[:3]:
+            bullet_lines.append(
+                f"  {m['name']}: price {m['price_pct_3mo']:+.2f}%, yield "
+                f"{m['yield_pp_3mo']:+.2f}pp"
+            )
+        bullet_lines.append("Bottom movers:")
+        for m in movers_by_price_down[:3]:
+            bullet_lines.append(
+                f"  {m['name']}: price {m['price_pct_3mo']:+.2f}%, yield "
+                f"{m['yield_pp_3mo']:+.2f}pp"
+            )
+        result = await openrouter_chat(
+            system=TRENDS_NARRATIVE_SYSTEM,
+            user="\n".join(bullet_lines),
+            max_tokens=200,
+            temperature=0.2,
+        )
+        if result.ok:
+            narrative = result.content.strip()
+            model_used = result.model
+            tokens_used = result.total_tokens
+
+    payload = {
+        "as_of": today,
+        "price_up": movers_by_price_up,
+        "price_down": movers_by_price_down,
+        "yield_up": movers_by_yield_up,
+        "volume_up": movers_by_volume,
+        "narrative": narrative,
+        "model": model_used,
+        "tokens": tokens_used,
+        "cached": False,
+    }
+    try:
+        await redis_client.setex(ck, TRENDS_TTL_S, json.dumps(payload))
     except Exception:
         pass
     return payload

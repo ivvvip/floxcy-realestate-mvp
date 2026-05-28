@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight, LayoutDashboard, TrendingUp } from 'lucide-react';
 import { AlertsCard } from './AlertsCard';
 import { OpportunitiesWidget } from './OpportunitiesWidget';
+import { MarketBriefCard } from './MarketBriefCard';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
@@ -250,8 +251,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Top opportunities (killer feature widget) */}
-        <div className="mt-6">
+        {/* Market brief + Top opportunities */}
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          <MarketBriefCard />
           <OpportunitiesWidget />
         </div>
 

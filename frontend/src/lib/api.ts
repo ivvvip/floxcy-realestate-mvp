@@ -22,6 +22,9 @@ import type {
   ApiKeyCreateRequest,
   AIAnalyticsResponse,
   OpportunityExplanation,
+  MarketBrief,
+  AreaInsight,
+  TrendsResponse,
 } from './types';
 
 export const API_BASE_URL =
@@ -151,6 +154,26 @@ export async function explainOpportunity(areaId: string): Promise<OpportunityExp
 export async function getAreaUndervaluation(id: string): Promise<OpportunityResult> {
   return request<OpportunityResult>(`/api/v1/areas/${id}/undervaluation`, {
     revalidate: 300,
+  });
+}
+
+// ---------- Insights (P2) ----------
+
+export async function getMarketBrief(): Promise<MarketBrief> {
+  return request<MarketBrief>('/api/v1/insights/market-brief', {
+    revalidate: 3600,
+  });
+}
+
+export async function getAreaInsight(id: string): Promise<AreaInsight> {
+  return request<AreaInsight>(`/api/v1/insights/area/${id}`, {
+    revalidate: 3600,
+  });
+}
+
+export async function getTrends(): Promise<TrendsResponse> {
+  return request<TrendsResponse>('/api/v1/insights/trends', {
+    revalidate: 3600,
   });
 }
 
