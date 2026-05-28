@@ -20,6 +20,7 @@
 | **Admin** with login, RBAC, audit log, API key management | `/admin/*` + `/api/v1/admin/*` |
 | **Trust pages**: about, data-sources, api, pricing, privacy, terms | All public routes |
 | **Subscription tier scaffold** (free/pro/api/enterprise) | `src/lib/plans.ts` + `/pricing` page |
+| **Supply layer**: verified brokers, curated deals, lead matching, consultation flow | `/opportunities`, `/brokers/apply`, `/broker/dashboard`, `/admin/{brokers,opportunities,leads}` |
 | **Tests** for ROI, confidence, undervaluation, security | `backend/tests/` |
 
 ---
@@ -64,6 +65,79 @@ floxcy-realestate-mvp/
 ├── CLAUDE.md                      # Project context for AI assistants
 └── README.md                      # This file
 ```
+
+---
+
+## Supply layer: brokers & curated deals
+
+Floxcy is **not** a generic property portal. It's an investor intelligence
+platform with a curated supply side bolted on. Two kinds of opportunities
+live under the same `/opportunities` feed:
+
+- **Area signals** (`kind: area_signal`) — computed by `opportunity_engine`
+  from the 70-area + 12-month snapshot universe. No broker, no specific
+  unit; it's the market telling us where to look.
+- **Broker deals** (`kind: broker_deal`) — specific units submitted by
+  verified UAE investment specialists, scored by `deal_scoring`, and
+  *admin-approved before publication*. Every deal carries broker identity,
+  required investment thesis, required risks, expected yield, strategy,
+  and confidence — these gate approval.
+
+### Database models (supply layer)
+
+| Table | Purpose |
+|---|---|
+| `brokers` | Approved investment specialists. RERA license, languages, specialist areas, status, performance/response scores, optional password hash for `/broker/login`. |
+| `broker_applications` | Public submissions awaiting admin review. Retained as audit trail post-decision. |
+| `investment_opportunities` | Broker-submitted (or manual/developer) deals. Distinct from area signals; merge happens at the API layer. |
+| `investor_leads` | Inbound investor interest, optionally tied to an opportunity and a matched broker. `lead_score` 0–100 from `lead_scoring` heuristic. |
+| `consultations` | Join row between a lead and a broker, optionally referencing the originating opportunity. |
+
+All FKs use `ON DELETE SET NULL` (or `CASCADE` on `consultations.investor_lead_id`).
+
+### Broker flow
+
+1. `/brokers/apply` — public application form. Creates a row in
+   `broker_applications` (idempotent on email for pending rows).
+2. Admin reviews at `/admin/brokers` and clicks **Approve** — creates a
+   `brokers` row and returns a one-time temp password (or accepts an
+   admin-supplied one).
+3. Broker logs in at `/broker/login`, lands on `/broker/dashboard`:
+   - **My opportunities** tab — every submission and its status.
+   - **My leads** tab — investors matched to their deals; broker
+     transitions status (`new → contacted → qualified → ...`).
+   - **Submit new** tab — investment-case form. Yield, confidence,
+     strategy, risk, thesis, risk summary are required. Submission lands
+     in `pending_review`; the broker cannot publish directly.
+4. Admin reviews at `/admin/opportunities`, approves or rejects. On
+   approval, `deal_scoring.score_and_apply` re-runs against the latest
+   area context and the deal becomes visible on the public feed.
+
+### Investor flow
+
+1. `/opportunities` — unified card feed. Filter by area, strategy, min
+   score; toggle between **All / Curated Deals / Market Signals**.
+2. Card → `/opportunities/[id]` (broker deals) or `/areas/[id]` (signals).
+   Deal detail is laid out as an **investment case**, not a listing:
+   thesis, risks, best-for, verified-specialist card, and an inline
+   consultation form.
+3. **Request Consultation** → creates an `investor_leads` row and a
+   `consultations` row, assigns to the deal's broker, returns the success
+   envelope.
+4. Generic interest (not tied to a specific deal) goes through
+   `/consultation` instead and lands in the same lead queue with
+   `opportunity_id = NULL`.
+
+Every lead is scored on submission (0–100) so admins / brokers triage
+the hottest leads first at `/admin/leads`.
+
+### n8n hooks
+
+`POST /api/v1/webhooks/{new-lead,broker-approved,opportunity-approved}` —
+stable URLs n8n can point at for downstream automation (WhatsApp, email,
+CRM sync). Signature-verified against `N8N_WEBHOOK_SECRET` when set; logs
+and acks otherwise. The outbound automation itself is intentionally
+deferred — these are placeholders.
 
 ---
 
@@ -141,6 +215,7 @@ pytest -v
 | `ENVIRONMENT` | no | `development` | `production` enables HSTS |
 | `DEBUG` | no | `True` | SQLAlchemy echo + FastAPI debug |
 | `ADMIN_API_KEY` | legacy | `change-me` | Kept only for backward compatibility — new mechanism uses login |
+| `N8N_WEBHOOK_SECRET` | no | `""` | Shared secret for HMAC-SHA256 on `/webhooks/*`. Empty = accept unsigned (dev only). |
 
 ### Frontend (`.env.local`)
 
@@ -161,6 +236,7 @@ BOOTSTRAP_ADMIN_PASSWORD=<a-strong-password>
 ENVIRONMENT=production
 COOKIE_DOMAIN=.floxcy.com
 CORS_ORIGINS=["https://floxcy.com"]
+N8N_WEBHOOK_SECRET=<long random string when wiring n8n>
 ```
 
 Set these on the **frontend** Coolify app:
@@ -201,9 +277,27 @@ redeploying will rotate the admin password automatically.
 | `POST /api/v1/admin/api-keys` | role=admin | Issue API key |
 | `POST /api/v1/admin/api-keys/{id}/revoke` | role=admin | Revoke key |
 | `GET /api/v1/admin/audit-log` | role=analyst | View audit log |
+| `GET /api/v1/opportunities?kind=all\|signals\|deals` | optional | **Unified opportunity feed** |
+| `GET /api/v1/opportunities/deals/{id}` | optional | Broker-deal detail |
+| `POST /api/v1/opportunities/deals/{id}/request-consultation` | optional | Tied lead + consultation |
+| `POST /api/v1/consultations/request` | optional | Generic (non-deal) consultation request |
+| `POST /api/v1/brokers/apply` | optional | Public broker application |
+| `POST /api/v1/broker/login` | none | Broker email+password → bearer token |
+| `GET /api/v1/broker/me` | bearer | Current broker |
+| `GET\|POST\|PATCH /api/v1/broker/opportunities[/{id}]` | bearer | Broker's own deals |
+| `GET\|PATCH /api/v1/broker/leads[/{id}]` | bearer | Broker's assigned leads |
+| `GET /api/v1/admin/broker-applications` | role=admin | Pending broker applications |
+| `POST /api/v1/admin/broker-applications/{id}/{approve\|reject}` | role=admin | Application review |
+| `GET\|PATCH /api/v1/admin/brokers[/{id}]` | role=admin | Approved-broker management |
+| `GET /api/v1/admin/opportunities/pending` | role=admin | Deals awaiting review |
+| `POST /api/v1/admin/opportunities/{id}/{approve\|reject}` | role=admin | Approval (QC-guarded) |
+| `PATCH /api/v1/admin/opportunities/{id}` | role=admin | Admin override |
+| `GET\|PATCH /api/v1/admin/leads[/{id}]` | role=admin | Investor leads + broker assignment |
+| `POST /api/v1/webhooks/{new-lead\|broker-approved\|opportunity-approved}` | HMAC | n8n placeholders |
 
 API uses `X-API-Key` header for key-based auth. All authenticated routes also accept
-the JWT cookie when set.
+the JWT cookie when set. Broker routes use `Authorization: Bearer <token>` where
+`<token>` is the JWT returned by `POST /api/v1/broker/login`.
 
 ---
 
