@@ -24,6 +24,10 @@ from app.api.routes import (
     alerts,
     methodology,
     insights,
+    brokers_public,
+    broker_admin,
+    broker_self,
+    consultations,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -124,6 +128,12 @@ app.include_router(methodology.router)
 app.include_router(insights.router)
 app.include_router(admin.router)
 
+# ---- Supply layer (brokers, opportunities, consultations) ----
+app.include_router(brokers_public.router)
+app.include_router(consultations.router)
+app.include_router(broker_self.router)
+app.include_router(broker_admin.router)
+
 
 @app.get("/")
 async def root():
@@ -148,5 +158,10 @@ async def root():
             "market_brief": "/api/v1/insights/market-brief",
             "area_insight": "/api/v1/insights/area/{id}",
             "trends": "/api/v1/insights/trends",
+            "brokers_apply": "/api/v1/brokers/apply",
+            "broker_login": "/api/v1/broker/login",
+            "broker_me": "/api/v1/broker/me",
+            "consultation_request": "/api/v1/consultations/request",
+            "deal_detail": "/api/v1/opportunities/deals/{id}",
         },
     }

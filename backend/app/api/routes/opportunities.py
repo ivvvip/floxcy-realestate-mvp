@@ -1,9 +1,14 @@
-"""Opportunity Engine endpoint surface.
+"""Opportunity Engine endpoint surface — unified feed.
 
-Powers the platform's investment-decision layer:
-  GET  /api/v1/opportunities                       — ranked list
-  POST /api/v1/opportunities/{area_id}/explain     — lazy structured AI
-  POST /api/v1/opportunities/recompute             — admin cache reset
+Surfaces *both* area-derived intelligence signals and broker-submitted
+deals under one set of routes, distinguished on the response by ``kind``
+(``area_signal`` | ``broker_deal``).
+
+  GET  /api/v1/opportunities                              — unified list (kind=all|signals|deals)
+  GET  /api/v1/opportunities/deals/{id}                   — broker-deal detail
+  POST /api/v1/opportunities/deals/{id}/request-consultation
+  POST /api/v1/opportunities/{area_id}/explain            — lazy structured AI (signal only)
+  POST /api/v1/opportunities/recompute                    — admin cache reset
 """
 from datetime import datetime, timezone
 from statistics import median
@@ -13,13 +18,19 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.api.routes.consultations import _create_lead_and_consultation, SUCCESS_MESSAGE
 from app.core.dependencies import AuthPrincipal, require_admin
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
+from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.market_snapshot import MarketSnapshot
 from app.redis_client import redis_client
+from app.schemas.consultation import ConsultationOut, ConsultationRequestResponse
+from app.schemas.investor_lead import LeadCreate, LeadOut
+from app.schemas.opportunity_deal import DealOut
 from app.services.confidence import build_confidence_report, confidence_to_dict
 from app.services.insights import opportunity_explanation
 from app.services.opportunity_engine import (
@@ -83,68 +94,187 @@ def _score_all(
     return reports
 
 
+def _deal_to_card(d: InvestmentOpportunity) -> dict:
+    """Serialize a broker-submitted deal into a card shape parallel to the
+    area-signal card. Frontend branches on ``kind``."""
+    score = float(d.opportunity_score) if d.opportunity_score is not None else 0.0
+    return {
+        "kind": "broker_deal",
+        "id": str(d.id),
+        "title": d.title,
+        "area_name": d.area,
+        "emirate": d.emirate,
+        "price": float(d.price),
+        "property_type": d.property_type,
+        "unit_type": d.unit_type,
+        "rental_yield": d.expected_gross_yield,
+        "expected_net_yield": d.expected_net_yield,
+        "opportunity_score": score,
+        "strategy": d.strategy_type,
+        "risk_level": d.risk_level,
+        "confidence_score": d.confidence_score,
+        "why_short": (d.why_opportunity or "")[:200],
+        "source_type": d.source_type,
+        "broker": {
+            "id": str(d.broker.id),
+            "full_name": d.broker.full_name,
+            "company_name": d.broker.company_name,
+        }
+        if d.broker
+        else None,
+    }
+
+
 @router.get("")
 async def list_opportunities(
     db: AsyncSession = Depends(get_db),
-    type: Optional[str] = Query(default=None, description="Filter by opportunity_type"),
+    kind: str = Query(
+        default="all",
+        pattern="^(all|signals|deals)$",
+        description="all=merged feed, signals=area-derived only, deals=broker-submitted only",
+    ),
+    type: Optional[str] = Query(default=None, description="Signal-only: opportunity_type"),
+    area: Optional[str] = Query(default=None, description="Deal-only: case-insensitive area substring"),
+    strategy: Optional[str] = Query(default=None, description="Deal-only: strategy_type"),
     min_score: int = Query(default=0, ge=0, le=100),
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=20, ge=1, le=100),
     sort_by: str = Query(default="score", description="score|yield|appreciation"),
 ):
-    """Top opportunities across all tracked UAE areas.
+    """Unified opportunity feed.
 
-    Response shape:
+    Returns a single list mixing two ``kind`` values:
+      - ``area_signal`` — computed by ``opportunity_engine`` (no broker).
+      - ``broker_deal`` — broker-submitted, approved by admin.
+
+    Response shape::
+
       {
-        "opportunities": [...],
-        "total": <count after filters>,
+        "opportunities": [{kind, ...}, ...],
+        "total": <count after filters, pre-limit>,
         "generated_at": "<ISO>",
         "methodology_link": "/methodology"
       }
     """
-    areas, history_by_id = await _load_universe(db)
-    if not areas:
-        return {
-            "opportunities": [],
-            "total": 0,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "methodology_link": "/methodology",
-        }
+    items: list[dict] = []
 
-    reports = _score_all(areas, history_by_id)
-    areas_by_id = {a.id: a for a in areas}
-    attach_nearby(reports, {str(k): v for k, v in areas_by_id.items()}, k=3)
+    # ---- Area signals ----
+    if kind in ("all", "signals"):
+        areas, history_by_id = await _load_universe(db)
+        if areas:
+            reports = _score_all(areas, history_by_id)
+            areas_by_id = {a.id: a for a in areas}
+            attach_nearby(reports, {str(k): v for k, v in areas_by_id.items()}, k=3)
+            filtered = [r for r in reports if r.opportunity_score >= min_score]
+            if type:
+                filtered = [r for r in filtered if r.opportunity_type == type]
+            for r in filtered:
+                history = history_by_id.get(UUID(r.area_id))
+                confidence = build_confidence_report(
+                    areas_by_id.get(UUID(r.area_id)),
+                    list(history) if history else [],
+                )
+                signal = report_to_dict(r)
+                signal["kind"] = "area_signal"
+                signal["data_confidence"] = confidence_to_dict(confidence)
+                items.append(signal)
 
-    # Filter
-    filtered = [r for r in reports if r.opportunity_score >= min_score]
-    if type:
-        filtered = [r for r in filtered if r.opportunity_type == type]
-
-    # Sort
-    key_map = {
-        "score": lambda r: r.opportunity_score,
-        "yield": lambda r: r.key_metrics.rental_yield,
-        "appreciation": lambda r: r.key_metrics.appreciation_1y or 0.0,
-    }
-    sort_fn = key_map.get(sort_by, key_map["score"])
-    filtered.sort(key=sort_fn, reverse=True)
-
-    # Attach confidence (data confidence, not the engine's confidence_level)
-    out: list[dict] = []
-    for r in filtered[:limit]:
-        history = history_by_id.get(UUID(r.area_id))
-        confidence = build_confidence_report(
-            areas_by_id.get(UUID(r.area_id)), list(history) if history else []
+    # ---- Broker deals ----
+    if kind in ("all", "deals"):
+        stmt = (
+            select(InvestmentOpportunity)
+            .where(InvestmentOpportunity.status == "approved")
+            .options(selectinload(InvestmentOpportunity.broker))
+            .order_by(InvestmentOpportunity.created_at.desc())
         )
-        d = report_to_dict(r)
-        d["data_confidence"] = confidence_to_dict(confidence)
-        out.append(d)
+        if area:
+            stmt = stmt.where(InvestmentOpportunity.area.ilike(f"%{area}%"))
+        if strategy:
+            stmt = stmt.where(InvestmentOpportunity.strategy_type == strategy)
+        deals = (await db.execute(stmt)).scalars().all()
+        for d in deals:
+            score = float(d.opportunity_score) if d.opportunity_score is not None else 0.0
+            if score < min_score:
+                continue
+            items.append(_deal_to_card(d))
+
+    # ---- Sort across the merged set ----
+    def _yield_key(item: dict) -> float:
+        if item["kind"] == "area_signal":
+            km = item.get("key_metrics") or {}
+            return float(km.get("rental_yield") or 0.0)
+        return float(item.get("rental_yield") or 0.0)
+
+    def _appr_key(item: dict) -> float:
+        if item["kind"] == "area_signal":
+            km = item.get("key_metrics") or {}
+            return float(km.get("appreciation_1y") or 0.0)
+        return 0.0
+
+    key_map = {
+        "score": lambda x: float(x.get("opportunity_score") or 0.0),
+        "yield": _yield_key,
+        "appreciation": _appr_key,
+    }
+    items.sort(key=key_map.get(sort_by, key_map["score"]), reverse=True)
 
     return {
-        "opportunities": out,
-        "total": len(filtered),
+        "opportunities": items[:limit],
+        "total": len(items),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "methodology_link": "/methodology",
     }
+
+
+# ---- Broker-deal detail + consultation request ----
+
+
+@router.get("/deals/{deal_id}", response_model=DealOut)
+async def get_deal(deal_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Broker-deal detail (only approved deals are visible publicly)."""
+    deal = (
+        await db.execute(
+            select(InvestmentOpportunity)
+            .where(InvestmentOpportunity.id == deal_id)
+            .where(InvestmentOpportunity.status == "approved")
+            .options(selectinload(InvestmentOpportunity.broker))
+        )
+    ).scalar_one_or_none()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
+
+
+@router.post(
+    "/deals/{deal_id}/request-consultation",
+    response_model=ConsultationRequestResponse,
+    status_code=201,
+)
+async def request_deal_consultation(
+    deal_id: UUID,
+    payload: LeadCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Investor requests a consultation tied to a specific broker deal.
+
+    Lead + Consultation are created and assigned to the deal's broker.
+    """
+    deal = (
+        await db.execute(
+            select(InvestmentOpportunity)
+            .where(InvestmentOpportunity.id == deal_id)
+            .where(InvestmentOpportunity.status == "approved")
+        )
+    ).scalar_one_or_none()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    # Path-derived opportunity_id wins over any body-supplied value.
+    payload.opportunity_id = deal.id
+    lead, consultation = await _create_lead_and_consultation(db, payload, deal)
+    return ConsultationRequestResponse(
+        message=SUCCESS_MESSAGE,
+        lead=LeadOut.model_validate(lead),
+        consultation=ConsultationOut.model_validate(consultation),
+    )
 
 
 @router.post("/{area_id}/explain")
