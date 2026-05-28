@@ -504,3 +504,233 @@ export interface ApiKeyCreateRequest {
 export interface ApiKeyCreateResponse extends ApiKeyPublic {
   full_key: string;
 }
+
+// ---------- Supply layer: brokers, deals, leads, consultations ----------
+
+export type BrokerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+export interface Broker {
+  id: string;
+  full_name: string;
+  company_name: string | null;
+  email: string;
+  phone: string | null;
+  whatsapp: string | null;
+  rera_license: string | null;
+  languages: string[] | null;
+  specialist_areas: string[] | null;
+  property_types: string[] | null;
+  experience_years: number | null;
+  bio: string | null;
+  status: BrokerStatus;
+  performance_score: number;
+  response_score: number;
+  created_at: string;
+}
+
+export type BrokerApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface BrokerApplication {
+  id: string;
+  full_name: string;
+  company_name: string | null;
+  email: string;
+  phone: string | null;
+  whatsapp: string | null;
+  rera_license: string | null;
+  specialist_areas: string[] | null;
+  experience_years: number | null;
+  message: string | null;
+  status: BrokerApplicationStatus;
+  created_at: string;
+}
+
+export interface BrokerApplicationCreate {
+  full_name: string;
+  company_name?: string;
+  email: string;
+  phone?: string;
+  whatsapp?: string;
+  rera_license?: string;
+  specialist_areas?: string[];
+  experience_years?: number;
+  message?: string;
+}
+
+export interface BrokerApproveResponse {
+  broker: Broker;
+  temp_password: string | null;
+}
+
+export interface BrokerLoginResponse {
+  token: string;
+  broker: Broker;
+}
+
+export type DealStatus =
+  | 'draft' | 'pending_review' | 'approved' | 'rejected' | 'archived';
+
+export type DealStrategy =
+  | 'income' | 'growth' | 'balanced' | 'luxury' | 'high-risk';
+
+export type DealRisk = 'low' | 'medium' | 'high';
+
+export interface BrokerStub {
+  id: string;
+  full_name: string;
+  company_name: string | null;
+  whatsapp?: string | null;
+  phone?: string | null;
+}
+
+export interface Deal {
+  id: string;
+  broker_id: string | null;
+  title: string;
+  emirate: string;
+  area: string;
+  property_type: string;
+  unit_type: string | null;
+  price: number;
+  price_per_sqft: number | null;
+  expected_annual_rent: number | null;
+  expected_gross_yield: number | null;
+  expected_net_yield: number | null;
+  service_charges: number | null;
+  strategy_type: DealStrategy;
+  opportunity_score: number | null;
+  risk_level: DealRisk;
+  confidence_score: number | null;
+  why_opportunity: string | null;
+  risk_summary: string | null;
+  best_for: string | null;
+  status: DealStatus;
+  source_type: 'broker' | 'developer' | 'manual';
+  created_at: string;
+  updated_at: string;
+  broker?: BrokerStub | null;
+}
+
+export interface DealCreate {
+  title: string;
+  emirate?: string;
+  area: string;
+  property_type: string;
+  unit_type?: string;
+  price: number;
+  price_per_sqft?: number;
+  expected_annual_rent?: number;
+  expected_gross_yield?: number;
+  expected_net_yield?: number;
+  service_charges?: number;
+  strategy_type?: DealStrategy;
+  risk_level?: DealRisk;
+  confidence_score?: number;
+  why_opportunity: string;
+  risk_summary: string;
+  best_for?: string;
+}
+
+export interface DealUpdate extends Partial<DealCreate> {
+  status?: 'draft' | 'pending_review' | 'archived';
+}
+
+export type LeadStatus =
+  | 'new' | 'contacted' | 'qualified' | 'viewing'
+  | 'negotiating' | 'closed' | 'lost';
+
+export interface InvestorLead {
+  id: string;
+  opportunity_id: string | null;
+  matched_broker_id: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  budget: number | null;
+  investment_goal: string | null;
+  risk_level: string | null;
+  preferred_area: string | null;
+  timeline: string | null;
+  message: string | null;
+  lead_score: number | null;
+  status: LeadStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadCreate {
+  opportunity_id?: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  budget?: number;
+  investment_goal?: string;
+  risk_level?: 'low' | 'medium' | 'high';
+  preferred_area?: string;
+  timeline?: string;
+  message?: string;
+}
+
+export interface LeadUpdate {
+  status?: LeadStatus;
+  matched_broker_id?: string;
+  lead_score?: number;
+  message?: string;
+}
+
+export type ConsultationStatus =
+  | 'requested' | 'assigned' | 'contacted' | 'completed' | 'cancelled';
+
+export interface Consultation {
+  id: string;
+  investor_lead_id: string;
+  broker_id: string | null;
+  opportunity_id: string | null;
+  status: ConsultationStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultationRequestResponse {
+  message: string;
+  lead: InvestorLead;
+  consultation: Consultation;
+}
+
+// ---------- Unified opportunity feed ----------
+
+export interface AreaSignalFeedItem extends OpportunityResult {
+  kind: 'area_signal';
+}
+
+export interface BrokerDealFeedItem {
+  kind: 'broker_deal';
+  id: string;
+  title: string;
+  area_name: string;
+  emirate: string;
+  price: number;
+  property_type: string;
+  unit_type: string | null;
+  rental_yield: number | null;
+  expected_net_yield: number | null;
+  opportunity_score: number;
+  strategy: DealStrategy;
+  risk_level: DealRisk;
+  confidence_score: number | null;
+  why_short: string;
+  source_type: 'broker' | 'developer' | 'manual';
+  broker: { id: string; full_name: string; company_name: string | null } | null;
+}
+
+export type OpportunityFeedItem = AreaSignalFeedItem | BrokerDealFeedItem;
+
+export interface OpportunityFeedResponse {
+  opportunities: OpportunityFeedItem[];
+  total: number;
+  generated_at: string;
+  methodology_link: string;
+}
