@@ -21,6 +21,7 @@ from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
 from app.schemas.consultation import ConsultationOut, ConsultationRequestResponse
 from app.schemas.investor_lead import LeadCreate, LeadOut
+from app.services.lead_scoring import compute_lead_score
 
 
 router = APIRouter(
@@ -42,9 +43,20 @@ async def _create_lead_and_consultation(
     opportunity: InvestmentOpportunity | None,
 ) -> tuple[InvestorLead, Consultation]:
     broker_id = opportunity.broker_id if opportunity else None
+    lead_score = compute_lead_score(
+        has_opportunity=opportunity is not None,
+        whatsapp=payload.whatsapp,
+        phone=payload.phone,
+        email=payload.email,
+        budget=payload.budget,
+        investment_goal=payload.investment_goal,
+        timeline=payload.timeline,
+        message=payload.message,
+    )
     lead = InvestorLead(
         opportunity_id=opportunity.id if opportunity else None,
         matched_broker_id=broker_id,
+        lead_score=lead_score,
         **payload.model_dump(exclude={"opportunity_id"}),
     )
     db.add(lead)
