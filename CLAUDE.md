@@ -84,8 +84,8 @@ floxcy-realestate-mvp/
 - `/admin` - Admin panel (seed data, internal tools)
 
 ## Database Tables
-- `areas` - 10 Dubai areas with sample data (name, price/sqft, ROI, type, etc.)
-- `market_snapshots` - 120 records (historical market data points)
+- `areas` - 70 Dubai areas (Q1 2026 calibrated): premium/luxury, mid-range, mixed-use/commercial, beachfront, emerging, old Dubai
+- `market_snapshots` - 840 records (12 monthly snapshots × 70 areas)
 - `alembic_version` - Migration tracking
 
 ## Common Tasks

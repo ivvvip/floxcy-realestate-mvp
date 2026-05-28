@@ -37,7 +37,7 @@ export const PLANS: Plan[] = [
     cta_href: '/dashboard',
     rate_limit_per_min: 60,
     features: [
-      { label: 'Dashboard with 10 UAE areas', included: true },
+      { label: 'Dashboard with limited UAE coverage (20 areas)', included: true },
       { label: 'Basic rankings', included: true },
       { label: 'Confidence layer on every metric', included: true },
       { label: 'Read-only API (60 req/min)', included: true },
