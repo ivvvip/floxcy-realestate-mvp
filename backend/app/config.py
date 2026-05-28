@@ -57,6 +57,9 @@ class Settings(BaseSettings):
 
     # API
     API_V1_PREFIX: str = "/api/v1"
+
+    # n8n webhook shared secret. Empty = accept unsigned (dev / early trial).
+    N8N_WEBHOOK_SECRET: str = ""
     PROJECT_NAME: str = "Floxcy MVP"
 
     # OpenRouter (LLM advisor)
