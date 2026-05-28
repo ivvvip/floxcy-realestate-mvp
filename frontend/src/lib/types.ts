@@ -620,12 +620,12 @@ export interface DealCreate {
   price: number;
   price_per_sqft?: number;
   expected_annual_rent?: number;
-  expected_gross_yield?: number;
+  expected_gross_yield: number;
   expected_net_yield?: number;
   service_charges?: number;
-  strategy_type?: DealStrategy;
-  risk_level?: DealRisk;
-  confidence_score?: number;
+  strategy_type: DealStrategy;
+  risk_level: DealRisk;
+  confidence_score: number;
   why_opportunity: string;
   risk_summary: string;
   best_for?: string;
