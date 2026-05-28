@@ -28,6 +28,7 @@ from app.schemas.broker import (
 )
 from app.schemas.investor_lead import LeadOut, LeadUpdate
 from app.schemas.opportunity_deal import DealAdminUpdate, DealOut
+from app.services.deal_scoring import score_and_apply
 
 
 router = APIRouter(
@@ -196,6 +197,8 @@ async def approve_opportunity(
             status_code=409, detail=f"Cannot approve from status '{opp.status}'"
         )
     opp.status = "approved"
+    # Re-score with latest area context before going public.
+    await score_and_apply(db, opp)
     await db.commit()
     await db.refresh(opp)
     return opp

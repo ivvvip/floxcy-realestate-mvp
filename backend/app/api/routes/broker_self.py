@@ -20,6 +20,7 @@ from app.models.investor_lead import InvestorLead
 from app.schemas.broker import BrokerLoginRequest, BrokerLoginResponse, BrokerOut
 from app.schemas.investor_lead import LeadOut, LeadUpdate
 from app.schemas.opportunity_deal import DealCreate, DealOut, DealUpdate
+from app.services.deal_scoring import score_and_apply
 
 
 router = APIRouter(
@@ -98,6 +99,8 @@ async def create_my_opportunity(
         **body.model_dump(),
     )
     db.add(opp)
+    await db.flush()
+    await score_and_apply(db, opp)
     await db.commit()
     await db.refresh(opp)
     return opp
@@ -125,8 +128,15 @@ async def update_my_opportunity(
             status_code=409,
             detail="Approved opportunities can only be archived, not edited",
         )
-    for k, v in body.model_dump(exclude_unset=True).items():
+    payload = body.model_dump(exclude_unset=True)
+    for k, v in payload.items():
         setattr(opp, k, v)
+    # Re-score if anything that feeds the score changed.
+    if payload.keys() & {
+        "price", "price_per_sqft", "expected_gross_yield",
+        "expected_net_yield", "area", "risk_level", "confidence_score",
+    }:
+        await score_and_apply(db, opp)
     await db.commit()
     await db.refresh(opp)
     return opp
