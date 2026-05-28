@@ -99,8 +99,10 @@ def classify_investor_type(
 
     Categories: Income-focused | Growth-focused | Balanced | Speculative.
     """
-    appr = appreciation_1y or 0.0
-    risk = risk_score if risk_score is not None else 5.0
+    # Coerce Decimal/int to float (SQLAlchemy Numeric returns Decimal).
+    rental_yield = float(rental_yield) if rental_yield is not None else 0.0
+    appr = float(appreciation_1y) if appreciation_1y is not None else 0.0
+    risk = float(risk_score) if risk_score is not None else 5.0
 
     if risk >= 6.5 and (appr >= 12 or rental_yield >= 9):
         return "Speculative"
