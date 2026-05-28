@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowUpRight, LayoutDashboard, TrendingUp } from 'lucide-react';
 import { AlertsCard } from './AlertsCard';
+import { OpportunitiesWidget } from './OpportunitiesWidget';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
@@ -247,6 +248,11 @@ export default async function DashboardPage() {
           <div className="px-4 py-2 border-t border-border text-[11px] text-fg-subtle">
             Gross rental yield by area. UAE benchmark ~6.5%.
           </div>
+        </div>
+
+        {/* Top opportunities (killer feature widget) */}
+        <div className="mt-6">
+          <OpportunitiesWidget />
         </div>
 
         {/* Alerts */}

@@ -99,6 +99,29 @@ async def get_areas_stats(db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.get("/{area_id}/undervaluation")
+async def area_undervaluation(area_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Undervaluation report for a single area, including nearby-3 comparison."""
+    # Delegate to the opportunities router's helpers
+    from app.api.routes.opportunities import (
+        _attach_nearby,
+        _load_universe,
+        _score_all,
+        _to_payload,
+    )
+
+    area = (await db.execute(select(Area).where(Area.id == area_id))).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+    universe = await _load_universe(db)
+    rows = _score_all(universe)
+    _attach_nearby(rows, k=3)
+    target = next((r for r in rows if r["area"].id == area_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="No snapshots for area")
+    return _to_payload(target)
+
+
 @router.get("/{area_id}/confidence")
 async def area_confidence(area_id: UUID, db: AsyncSession = Depends(get_db)):
     """Data confidence breakdown for a single area."""

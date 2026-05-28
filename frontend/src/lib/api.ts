@@ -21,6 +21,7 @@ import type {
   ApiKeyCreateResponse,
   ApiKeyCreateRequest,
   AIAnalyticsResponse,
+  OpportunityExplanation,
 } from './types';
 
 export const API_BASE_URL =
@@ -138,6 +139,19 @@ export async function getOpportunities(opts?: {
   if (opts?.limit) params.set('limit', String(opts.limit));
   const q = params.toString();
   return request(`/api/v1/opportunities${q ? `?${q}` : ''}`, { revalidate: 300 });
+}
+
+export async function explainOpportunity(areaId: string): Promise<OpportunityExplanation> {
+  return request<OpportunityExplanation>(
+    `/api/v1/opportunities/${areaId}/explain`,
+    { method: 'POST', revalidate: false }
+  );
+}
+
+export async function getAreaUndervaluation(id: string): Promise<OpportunityResult> {
+  return request<OpportunityResult>(`/api/v1/areas/${id}/undervaluation`, {
+    revalidate: 300,
+  });
 }
 
 export async function getRankings(by: string, limit = 20): Promise<{

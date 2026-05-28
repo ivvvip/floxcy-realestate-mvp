@@ -11,10 +11,12 @@ should. Scoring inputs:
   * Inverse risk score                     (weight 0.10)
 
 Output per area:
-  Undervaluation { score (0–100), tier, headline, reasons[], risks[], best_for[] }
+  Undervaluation { score, tier, headline, reasons[], risks[], best_for[],
+                   suggested_investor_type, nearby_comparison[], factors[] }
 """
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from statistics import median
 from typing import Iterable, Optional
@@ -38,6 +40,17 @@ class UndervaluationFactor:
 
 
 @dataclass
+class NearbyArea:
+    area_id: str
+    area_name: str
+    distance_km: float
+    score: int
+    tier: str
+    price_per_sqft: float
+    rental_yield: float
+
+
+@dataclass
 class UndervaluationReport:
     area_id: str
     area_name: str
@@ -48,6 +61,56 @@ class UndervaluationReport:
     risks: list[str]
     best_for: list[str]
     factors: list[UndervaluationFactor] = field(default_factory=list)
+    # P1 extensions
+    suggested_investor_type: str = "Balanced"
+    nearby_comparison: list[NearbyArea] = field(default_factory=list)
+
+
+# Map raw tier codes → display labels. Backend returns codes; the frontend
+# is also free to map (Display-only rename per product decision).
+TIER_DISPLAY: dict[str, str] = {
+    "strong": "Strong Opportunity",
+    "moderate": "Moderate",
+    "neutral": "Fair Value",
+    "overpriced": "Overvalued",
+}
+
+
+def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km between two lat/lng points."""
+    R = 6371.0
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lng2 - lng1)
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    )
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def classify_investor_type(
+    rental_yield: float,
+    appreciation_1y: float | None,
+    risk_score: float | None,
+) -> str:
+    """Pick the headline investor profile for an area.
+
+    Categories: Income-focused | Growth-focused | Balanced | Speculative.
+    """
+    appr = appreciation_1y or 0.0
+    risk = risk_score if risk_score is not None else 5.0
+
+    if risk >= 6.5 and (appr >= 12 or rental_yield >= 9):
+        return "Speculative"
+    income_edge = rental_yield - BENCHMARK_YIELD  # pp vs benchmark
+    growth_edge = appr - BENCHMARK_APPRECIATION  # pp vs benchmark
+    if income_edge >= 1.0 and growth_edge < 2.0:
+        return "Income-focused"
+    if growth_edge >= 2.0 and income_edge < 1.0:
+        return "Growth-focused"
+    return "Balanced"
 
 
 def _tier_for(score: float) -> str:
@@ -271,6 +334,12 @@ def detect_undervaluation(
     if not best_for:
         best_for.append("Balanced portfolios; suitable for diversification, not concentration")
 
+    investor_type = classify_investor_type(
+        rental_yield=yield_now,
+        appreciation_1y=latest.appreciation_1y,
+        risk_score=latest.risk_score,
+    )
+
     return UndervaluationReport(
         area_id=str(area.id),
         area_name=area.name,
@@ -281,6 +350,7 @@ def detect_undervaluation(
         risks=risks,
         best_for=best_for,
         factors=factors,
+        suggested_investor_type=investor_type,
     )
 
 

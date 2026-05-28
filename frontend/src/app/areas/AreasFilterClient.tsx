@@ -1,17 +1,25 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { LayoutGrid, List, SlidersHorizontal, MapPin } from 'lucide-react';
-import type { Area } from '@/lib/types';
+import type { Area, OpportunityResult, OpportunityTier } from '@/lib/types';
 import { AreaCard } from '@/components/AreaCard';
 import { DataBadge } from '@/components/data/DataBadge';
 import { FilterChip } from '@/components/data/FilterChip';
 import { formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { getOpportunities } from '@/lib/api';
 
 type TypeFilter = 'all' | 'residential' | 'commercial' | 'mixed';
-type SortKey = 'name' | 'yield' | 'price' | 'appreciation' | 'score';
+type SortKey = 'name' | 'yield' | 'price' | 'appreciation' | 'score' | 'undervaluation';
+
+const TIER_LABEL: Record<OpportunityTier, string> = {
+  strong: 'Strong Opportunity',
+  moderate: 'Moderate',
+  neutral: 'Fair Value',
+  overpriced: 'Overvalued',
+};
 type SortDir = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
@@ -33,10 +41,27 @@ export function AreasFilterClient({ areas }: Props) {
   const [minYield, setMinYield] = useState(0);
   const [maxPrice, setMaxPrice] = useState(priceRange[1]);
   const [minScore, setMinScore] = useState(0);
-  const [sortKey, setSortKey] = useState<SortKey>('score');
+  const [sortKey, setSortKey] = useState<SortKey>('undervaluation');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [view, setView] = useState<ViewMode>('table');
   const [filtersOpen, setFiltersOpen] = useState(true);
+
+  // Lazy-load undervaluation scores once so the screener can sort + display them.
+  const [oppByArea, setOppByArea] = useState<Record<string, OpportunityResult>>({});
+  useEffect(() => {
+    let cancelled = false;
+    getOpportunities({ limit: 100 })
+      .then((r) => {
+        if (cancelled) return;
+        const map: Record<string, OpportunityResult> = {};
+        for (const o of r.results) map[o.area_id] = o;
+        setOppByArea(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const list = areas.filter((a) => {
@@ -63,10 +88,15 @@ export function AreasFilterClient({ areas }: Props) {
           return ((a.appreciation_1y ?? 0) - (b.appreciation_1y ?? 0)) * dir;
         case 'score':
           return ((a.investment_score ?? 0) - (b.investment_score ?? 0)) * dir;
+        case 'undervaluation': {
+          const sa = oppByArea[a.id]?.score ?? -1;
+          const sb = oppByArea[b.id]?.score ?? -1;
+          return (sa - sb) * dir;
+        }
       }
     });
     return list;
-  }, [areas, typeFilter, minYield, maxPrice, minScore, sortKey, sortDir]);
+  }, [areas, typeFilter, minYield, maxPrice, minScore, sortKey, sortDir, oppByArea]);
 
   const reset = () => {
     setTypeFilter('all');
@@ -307,6 +337,13 @@ export function AreasFilterClient({ areas }: Props) {
                       dir={sortDir}
                       onClick={() => toggleSort('score')}
                     />
+                    <SortHeader
+                      label="Undervalued"
+                      align="right"
+                      active={sortKey === 'undervaluation'}
+                      dir={sortDir}
+                      onClick={() => toggleSort('undervaluation')}
+                    />
                     <th>Location</th>
                   </tr>
                 </thead>
@@ -349,6 +386,23 @@ export function AreasFilterClient({ areas }: Props) {
                         {a.investment_score != null
                           ? a.investment_score.toFixed(1)
                           : '—'}
+                      </td>
+                      <td className="num">
+                        {oppByArea[a.id] ? (
+                          <span
+                            className={cn(
+                              'pill tabular',
+                              oppByArea[a.id].tier === 'strong' && 'pill-positive',
+                              oppByArea[a.id].tier === 'moderate' && 'pill-accent',
+                              oppByArea[a.id].tier === 'overpriced' && 'pill-negative'
+                            )}
+                            title={TIER_LABEL[oppByArea[a.id].tier]}
+                          >
+                            {oppByArea[a.id].score}
+                          </span>
+                        ) : (
+                          <span className="text-fg-subtle tabular">—</span>
+                        )}
                       </td>
                       <td>
                         <span className="inline-flex items-center gap-1 text-[11px] text-fg-muted">

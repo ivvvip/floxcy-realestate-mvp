@@ -222,16 +222,35 @@ export interface UndervaluationFactor {
   note: string;
 }
 
+export interface NearbyArea {
+  area_id: string;
+  area_name: string;
+  distance_km: number;
+  score: number;
+  tier: OpportunityTier;
+  price_per_sqft: number;
+  rental_yield: number;
+}
+
+export type InvestorType =
+  | 'Income-focused'
+  | 'Growth-focused'
+  | 'Balanced'
+  | 'Speculative';
+
 export interface OpportunityResult {
   area_id: string;
   area_name: string;
   score: number;
   tier: OpportunityTier;
+  tier_display?: string;
   headline: string;
   reasons: string[];
   risks: string[];
   best_for: string[];
   factors: UndervaluationFactor[];
+  suggested_investor_type?: InvestorType | string;
+  nearby_comparison?: NearbyArea[];
   confidence: ConfidenceReport;
   snapshot: {
     snapshot_date: string;
@@ -241,6 +260,18 @@ export interface OpportunityResult {
     transaction_volume: number | null;
     investment_score: number | null;
   };
+}
+
+export interface OpportunityExplanation {
+  area_id: string;
+  area_name: string;
+  markdown: string;
+  model: string;
+  tokens: number;
+  cost_usd?: number;
+  latency_ms?: number;
+  fallback_used?: boolean;
+  cached: boolean;
 }
 
 // ---------- Rankings ----------
