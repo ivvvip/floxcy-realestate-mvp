@@ -139,36 +139,35 @@ export default async function HomePage() {
                 </span>
               </div>
               <h1 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-tight text-fg leading-[1.1]">
-                The intelligence layer behind UAE
+                Find UAE Real Estate Opportunities
                 <br className="hidden md:block" />{' '}
-                <span className="text-accent">real estate capital</span>.
+                <span className="text-accent">Before the Market Does</span>.
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-fg-muted">
-                Floxcy is an institutional-grade market terminal for UAE
-                property investors. Yield analytics, multi-factor area scoring,
-                and AI-generated investment intelligence — built for principals
-                deploying real capital, not browsers.
+                Floxcy combines market intelligence, AI analysis, and verified
+                investment specialists to help investors discover and act on
+                high-quality UAE property opportunities.
               </p>
               <div className="mt-5 flex items-center gap-2 flex-wrap">
                 <Link
-                  href="/advisor"
+                  href="/opportunities"
                   className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
                 >
                   <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                  Run AI Investment Analyst
+                  Explore Opportunities
+                </Link>
+                <Link
+                  href="/brokers/apply"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-3.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                >
+                  Join as Broker
+                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
                 </Link>
                 <Link
                   href="/dashboard"
                   className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
                 >
-                  Open market dashboard
-                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
-                </Link>
-                <Link
-                  href="/areas"
-                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
-                >
-                  Screen areas
+                  Market dashboard
                   <ArrowRight className="h-3 w-3" strokeWidth={2} />
                 </Link>
               </div>
@@ -488,6 +487,70 @@ export default async function HomePage() {
         <Container>
           <div className="my-6 border border-border rounded-lg bg-bg-card overflow-hidden">
             <RoiMiniWidget />
+          </div>
+        </Container>
+      </section>
+
+      {/* Verified Investment Specialists */}
+      <section className="border-b border-border">
+        <Container>
+          <div className="py-7">
+            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3 w-3 text-accent" strokeWidth={2} />
+              Verified investment specialists
+            </div>
+            <h2 className="mt-1 text-lg font-semibold text-fg">
+              Curated brokers, not a marketplace
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-muted">
+              Every broker on Floxcy goes through application review. Every
+              opportunity they submit is reviewed before publication. Investors
+              get a curated deal flow — not a flood of listings. Specialists
+              get serious investor inquiries — not unqualified noise.
+            </p>
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
+              <Link
+                href="/brokers/apply"
+                className="inline-flex h-9 items-center gap-1 rounded-md bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+              >
+                Apply as a specialist
+                <ArrowRight className="h-3 w-3" strokeWidth={2} />
+              </Link>
+              <Link
+                href="/opportunities"
+                className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+              >
+                Browse curated deals
+                <ArrowRight className="h-3 w-3" strokeWidth={2} />
+              </Link>
+            </div>
+          </div>
+        </Container>
+      </section>
+
+      {/* Request Investment Consultation */}
+      <section className="border-b border-border bg-accent/5">
+        <Container>
+          <div className="py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-accent font-medium">
+                Investor concierge
+              </div>
+              <h2 className="mt-1 text-lg font-semibold text-fg">
+                Request an investment consultation
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-fg-muted">
+                Tell us your goals and budget. A verified UAE specialist will
+                reach out — no spam, no marketing list.
+              </p>
+            </div>
+            <Link
+              href="/consultation"
+              className="inline-flex h-10 items-center gap-1.5 rounded-md bg-accent px-5 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+            >
+              Request Consultation
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+            </Link>
           </div>
         </Container>
       </section>
