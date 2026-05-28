@@ -19,6 +19,13 @@ DEAL_STATUSES = ("draft", "pending_review", "approved", "rejected", "archived")
 
 
 class DealCreate(BaseModel):
+    """Broker submission payload.
+
+    Quality control rule (Phase 7): every published opportunity must include
+    yield, confidence, strategy, risk, why, and risks. These are required at
+    submission time so brokers can't bypass curation by submitting a stub.
+    """
+
     title: str = Field(..., min_length=4, max_length=255)
     emirate: str = Field("Dubai", max_length=64)
     area: str = Field(..., min_length=1, max_length=255)
@@ -27,12 +34,19 @@ class DealCreate(BaseModel):
     price: Decimal = Field(..., gt=0)
     price_per_sqft: Optional[Decimal] = Field(None, gt=0)
     expected_annual_rent: Optional[Decimal] = Field(None, ge=0)
-    expected_gross_yield: Optional[float] = Field(None, ge=0, le=50)
+    expected_gross_yield: float = Field(
+        ..., ge=0, le=50, description="Required: expected gross rental yield (%)."
+    )
     expected_net_yield: Optional[float] = Field(None, ge=0, le=50)
     service_charges: Optional[Decimal] = Field(None, ge=0)
-    strategy_type: str = Field("balanced", pattern="^(income|growth|balanced|luxury|high-risk)$")
-    risk_level: str = Field("medium", pattern="^(low|medium|high)$")
-    confidence_score: Optional[float] = Field(None, ge=0, le=100)
+    strategy_type: str = Field(..., pattern="^(income|growth|balanced|luxury|high-risk)$")
+    risk_level: str = Field(..., pattern="^(low|medium|high)$")
+    confidence_score: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Required: broker confidence 0-100 (use 50 if unsure).",
+    )
     why_opportunity: str = Field(..., min_length=10, description="Investment thesis — required")
     risk_summary: str = Field(..., min_length=10, description="Risks — required")
     best_for: Optional[str] = None

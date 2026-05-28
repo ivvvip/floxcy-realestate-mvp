@@ -31,6 +31,38 @@ from app.schemas.opportunity_deal import DealAdminUpdate, DealOut
 from app.services.deal_scoring import score_and_apply
 
 
+# ---- Phase 7 quality-control rule ----
+# Every published opportunity must include the investment-case fields below.
+# Admin can rescue a partial submission via PATCH but cannot approve it until
+# all required fields are present.
+REQUIRED_FOR_APPROVAL = (
+    "why_opportunity",
+    "risk_summary",
+    "expected_gross_yield",
+    "strategy_type",
+    "confidence_score",
+)
+
+
+def _validate_for_approval(opp: InvestmentOpportunity) -> None:
+    """Reject approval of deals missing the curated-case fields."""
+    missing = [
+        f for f in REQUIRED_FOR_APPROVAL
+        if getattr(opp, f, None) in (None, "")
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot approve: missing required fields {missing}. "
+            "Edit the deal first or ask the broker to update it.",
+        )
+    if opp.broker_id is None and opp.source_type == "broker":
+        raise HTTPException(
+            status_code=422,
+            detail="Broker-source deal has no broker_id attached.",
+        )
+
+
 router = APIRouter(
     prefix="/api/v1/admin",
     tags=["admin-supply"],
@@ -196,6 +228,7 @@ async def approve_opportunity(
         raise HTTPException(
             status_code=409, detail=f"Cannot approve from status '{opp.status}'"
         )
+    _validate_for_approval(opp)
     opp.status = "approved"
     # Re-score with latest area context before going public.
     await score_and_apply(db, opp)

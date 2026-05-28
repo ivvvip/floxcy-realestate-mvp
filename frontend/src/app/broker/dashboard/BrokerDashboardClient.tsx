@@ -258,8 +258,10 @@ const EMPTY_DEAL: DealCreate = {
   area: '',
   property_type: 'apartment',
   price: 0,
+  expected_gross_yield: 0,
   strategy_type: 'balanced',
   risk_level: 'medium',
+  confidence_score: 50,
   why_opportunity: '',
   risk_summary: '',
 };
@@ -358,16 +360,15 @@ function SubmitDealForm({ onCreated }: { onCreated: () => void }) {
             className="input-field"
           />
         </Field>
-        <Field label="Expected gross yield (%)">
+        <Field label="Expected gross yield (%)" required>
           <input
             type="number"
+            required
             step="0.01"
             min={0}
             max={50}
-            value={form.expected_gross_yield ?? ''}
-            onChange={(e) =>
-              set('expected_gross_yield', e.target.value ? Number(e.target.value) : undefined)
-            }
+            value={form.expected_gross_yield || ''}
+            onChange={(e) => set('expected_gross_yield', Number(e.target.value || 0))}
             className="input-field"
           />
         </Field>
@@ -395,15 +396,14 @@ function SubmitDealForm({ onCreated }: { onCreated: () => void }) {
             <option value="high">High</option>
           </select>
         </Field>
-        <Field label="Confidence score (0–100)">
+        <Field label="Confidence score (0–100)" required>
           <input
             type="number"
+            required
             min={0}
             max={100}
-            value={form.confidence_score ?? ''}
-            onChange={(e) =>
-              set('confidence_score', e.target.value ? Number(e.target.value) : undefined)
-            }
+            value={form.confidence_score}
+            onChange={(e) => set('confidence_score', Number(e.target.value || 0))}
             className="input-field"
           />
         </Field>
