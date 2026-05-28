@@ -15,7 +15,10 @@ from app.services.insights import (
     market_brief,
     structured_area_insight,
 )
-from app.services.undervaluation import detect_undervaluation
+from app.services.opportunity_engine import (
+    build_report,
+    compute_cohort_median,
+)
 
 
 router = APIRouter(
@@ -56,12 +59,8 @@ async def get_market_brief(db: AsyncSession = Depends(get_db)) -> dict:
     avg_yield = sum(yields) / len(yields)
     avg_price = sum(prices) / len(prices)
 
-    # Top opportunities (reuse undervaluation logic, light cohort filter)
+    # Top opportunities via the Opportunity Engine
     universe_areas = [a for a, _ in pairs]
-    cohort_prices = prices
-    cohort_yields = yields
-    # Need full history per area for momentum-aware score. Pull cheaply.
-    by_id = {a.id: a for a in universe_areas}
     universe_full: list[tuple[Area, list[MarketSnapshot]]] = []
     for a in universe_areas:
         hist = (
@@ -73,25 +72,26 @@ async def get_market_brief(db: AsyncSession = Depends(get_db)) -> dict:
         ).scalars().all()
         universe_full.append((a, list(hist)))
 
+    cohort_median = compute_cohort_median(
+        [h[-1] for _, h in universe_full if h]
+    )
     opps: list[dict] = []
     for a, hist in universe_full:
         if not hist:
             continue
-        latest = hist[-1]
-        report = detect_undervaluation(
+        report = build_report(
             area=a,
-            latest=latest,
+            latest=hist[-1],
             history=hist,
-            cohort_prices=[p for p in cohort_prices if p != float(latest.avg_price_per_sqft)],
-            cohort_yields=[y for y in cohort_yields if y != float(latest.rental_yield)],
+            cohort_median_price=cohort_median,
         )
         opps.append(
             {
                 "name": a.name,
-                "score": report.score,
-                "tier": report.tier,
-                "yield": float(latest.rental_yield),
-                "price": float(latest.avg_price_per_sqft),
+                "score": report.opportunity_score,
+                "tier": report.opportunity_type,
+                "yield": report.key_metrics.rental_yield,
+                "price": report.key_metrics.price_per_sqft,
             }
         )
     opps.sort(key=lambda r: r["score"], reverse=True)
@@ -158,21 +158,14 @@ async def get_area_insight(
         raise HTTPException(status_code=404, detail="No snapshots for area")
     latest = history[-1]
 
-    # Need cohort medians for the undervaluation score that drives the cache key.
+    # Need cohort median + opportunity score so cache key invalidates on data drift.
     pairs = await _all_latest(db)
-    cohort_prices = [
-        float(s.avg_price_per_sqft) for _, s in pairs
-        if s.id != latest.id
-    ]
-    cohort_yields = [
-        float(s.rental_yield) for _, s in pairs if s.id != latest.id
-    ]
-    report = detect_undervaluation(
+    cohort_median = compute_cohort_median([s for _, s in pairs])
+    report = build_report(
         area=area,
         latest=latest,
         history=list(history),
-        cohort_prices=cohort_prices,
-        cohort_yields=cohort_yields,
+        cohort_median_price=cohort_median,
     )
 
     payload = await structured_area_insight(
@@ -186,16 +179,16 @@ async def get_area_insight(
         demand_score=float(latest.demand_score) if latest.demand_score else None,
         occupancy=float(latest.occupancy_rate) if latest.occupancy_rate else None,
         transaction_volume=latest.transaction_volume,
-        score=report.score,
-        tier=report.tier,
+        score=report.opportunity_score,
+        tier=report.opportunity_type,
     )
     if payload is None:
         raise HTTPException(status_code=503, detail="Insight unavailable")
     return {
         "area_id": str(area_id),
         "area_name": area.name,
-        "undervaluation_score": report.score,
-        "tier": report.tier,
+        "opportunity_score": report.opportunity_score,
+        "opportunity_type": report.opportunity_type,
         **payload,
     }
 

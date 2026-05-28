@@ -238,35 +238,79 @@ export type InvestorType =
   | 'Balanced'
   | 'Speculative';
 
+export type OpportunityType =
+  | 'Premium Hold'
+  | 'Growth Opportunity'
+  | 'Speculative'
+  | 'Income Opportunity'
+  | 'Value Opportunity'
+  | 'Balanced';
+
+export interface OpportunityComponents {
+  yield: number;
+  appreciation: number;
+  value: number;
+  demand: number;
+  risk: number;
+}
+
+export interface OpportunityKeyMetrics {
+  rental_yield: number;
+  price_per_sqft: number;
+  appreciation_1y: number | null;
+  appreciation_3y: number | null;
+  investment_score: number | null;
+  risk_score: number | null;
+  demand_score: number | null;
+  transaction_volume: number | null;
+  occupancy_rate: number | null;
+}
+
+export interface NearbyOpportunity {
+  area_id: string;
+  area_name: string;
+  distance_km: number;
+  opportunity_score: number;
+  opportunity_type: OpportunityType;
+  price_per_sqft: number;
+  rental_yield: number;
+}
+
 export interface OpportunityResult {
   area_id: string;
   area_name: string;
-  score: number;
-  tier: OpportunityTier;
-  tier_display?: string;
-  headline: string;
-  reasons: string[];
+  area_name_arabic: string | null;
+  area_type: string;
+  opportunity_score: number;
+  opportunity_type: OpportunityType;
+  confidence_level: number;
+  components: OpportunityComponents;
+  key_metrics: OpportunityKeyMetrics;
+  why: string[];
   risks: string[];
-  best_for: string[];
-  factors: UndervaluationFactor[];
-  suggested_investor_type?: InvestorType | string;
-  nearby_comparison?: NearbyArea[];
-  confidence: ConfidenceReport;
-  snapshot: {
-    snapshot_date: string;
-    avg_price_per_sqft: number;
-    rental_yield: number;
-    appreciation_1y: number | null;
-    transaction_volume: number | null;
-    investment_score: number | null;
-  };
+  best_for: string;
+  strategy: string;
+  nearby_comparison: NearbyOpportunity[];
+  snapshot_date: string;
+  last_updated: string;
+  data_confidence?: ConfidenceReport;
+}
+
+export interface OpportunitiesResponse {
+  opportunities: OpportunityResult[];
+  total: number;
+  generated_at: string;
+  methodology_link: string;
 }
 
 export interface OpportunityExplanation {
   area_id: string;
   area_name: string;
-  markdown: string;
-  model: string;
+  why: string[];
+  risks: string[];
+  best_for: string;
+  strategy: string;
+  model: string | null;
   tokens: number;
   cost_usd?: number;
   latency_ms?: number;

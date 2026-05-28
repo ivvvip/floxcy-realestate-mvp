@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock, Sparkles } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock, Sparkles, Activity } from 'lucide-react';
 import {
   ApiError,
   adminAiAnalytics,
@@ -14,6 +14,7 @@ import {
   adminRevokeApiKey,
   authLogout,
   authMe,
+  recomputeOpportunities,
 } from '@/lib/api';
 import type {
   AIAnalyticsResponse,
@@ -35,6 +36,8 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
+  const [recompResult, setRecompResult] = useState<string | null>(null);
+  const [recompLoading, setRecompLoading] = useState(false);
   const [newKey, setNewKey] = useState<ApiKeyCreateResponse | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyTier, setNewKeyTier] = useState<'free' | 'pro' | 'api' | 'enterprise'>('pro');
@@ -90,6 +93,19 @@ export function AdminDashboard() {
       setSeedResult(err instanceof Error ? err.message : 'Seed failed');
     } finally {
       setSeedLoading(false);
+    }
+  }
+
+  async function doRecompute() {
+    setRecompLoading(true);
+    setRecompResult(null);
+    try {
+      const r = await recomputeOpportunities();
+      setRecompResult(`✓ Cleared ${r.cleared_keys} AI explanation cache keys.`);
+    } catch (err) {
+      setRecompResult(err instanceof Error ? err.message : 'Recompute failed');
+    } finally {
+      setRecompLoading(false);
     }
   }
 
@@ -192,6 +208,47 @@ export function AdminDashboard() {
               {seedResult}
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Opportunity Engine */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+            Opportunity Engine
+          </span>
+          <span className="text-[11px] text-fg-subtle tabular">
+            P1B · scoring v1
+          </span>
+        </div>
+        <div className="p-4 flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={doRecompute}
+            disabled={recompLoading || me.role !== 'admin'}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {recompLoading ? 'Clearing…' : 'Recompute all (clear AI cache)'}
+          </button>
+          <span className="text-[11px] text-fg-subtle">
+            Drops all <code className="font-mono text-fg-muted">ai:opp_explain:*</code> keys in Redis.
+            Next /opportunities/&#123;id&#125;/explain call regenerates fresh AI text.
+          </span>
+          {recompResult && (
+            <span
+              className={cn(
+                'text-[11px] tabular',
+                recompResult.startsWith('✓') ? 'text-positive' : 'text-negative'
+              )}
+            >
+              {recompResult}
+            </span>
+          )}
+        </div>
+        <div className="border-t border-border px-4 py-2 text-[11px] text-fg-subtle">
+          Opportunity scores are computed on read from current snapshots — no cache to clear there.
+          AI explanations cached 24h per (area, score, type).
         </div>
       </div>
 

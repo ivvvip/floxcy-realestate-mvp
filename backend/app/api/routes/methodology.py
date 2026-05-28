@@ -84,17 +84,30 @@ METHODOLOGY_DOC = {
                 "on every figure derived from the snapshot."
             ),
         },
-        "undervaluation_score": {
+        "opportunity_score": {
             "formula": (
-                "0.30*yield_premium + 0.25*price_discount + 0.15*momentum + "
-                "0.10*volume + 0.10*demand + 0.10*inverse_risk"
+                "0.30*yield + 0.25*appreciation_1y + 0.25*value_entry + "
+                "0.10*demand + 0.10*inverse_risk"
             ),
-            "tiers": {
-                "strong": "75–100 — Strong opportunity",
-                "moderate": "55–74 — Moderate opportunity",
-                "neutral": "35–54 — Fair value",
-                "overpriced": "0–34 — Overpriced risk",
+            "components": {
+                "yield": "(rental_yield - 3) / 7 clamped [0,1]",
+                "appreciation": "(appreciation_1y + 5) / 25 clamped [0,1]",
+                "value_entry": "(cohort_median_price - price) / cohort_median + 0.5",
+                "demand": "0.6*occupancy + 0.4*min(1, volume/1500)",
+                "inverse_risk": "(10 - risk_score) / 10",
             },
+            "types": {
+                "Premium Hold": "score>=70 AND demand>=8 AND risk<=4",
+                "Growth Opportunity": "appreciation_1y>10 AND appr_component>0.7",
+                "Speculative": "appreciation_1y>12 AND risk>=6.5",
+                "Income Opportunity": "yield>7 AND value_component>0.6",
+                "Value Opportunity": "value_component>0.6 (otherwise)",
+                "Balanced": "fallback",
+            },
+            "classifier_order": (
+                "First-match wins, evaluated in this order: Premium Hold → "
+                "Growth → Speculative → Income → Value → Balanced."
+            ),
         },
         "advisor_match": {
             "formula": (

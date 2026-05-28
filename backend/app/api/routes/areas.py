@@ -101,25 +101,25 @@ async def get_areas_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/{area_id}/undervaluation")
 async def area_undervaluation(area_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Undervaluation report for a single area, including nearby-3 comparison."""
-    # Delegate to the opportunities router's helpers
-    from app.api.routes.opportunities import (
-        _attach_nearby,
-        _load_universe,
-        _score_all,
-        _to_payload,
-    )
+    """Opportunity Engine report for a single area, including nearby-3 comparison.
+
+    Endpoint name retained for backward compat with existing frontend imports;
+    payload now uses the new opportunity_score/opportunity_type contract.
+    """
+    from app.api.routes.opportunities import _load_universe, _score_all
+    from app.services.opportunity_engine import attach_nearby, report_to_dict
 
     area = (await db.execute(select(Area).where(Area.id == area_id))).scalar_one_or_none()
     if not area:
         raise HTTPException(status_code=404, detail="Area not found")
-    universe = await _load_universe(db)
-    rows = _score_all(universe)
-    _attach_nearby(rows, k=3)
-    target = next((r for r in rows if r["area"].id == area_id), None)
+    areas, history_by_id = await _load_universe(db)
+    reports = _score_all(areas, history_by_id)
+    areas_by_id = {str(a.id): a for a in areas}
+    attach_nearby(reports, areas_by_id, k=3)
+    target = next((r for r in reports if r.area_id == str(area_id)), None)
     if not target:
         raise HTTPException(status_code=404, detail="No snapshots for area")
-    return _to_payload(target)
+    return report_to_dict(target)
 
 
 @router.get("/{area_id}/confidence")

@@ -28,11 +28,13 @@ import { ConfidenceBadge, ConfidenceWarningBanner } from '@/components/data/Conf
 import { AreaAiInsightCard } from '@/components/data/AreaAiInsightCard';
 import type { ConfidenceReport, OpportunityResult } from '@/lib/types';
 
-const TIER_LABEL_MAP: Record<string, string> = {
-  strong: 'Strong Opportunity',
-  moderate: 'Moderate',
-  neutral: 'Fair Value',
-  overpriced: 'Overvalued',
+const TYPE_TONE: Record<string, string> = {
+  'Premium Hold': 'pill-accent',
+  'Growth Opportunity': 'pill-positive',
+  Speculative: 'pill-negative',
+  'Income Opportunity': 'pill-positive',
+  'Value Opportunity': 'pill-accent',
+  Balanced: '',
 };
 
 export const revalidate = 60;
@@ -296,7 +298,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             <div className="chart-header">
               <span className="chart-header-label inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
-                Undervaluation analysis
+                Opportunity classification
               </span>
               <Link
                 href="/opportunities"
@@ -309,35 +311,28 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               <div className="lg:col-span-7 bg-bg-card p-5">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <div className="text-4xl font-semibold tabular text-fg">
-                    {undervaluation.score}
+                    {undervaluation.opportunity_score}
                     <span className="text-base font-normal text-fg-subtle">/100</span>
                   </div>
                   <span
                     className={cn(
                       'pill text-sm',
-                      undervaluation.tier === 'strong' && 'pill-positive',
-                      undervaluation.tier === 'moderate' && 'pill-accent',
-                      undervaluation.tier === 'overpriced' && 'pill-negative'
+                      TYPE_TONE[undervaluation.opportunity_type] ?? ''
                     )}
                   >
-                    {TIER_LABEL_MAP[undervaluation.tier] ?? undervaluation.tier}
+                    {undervaluation.opportunity_type}
                   </span>
-                  {undervaluation.suggested_investor_type && (
-                    <span className="pill">
-                      Profile: {undervaluation.suggested_investor_type}
-                    </span>
-                  )}
+                  <span className="pill">
+                    Confidence: {(undervaluation.confidence_level * 100).toFixed(0)}%
+                  </span>
                 </div>
-                <p className="mt-3 text-sm text-fg-muted leading-relaxed">
-                  {undervaluation.headline}
-                </p>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-                      Why this scores well
+                      Why
                     </div>
                     <ul className="mt-1.5 space-y-1 text-xs text-fg-muted">
-                      {undervaluation.reasons.map((r, i) => (
+                      {undervaluation.why.map((r, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-positive" />
                           <span>{r}</span>
@@ -347,7 +342,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                   </div>
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-                      Risks to watch
+                      Risks
                     </div>
                     <ul className="mt-1.5 space-y-1 text-xs text-fg-muted">
                       {undervaluation.risks.map((r, i) => (
@@ -357,6 +352,24 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                      Best for
+                    </div>
+                    <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
+                      {undervaluation.best_for}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+                      Strategy
+                    </div>
+                    <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">
+                      {undervaluation.strategy}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -386,12 +399,11 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                           <span
                             className={cn(
                               'pill',
-                              n.tier === 'strong' && 'pill-positive',
-                              n.tier === 'overpriced' && 'pill-negative',
-                              n.tier === 'moderate' && 'pill-accent'
+                              TYPE_TONE[n.opportunity_type] ?? ''
                             )}
+                            title={n.opportunity_type}
                           >
-                            {n.score}
+                            {n.opportunity_score}
                           </span>
                         </td>
                       </tr>

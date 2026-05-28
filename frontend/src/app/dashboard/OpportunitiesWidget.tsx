@@ -4,15 +4,17 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { getOpportunities } from '@/lib/api';
-import type { OpportunityResult, OpportunityTier } from '@/lib/types';
+import type { OpportunityResult, OpportunityType } from '@/lib/types';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
-const TIER_DISPLAY: Record<OpportunityTier, string> = {
-  strong: 'Strong Opportunity',
-  moderate: 'Moderate',
-  neutral: 'Fair Value',
-  overpriced: 'Overvalued',
+const TYPE_TONE: Record<OpportunityType, string> = {
+  'Premium Hold': 'pill-accent',
+  'Growth Opportunity': 'pill-positive',
+  Speculative: 'pill-negative',
+  'Income Opportunity': 'pill-positive',
+  'Value Opportunity': 'pill-accent',
+  Balanced: '',
 };
 
 export function OpportunitiesWidget() {
@@ -23,7 +25,7 @@ export function OpportunitiesWidget() {
     let cancelled = false;
     getOpportunities({ limit: 5 })
       .then((r) => {
-        if (!cancelled) setRows(r.results);
+        if (!cancelled) setRows(r.opportunities);
       })
       .catch(() => {})
       .finally(() => {
@@ -64,9 +66,8 @@ export function OpportunitiesWidget() {
               <tr>
                 <th className="w-8 text-right">#</th>
                 <th>Area</th>
-                <th>Tier</th>
+                <th>Type</th>
                 <th className="text-right">Score</th>
-                <th>Profile</th>
                 <th className="text-right">Yield</th>
                 <th className="text-right">AED/sqft</th>
               </tr>
@@ -87,22 +88,18 @@ export function OpportunitiesWidget() {
                     <span
                       className={cn(
                         'pill',
-                        o.tier === 'strong' && 'pill-positive',
-                        o.tier === 'moderate' && 'pill-accent'
+                        TYPE_TONE[o.opportunity_type] ?? ''
                       )}
                     >
-                      {TIER_DISPLAY[o.tier]}
+                      {o.opportunity_type}
                     </span>
                   </td>
-                  <td className="num font-semibold text-fg">{o.score}</td>
-                  <td>
-                    <span className="pill">
-                      {o.suggested_investor_type ?? '—'}
-                    </span>
-                  </td>
-                  <td className="num">{formatPercent(o.snapshot.rental_yield, 2)}</td>
+                  <td className="num font-semibold text-fg">{o.opportunity_score}</td>
                   <td className="num">
-                    {formatNumber(o.snapshot.avg_price_per_sqft, 0)}
+                    {formatPercent(o.key_metrics.rental_yield, 2)}
+                  </td>
+                  <td className="num">
+                    {formatNumber(o.key_metrics.price_per_sqft, 0)}
                   </td>
                 </tr>
               ))}

@@ -23,6 +23,7 @@ import { Sparkline } from '@/components/data/Sparkline';
 import { summaryForLatest, describeOpportunity, interpretRisk } from '@/lib/insights';
 import { cn } from '@/lib/cn';
 import { RoiMiniWidget } from './RoiMiniWidget';
+import { HomeOpportunities } from './HomeOpportunities';
 
 export const revalidate = 300;
 
@@ -270,7 +271,10 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* Featured: Top Investment Opportunity */}
+      {/* Today's Top Opportunities (P1B — Opportunity Engine) */}
+      <HomeOpportunities />
+
+      {/* Featured: Top Investment Opportunity (legacy single-area card) */}
       {featured && featuredSummary && featuredOpp && (
         <section className="border-b border-border bg-bg-card/20">
           <Container>

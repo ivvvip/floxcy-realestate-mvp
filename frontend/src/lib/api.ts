@@ -22,6 +22,7 @@ import type {
   ApiKeyCreateRequest,
   AIAnalyticsResponse,
   OpportunityExplanation,
+  OpportunitiesResponse,
   MarketBrief,
   AreaInsight,
   TrendsResponse,
@@ -134,14 +135,29 @@ export async function advisorQuery(
 // ---------- New: opportunities, rankings, alerts, methodology ----------
 
 export async function getOpportunities(opts?: {
-  tier?: 'strong' | 'moderate' | 'neutral' | 'overpriced';
+  type?: string;
+  min_score?: number;
   limit?: number;
-}): Promise<{ count: number; results: OpportunityResult[] }> {
+  sort_by?: 'score' | 'yield' | 'appreciation';
+}): Promise<OpportunitiesResponse> {
   const params = new URLSearchParams();
-  if (opts?.tier) params.set('tier', opts.tier);
+  if (opts?.type) params.set('type', opts.type);
+  if (opts?.min_score != null) params.set('min_score', String(opts.min_score));
   if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.sort_by) params.set('sort_by', opts.sort_by);
   const q = params.toString();
-  return request(`/api/v1/opportunities${q ? `?${q}` : ''}`, { revalidate: 300 });
+  return request<OpportunitiesResponse>(
+    `/api/v1/opportunities${q ? `?${q}` : ''}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function recomputeOpportunities(): Promise<{ status: string; cleared_keys: number; ts: string }> {
+  return request('/api/v1/opportunities/recompute', {
+    method: 'POST',
+    revalidate: false,
+    withCredentials: true,
+  });
 }
 
 export async function explainOpportunity(areaId: string): Promise<OpportunityExplanation> {

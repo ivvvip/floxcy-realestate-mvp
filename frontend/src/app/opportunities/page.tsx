@@ -7,19 +7,21 @@ import { getOpportunities } from '@/lib/api';
 import type { OpportunityResult } from '@/lib/types';
 
 export const metadata = {
-  title: 'Undervalued Area Detector',
+  title: 'Opportunity Engine',
   description:
-    'AI-driven detection of UAE real-estate areas trading below where fundamentals suggest they should.',
+    'AI-ranked UAE real-estate investment opportunities across 70 Dubai areas.',
 };
 
 export const revalidate = 300;
 
 export default async function OpportunitiesPage() {
   let opportunities: OpportunityResult[] = [];
+  let total = 0;
   let error: string | null = null;
   try {
-    const res = await getOpportunities({ limit: 50 });
-    opportunities = res.results;
+    const res = await getOpportunities({ limit: 50, min_score: 0 });
+    opportunities = res.opportunities ?? [];
+    total = res.total ?? 0;
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load opportunities.';
   }
@@ -35,14 +37,14 @@ export default async function OpportunitiesPage() {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight">
-                    Undervalued Area Detector
+                    Top UAE Investment Opportunities
                   </h1>
                   <span className="pill pill-accent">Killer feature</span>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted max-w-2xl">
-                  Multi-factor scan: yield premium, price discount, momentum,
-                  volume, demand, and risk. Areas scoring 75+ flag as strong
-                  opportunities. Every score includes data-confidence and{' '}
+                  AI-ranked opportunities across 70 Dubai areas. Six categories
+                  (Premium Hold, Growth, Speculative, Income, Value, Balanced).
+                  Every score is reproducible — see{' '}
                   <Link
                     href="/methodology"
                     className="text-accent hover:underline"
@@ -64,7 +66,10 @@ export default async function OpportunitiesPage() {
               {error}
             </div>
           ) : (
-            <OpportunitiesClient opportunities={opportunities} />
+            <OpportunitiesClient
+              opportunities={opportunities}
+              total={total}
+            />
           )}
         </div>
       </Container>

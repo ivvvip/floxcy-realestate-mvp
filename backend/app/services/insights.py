@@ -153,6 +153,121 @@ async def area_explanation(
 # P2: STRUCTURED AREA INSIGHT (JSON)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# P1B: STRUCTURED OPPORTUNITY EXPLANATION
+# ---------------------------------------------------------------------------
+
+OPPORTUNITY_EXPLAIN_SYSTEM = """You are Floxcy's UAE real-estate analyst.
+
+You return STRICT JSON (no prose, no markdown fences) explaining an
+investment opportunity. Audience: property investors. Tone: institutional.
+
+OPERATING RULES
+- Ground every sentence in the numbers passed in the user message. Never
+  invent figures.
+- 3-4 bullets for "why", 1-2 bullets for "risks", one short sentence each
+  for "best_for" and "strategy".
+- Output a single JSON object with EXACTLY these keys:
+  {
+    "why": ["bullet 1", "bullet 2", "bullet 3", ...],
+    "risks": ["risk 1", "risk 2"],
+    "best_for": "investor profile description (one sentence)",
+    "strategy": "suggested investment strategy (one sentence)"
+  }
+- Do NOT include any wrapper, key, or comment outside that JSON.
+- Maximum 150 words across all fields combined.
+"""
+
+
+async def opportunity_explanation(
+    *,
+    area_id: str,
+    area_name: str,
+    opportunity_score: int,
+    opportunity_type: str,
+    rental_yield: float,
+    price_per_sqft: float,
+    appreciation_1y: float | None,
+    risk_score: float | None,
+    demand_score: float | None,
+    transaction_volume: int | None,
+    cohort_median_price: float,
+    why_rules: list[str],
+    risks_rules: list[str],
+) -> Optional[dict]:
+    """Return structured JSON {why, risks, best_for, strategy, model, tokens, cached}.
+    None on failure (caller should fall back to rules-based explanation)."""
+    if not settings.OPENROUTER_API_KEY:
+        return None
+
+    blob = f"opp|{area_id}|{opportunity_score}|{opportunity_type}".encode()
+    ck = "ai:opp_explain:" + hashlib.sha256(blob).hexdigest()
+    try:
+        cached_blob = await redis_client.get(ck)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob)
+            payload["cached"] = True
+            return payload
+        except Exception:
+            pass
+
+    user_msg = (
+        f"Area: {area_name}\n"
+        f"Opportunity score: {opportunity_score}/100\n"
+        f"Opportunity type: {opportunity_type}\n"
+        f"Rental yield: {rental_yield:.2f}%\n"
+        f"Price per sqft: AED {price_per_sqft:,.0f} "
+        f"(cohort median: AED {cohort_median_price:,.0f})\n"
+        f"1Y appreciation: "
+        f"{(appreciation_1y if appreciation_1y is not None else 0):+.2f}%\n"
+        f"Risk score: "
+        f"{(risk_score if risk_score is not None else 5):.1f}/10 (lower is safer)\n"
+        f"Demand score: "
+        f"{(demand_score if demand_score is not None else 5):.1f}/10\n"
+        f"Transaction volume (latest): {transaction_volume or 0}\n"
+        f"\n"
+        f"Rules-derived drivers: " + " | ".join(why_rules) + "\n"
+        f"Rules-derived risks: " + " | ".join(risks_rules) + "\n"
+    )
+
+    result = await openrouter_chat(
+        system=OPPORTUNITY_EXPLAIN_SYSTEM,
+        user=user_msg,
+        max_tokens=400,
+        temperature=0.2,
+    )
+    if not result.ok:
+        return None
+    parsed = _extract_json_block(result.content)
+    if not parsed or not isinstance(parsed.get("why"), list):
+        return None
+
+    why = [str(x)[:200] for x in parsed.get("why", [])][:5]
+    risks = [str(x)[:200] for x in parsed.get("risks", [])][:4]
+    best_for = str(parsed.get("best_for") or "")[:200]
+    strategy = str(parsed.get("strategy") or "")[:200]
+
+    payload = {
+        "why": why,
+        "risks": risks,
+        "best_for": best_for,
+        "strategy": strategy,
+        "model": result.model,
+        "tokens": result.total_tokens,
+        "latency_ms": result.latency_ms,
+        "fallback_used": result.fallback_used,
+        "cached": False,
+    }
+    try:
+        await redis_client.setex(ck, AREA_EXPLAIN_TTL_S, json.dumps(payload))
+    except Exception:
+        pass
+    return payload
+
+
 AREA_INSIGHT_SYSTEM = """You are Floxcy's UAE real-estate analyst.
 
 You return STRICT JSON (no prose, no markdown fences) describing a single

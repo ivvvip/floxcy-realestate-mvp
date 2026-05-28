@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { LayoutGrid, List, SlidersHorizontal, MapPin } from 'lucide-react';
-import type { Area, OpportunityResult, OpportunityTier } from '@/lib/types';
+import type { Area, OpportunityResult, OpportunityType } from '@/lib/types';
 import { AreaCard } from '@/components/AreaCard';
 import { DataBadge } from '@/components/data/DataBadge';
 import { FilterChip } from '@/components/data/FilterChip';
@@ -14,11 +14,13 @@ import { getOpportunities } from '@/lib/api';
 type TypeFilter = 'all' | 'residential' | 'commercial' | 'mixed';
 type SortKey = 'name' | 'yield' | 'price' | 'appreciation' | 'score' | 'undervaluation';
 
-const TIER_LABEL: Record<OpportunityTier, string> = {
-  strong: 'Strong Opportunity',
-  moderate: 'Moderate',
-  neutral: 'Fair Value',
-  overpriced: 'Overvalued',
+const TYPE_TONE: Record<OpportunityType, string> = {
+  'Premium Hold': 'pill-accent',
+  'Growth Opportunity': 'pill-positive',
+  Speculative: 'pill-negative',
+  'Income Opportunity': 'pill-positive',
+  'Value Opportunity': 'pill-accent',
+  Balanced: '',
 };
 type SortDir = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
@@ -50,11 +52,11 @@ export function AreasFilterClient({ areas }: Props) {
   const [oppByArea, setOppByArea] = useState<Record<string, OpportunityResult>>({});
   useEffect(() => {
     let cancelled = false;
-    getOpportunities({ limit: 100 })
+    getOpportunities({ limit: 100, min_score: 0 })
       .then((r) => {
         if (cancelled) return;
         const map: Record<string, OpportunityResult> = {};
-        for (const o of r.results) map[o.area_id] = o;
+        for (const o of r.opportunities) map[o.area_id] = o;
         setOppByArea(map);
       })
       .catch(() => {});
@@ -89,8 +91,8 @@ export function AreasFilterClient({ areas }: Props) {
         case 'score':
           return ((a.investment_score ?? 0) - (b.investment_score ?? 0)) * dir;
         case 'undervaluation': {
-          const sa = oppByArea[a.id]?.score ?? -1;
-          const sb = oppByArea[b.id]?.score ?? -1;
+          const sa = oppByArea[a.id]?.opportunity_score ?? -1;
+          const sb = oppByArea[b.id]?.opportunity_score ?? -1;
           return (sa - sb) * dir;
         }
       }
@@ -392,13 +394,11 @@ export function AreasFilterClient({ areas }: Props) {
                           <span
                             className={cn(
                               'pill tabular',
-                              oppByArea[a.id].tier === 'strong' && 'pill-positive',
-                              oppByArea[a.id].tier === 'moderate' && 'pill-accent',
-                              oppByArea[a.id].tier === 'overpriced' && 'pill-negative'
+                              TYPE_TONE[oppByArea[a.id].opportunity_type] ?? ''
                             )}
-                            title={TIER_LABEL[oppByArea[a.id].tier]}
+                            title={oppByArea[a.id].opportunity_type}
                           >
-                            {oppByArea[a.id].score}
+                            {oppByArea[a.id].opportunity_score}
                           </span>
                         ) : (
                           <span className="text-fg-subtle tabular">—</span>
