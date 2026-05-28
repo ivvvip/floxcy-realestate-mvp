@@ -28,6 +28,7 @@ from app.api.routes import (
     broker_admin,
     broker_self,
     consultations,
+    webhooks,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -133,6 +134,7 @@ app.include_router(brokers_public.router)
 app.include_router(consultations.router)
 app.include_router(broker_self.router)
 app.include_router(broker_admin.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/")
