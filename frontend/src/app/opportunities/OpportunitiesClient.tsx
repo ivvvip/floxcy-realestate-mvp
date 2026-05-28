@@ -2,43 +2,28 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import {
-  ArrowUpRight,
-  BellPlus,
-  Info,
-  Sparkles,
-  Loader2,
-  MapPin,
-} from 'lucide-react';
+import { ArrowUpRight, Building2, Sparkles, ShieldCheck } from 'lucide-react';
 import type {
-  OpportunityExplanation,
-  OpportunityResult,
-  OpportunityType,
+  AreaSignalFeedItem,
+  BrokerDealFeedItem,
+  OpportunityFeedItem,
 } from '@/lib/types';
-import { formatNumber, formatPercent } from '@/lib/format';
+import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { FilterChip } from '@/components/data/FilterChip';
-import { ConfidenceBadge } from '@/components/data/ConfidenceBadge';
-import { DataBadge } from '@/components/data/DataBadge';
-import { createAlert, explainOpportunity } from '@/lib/api';
 
-const TYPES: { value: OpportunityType | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'Premium Hold', label: 'Premium Hold' },
-  { value: 'Growth Opportunity', label: 'Growth' },
-  { value: 'Speculative', label: 'Speculative' },
-  { value: 'Income Opportunity', label: 'Income' },
-  { value: 'Value Opportunity', label: 'Value' },
-  { value: 'Balanced', label: 'Balanced' },
-];
+type KindFilter = 'all' | 'deals' | 'signals';
+type StrategyFilter =
+  | 'all'
+  | 'income' | 'growth' | 'balanced' | 'luxury' | 'high-risk';
 
-const TYPE_TONE: Record<OpportunityType, string> = {
-  'Premium Hold': 'pill-accent',
-  'Growth Opportunity': 'pill-positive',
-  Speculative: 'pill-negative',
-  'Income Opportunity': 'pill-positive',
-  'Value Opportunity': 'pill-accent',
-  Balanced: '',
+const STRATEGY_LABELS: Record<StrategyFilter, string> = {
+  all: 'All strategies',
+  income: 'Income',
+  growth: 'Growth',
+  balanced: 'Balanced',
+  luxury: 'Luxury',
+  'high-risk': 'High risk',
 };
 
 function scoreTone(score: number): string {
@@ -48,78 +33,113 @@ function scoreTone(score: number): string {
   return 'text-negative';
 }
 
+const RISK_TONE: Record<string, string> = {
+  low: 'text-positive',
+  medium: 'text-fg-muted',
+  high: 'text-negative',
+};
+
 interface Props {
-  opportunities: OpportunityResult[];
+  opportunities: OpportunityFeedItem[];
   total: number;
 }
 
 export function OpportunitiesClient({ opportunities, total }: Props) {
-  const [type, setType] = useState<OpportunityType | 'all'>('all');
-  const [minScore, setMinScore] = useState(60);
-  const [sortBy, setSortBy] = useState<'score' | 'yield' | 'appreciation'>('score');
-  const [expanded, setExpanded] = useState<string | null>(
-    opportunities[0]?.area_id ?? null
-  );
+  const [kind, setKind] = useState<KindFilter>('all');
+  const [strategy, setStrategy] = useState<StrategyFilter>('all');
+  const [minScore, setMinScore] = useState(0);
+  const [areaQ, setAreaQ] = useState('');
 
   const filtered = useMemo(() => {
     let list = opportunities;
-    if (type !== 'all') list = list.filter((o) => o.opportunity_type === type);
+    if (kind === 'deals') list = list.filter((o) => o.kind === 'broker_deal');
+    if (kind === 'signals') list = list.filter((o) => o.kind === 'area_signal');
+    if (strategy !== 'all') {
+      list = list.filter((o) =>
+        o.kind === 'broker_deal' ? o.strategy === strategy : true
+      );
+    }
     list = list.filter((o) => o.opportunity_score >= minScore);
-    const key = (o: OpportunityResult) => {
-      switch (sortBy) {
-        case 'yield':
-          return o.key_metrics.rental_yield;
-        case 'appreciation':
-          return o.key_metrics.appreciation_1y ?? 0;
-        default:
-          return o.opportunity_score;
-      }
-    };
-    return [...list].sort((a, b) => key(b) - key(a));
-  }, [opportunities, type, minScore, sortBy]);
+    if (areaQ.trim()) {
+      const q = areaQ.trim().toLowerCase();
+      list = list.filter((o) => {
+        const name =
+          o.kind === 'area_signal' ? o.area_name : o.area_name;
+        return name.toLowerCase().includes(q);
+      });
+    }
+    return [...list].sort(
+      (a, b) => b.opportunity_score - a.opportunity_score
+    );
+  }, [opportunities, kind, strategy, minScore, areaQ]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: opportunities.length };
-    for (const o of opportunities) c[o.opportunity_type] = (c[o.opportunity_type] || 0) + 1;
+    const c = { all: opportunities.length, deals: 0, signals: 0 };
+    for (const o of opportunities) {
+      if (o.kind === 'broker_deal') c.deals++;
+      else c.signals++;
+    }
     return c;
   }, [opportunities]);
-
-  async function subscribeAlert() {
-    try {
-      await createAlert({
-        type: 'opportunity_appears',
-        params: { type: 'Growth Opportunity' },
-        delivery: 'in_app',
-      });
-      alert('Alert created — notify on new Growth Opportunities.');
-    } catch {
-      alert('Could not create alert. Try again.');
-    }
-  }
 
   if (!opportunities.length) {
     return (
       <div className="border border-border rounded-lg bg-bg-card p-10 text-center">
-        <p className="text-sm text-fg-muted">No opportunities computed yet.</p>
+        <p className="text-sm text-fg-muted">No opportunities available yet.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      {/* Tabs */}
       <div className="flex items-center gap-2 flex-wrap">
-        {TYPES.map((t) => (
-          <FilterChip
-            key={t.value}
-            label={t.label}
-            count={counts[t.value] ?? 0}
-            active={type === t.value}
-            onClick={() => setType(t.value)}
-          />
-        ))}
+        <FilterChip
+          label="All"
+          count={counts.all}
+          active={kind === 'all'}
+          onClick={() => setKind('all')}
+        />
+        <FilterChip
+          label="Curated Deals"
+          count={counts.deals}
+          active={kind === 'deals'}
+          onClick={() => setKind('deals')}
+        />
+        <FilterChip
+          label="Market Signals"
+          count={counts.signals}
+          active={kind === 'signals'}
+          onClick={() => setKind('signals')}
+        />
       </div>
 
+      {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap text-xs">
+        <label className="inline-flex items-center gap-2">
+          <span className="text-fg-muted">Area</span>
+          <input
+            type="text"
+            value={areaQ}
+            onChange={(e) => setAreaQ(e.target.value)}
+            placeholder="e.g. Marina"
+            className="h-8 w-40 rounded-md border border-border bg-bg-card px-2 text-fg text-xs"
+          />
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <span className="text-fg-muted">Strategy</span>
+          <select
+            value={strategy}
+            onChange={(e) => setStrategy(e.target.value as StrategyFilter)}
+            className="h-8 rounded-md border border-border bg-bg-card px-2 text-fg text-xs"
+          >
+            {(Object.keys(STRATEGY_LABELS) as StrategyFilter[]).map((s) => (
+              <option key={s} value={s}>
+                {STRATEGY_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="inline-flex items-center gap-2">
           <span className="text-fg-muted">Min score</span>
           <input
@@ -129,334 +149,174 @@ export function OpportunitiesClient({ opportunities, total }: Props) {
             step={5}
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
-            className="w-32 accent-accent"
+            className="w-28 accent-accent"
           />
           <span className="tabular text-fg w-8">{minScore}</span>
         </label>
-        <label className="inline-flex items-center gap-2">
-          <span className="text-fg-muted">Sort by</span>
-          <div className="segmented">
-            {(['score', 'yield', 'appreciation'] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                data-active={sortBy === k}
-                onClick={() => setSortBy(k)}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-        </label>
-        <button
-          type="button"
-          onClick={subscribeAlert}
-          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
-        >
-          <BellPlus className="h-3.5 w-3.5" strokeWidth={2} />
-          Alert me on new Growth opportunities
-        </button>
       </div>
 
       <div className="text-[11px] text-fg-subtle">
-        Showing {filtered.length} of {total} opportunities · sorted by {sortBy}
+        Showing {filtered.length} of {total} opportunities
       </div>
 
-      <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
-        <div className="overflow-x-auto scrollbar-thin">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th className="w-10 text-right">#</th>
-                <th>Area</th>
-                <th>Type</th>
-                <th className="text-right">Score</th>
-                <th className="text-right">Yield</th>
-                <th className="text-right">AED/sqft</th>
-                <th className="text-right">1Y App</th>
-                <th>Confidence</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((o, i) => (
-                <OpportunityRow
-                  key={o.area_id}
-                  rank={i + 1}
-                  opp={o}
-                  expanded={expanded === o.area_id}
-                  onToggle={() =>
-                    setExpanded((cur) => (cur === o.area_id ? null : o.area_id))
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {filtered.map((o) =>
+          o.kind === 'broker_deal' ? (
+            <DealCard key={`deal-${o.id}`} deal={o} />
+          ) : (
+            <SignalCard key={`signal-${o.area_id}`} signal={o} />
+          )
+        )}
       </div>
 
-      <div className="text-[11px] text-fg-subtle flex items-start gap-2">
-        <Info className="h-3 w-3 mt-0.5 flex-shrink-0" strokeWidth={2} />
-        <span>
-          Scoring formula:{' '}
-          <code className="text-fg-muted">
-            0.30·yield + 0.25·appreciation + 0.25·value + 0.10·demand +
-            0.10·inv_risk
-          </code>
-          . Classifier: Premium Hold → Growth → Speculative → Income → Value → Balanced.
-          See{' '}
-          <Link href="/methodology" className="text-accent hover:underline">
-            methodology
-          </Link>
-          . Not investment advice.
-        </span>
+      <div className="text-[11px] text-fg-subtle">
+        Curated by Floxcy. Verified investment specialists submit deals;
+        every deal is reviewed before publication. Not investment advice.
       </div>
     </div>
   );
 }
 
-function OpportunityRow({
-  rank,
-  opp,
-  expanded,
-  onToggle,
-}: {
-  rank: number;
-  opp: OpportunityResult;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const typeClass = cn('pill', TYPE_TONE[opp.opportunity_type] ?? '');
+function DealCard({ deal }: { deal: BrokerDealFeedItem }) {
   return (
-    <>
-      <tr className="cursor-pointer" onClick={onToggle}>
-        <td className="num text-fg-subtle">{rank}</td>
-        <td>
-          <Link
-            href={`/areas/${opp.area_id}`}
-            className="font-medium text-fg hover:text-accent transition-colors"
-            onClick={(e) => e.stopPropagation()}
+    <div className="border border-border rounded-lg bg-bg-card overflow-hidden hover:border-accent/40 transition-colors">
+      <div className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <span className="pill pill-accent inline-flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3" strokeWidth={2} />
+            Curated Deal
+          </span>
+          <span
+            className={cn('text-lg font-semibold tabular', scoreTone(deal.opportunity_score))}
+            title="Opportunity score"
           >
-            {opp.area_name}
-          </Link>
-          {opp.area_name_arabic && (
-            <div className="text-[10px] text-fg-muted" dir="rtl">
-              {opp.area_name_arabic}
+            {deal.opportunity_score.toFixed(0)}
+          </span>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-medium text-fg leading-snug">
+            {deal.title}
+          </h3>
+          <div className="mt-1 text-[11px] text-fg-muted">
+            {deal.area_name} · {deal.emirate} · {deal.property_type}
+            {deal.unit_type ? ` · ${deal.unit_type}` : ''}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 text-[11px]">
+          <div>
+            <div className="text-fg-subtle uppercase tracking-wide">Price</div>
+            <div className="text-fg tabular">{formatAED(deal.price, { compact: true })}</div>
+          </div>
+          <div>
+            <div className="text-fg-subtle uppercase tracking-wide">Yield</div>
+            <div className="text-fg tabular">
+              {deal.rental_yield != null ? formatPercent(deal.rental_yield, 2) : '—'}
             </div>
-          )}
-        </td>
-        <td>
-          <span className={typeClass}>{opp.opportunity_type}</span>
-        </td>
-        <td className={cn('num font-semibold', scoreTone(opp.opportunity_score))}>
-          {opp.opportunity_score}
-        </td>
-        <td className="num">{formatPercent(opp.key_metrics.rental_yield, 2)}</td>
-        <td className="num">{formatNumber(opp.key_metrics.price_per_sqft, 0)}</td>
-        <td className="num">
-          <DataBadge value={opp.key_metrics.appreciation_1y} format="percent" />
-        </td>
-        <td>
-          <ConfidenceBadge report={opp.data_confidence ?? null} compact />
-        </td>
-        <td className="num">
-          <ArrowUpRight
-            className={cn(
-              'inline h-3 w-3 text-fg-subtle transition-transform',
-              expanded && 'rotate-90'
+          </div>
+          <div>
+            <div className="text-fg-subtle uppercase tracking-wide">Risk</div>
+            <div className={cn('tabular capitalize', RISK_TONE[deal.risk_level] ?? 'text-fg')}>
+              {deal.risk_level}
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-fg-muted leading-relaxed line-clamp-3">
+          {deal.why_short}
+        </p>
+
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="text-[10px] text-fg-subtle">
+            {deal.broker?.full_name && (
+              <span className="inline-flex items-center gap-1">
+                <Building2 className="h-3 w-3" strokeWidth={2} />
+                {deal.broker.company_name || deal.broker.full_name}
+              </span>
             )}
-            strokeWidth={2}
-          />
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="bg-bg-elev/30">
-          <td colSpan={9}>
-            <ExpandedDetail opp={opp} />
-          </td>
-        </tr>
-      )}
-    </>
+            <span className="ml-2 capitalize">· {deal.strategy}</span>
+          </div>
+          <Link
+            href={`/opportunities/${deal.id}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+          >
+            View Opportunity
+            <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function ExpandedDetail({ opp }: { opp: OpportunityResult }) {
-  const [llm, setLlm] = useState<OpportunityExplanation | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadAi() {
-    if (llm || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await explainOpportunity(opp.area_id);
-      setLlm(r);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI unavailable');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const why = llm?.why ?? opp.why;
-  const risks = llm?.risks ?? opp.risks;
-  const bestFor = llm?.best_for ?? opp.best_for;
-  const strategy = llm?.strategy ?? opp.strategy;
-  const source = llm ? 'ai' : 'rules';
-
+function SignalCard({ signal }: { signal: AreaSignalFeedItem }) {
   return (
-    <div className="px-5 py-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-2 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-            {source === 'ai' ? (
-              <span className="inline-flex items-center gap-1 text-accent">
-                <Sparkles className="h-3 w-3" strokeWidth={2} />
-                AI-grounded explanation
-              </span>
-            ) : (
-              <>Rules-based explanation</>
-            )}
-          </div>
-          {!llm && (
-            <button
-              type="button"
-              onClick={loadAi}
-              disabled={loading}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-2.5 text-[11px] font-medium text-accent hover:bg-accent/20 disabled:opacity-60"
-            >
-              {loading ? (
-                <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
-              ) : (
-                <Sparkles className="h-3 w-3" strokeWidth={2} />
-              )}
-              {loading ? 'Generating…' : 'Upgrade to AI explanation'}
-            </button>
-          )}
+    <div className="border border-border rounded-lg bg-bg-card overflow-hidden hover:border-accent/40 transition-colors">
+      <div className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <span className="pill inline-flex items-center gap-1">
+            <Sparkles className="h-3 w-3" strokeWidth={2} />
+            Market Signal
+          </span>
+          <span
+            className={cn('text-lg font-semibold tabular', scoreTone(signal.opportunity_score))}
+            title="Opportunity score"
+          >
+            {signal.opportunity_score.toFixed(0)}
+          </span>
         </div>
-        {error && <div className="text-[11px] text-negative">{error}</div>}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-              Why
-            </div>
-            <ul className="mt-1.5 space-y-1 text-xs text-fg-muted">
-              {why.map((r, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-positive" />
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-              Risks
-            </div>
-            <ul className="mt-1.5 space-y-1 text-xs text-fg-muted">
-              {risks.map((r, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-negative" />
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
+        <div>
+          <h3 className="text-sm font-medium text-fg leading-snug">
+            {signal.area_name}
+          </h3>
+          <div className="mt-1 text-[11px] text-fg-muted">
+            {signal.opportunity_type}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3 text-[11px]">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-              Best for
+            <div className="text-fg-subtle uppercase tracking-wide">AED/sqft</div>
+            <div className="text-fg tabular">
+              {formatNumber(signal.key_metrics.price_per_sqft, 0)}
             </div>
-            <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">{bestFor}</p>
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-              Suggested strategy
+            <div className="text-fg-subtle uppercase tracking-wide">Yield</div>
+            <div className="text-fg tabular">
+              {formatPercent(signal.key_metrics.rental_yield, 2)}
             </div>
-            <p className="mt-1.5 text-xs text-fg-muted leading-relaxed">{strategy}</p>
+          </div>
+          <div>
+            <div className="text-fg-subtle uppercase tracking-wide">1Y App</div>
+            <div className="text-fg tabular">
+              {signal.key_metrics.appreciation_1y != null
+                ? formatPercent(signal.key_metrics.appreciation_1y, 1)
+                : '—'}
+            </div>
           </div>
         </div>
 
-        {llm?.model && (
-          <div className="text-[10px] text-fg-subtle italic">
-            AI: {llm.model.split('/').pop()} · {llm.tokens} tokens · {llm.cached ? 'cached' : 'fresh'}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        {opp.data_confidence && <ConfidenceBadge report={opp.data_confidence} />}
-
-        {opp.nearby_comparison && opp.nearby_comparison.length > 0 && (
-          <div className="border border-border rounded-lg bg-bg-card">
-            <div className="chart-header">
-              <span className="chart-header-label inline-flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
-                Nearby (3 closest)
-              </span>
-            </div>
-            <table className="data-table">
-              <tbody>
-                {opp.nearby_comparison.map((n) => (
-                  <tr key={n.area_id}>
-                    <td>
-                      <Link
-                        href={`/areas/${n.area_id}`}
-                        className="text-fg hover:text-accent text-xs"
-                      >
-                        {n.area_name}
-                      </Link>
-                      <div className="text-[10px] text-fg-subtle tabular">
-                        {n.distance_km.toFixed(1)} km ·{' '}
-                        {formatNumber(n.price_per_sqft, 0)} AED/sqft ·{' '}
-                        {formatPercent(n.rental_yield, 1)}
-                      </div>
-                    </td>
-                    <td className="num">
-                      <span
-                        className={cn(
-                          'pill',
-                          TYPE_TONE[n.opportunity_type] ?? ''
-                        )}
-                        title={n.opportunity_type}
-                      >
-                        {n.opportunity_score}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {signal.why?.length > 0 && (
+          <p className="text-[11px] text-fg-muted leading-relaxed line-clamp-3">
+            {signal.why[0]}
+          </p>
         )}
 
-        <div className="border border-border rounded-lg bg-bg-card">
-          <div className="chart-header">
-            <span className="chart-header-label">Score components</span>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="text-[10px] text-fg-subtle capitalize">
+            {signal.strategy}
           </div>
-          <table className="data-table">
-            <tbody>
-              {Object.entries(opp.components).map(([k, v]) => (
-                <tr key={k}>
-                  <td className="text-fg-muted text-[11px] capitalize">{k}</td>
-                  <td className="num text-[11px] tabular">{(v * 100).toFixed(0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Link
+            href={`/areas/${signal.area_id}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+          >
+            Area Detail
+            <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
+          </Link>
         </div>
-
-        <Link
-          href={`/areas/${opp.area_id}`}
-          className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
-        >
-          Open full area detail
-          <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
-        </Link>
       </div>
     </div>
   );

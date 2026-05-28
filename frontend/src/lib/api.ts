@@ -26,7 +26,21 @@ import type {
   MarketBrief,
   AreaInsight,
   TrendsResponse,
+  Broker,
+  BrokerApplication,
+  BrokerApplicationCreate,
+  BrokerApproveResponse,
+  BrokerLoginResponse,
+  ConsultationRequestResponse,
+  Deal,
+  DealCreate,
+  DealUpdate,
+  InvestorLead,
+  LeadCreate,
+  LeadUpdate,
+  OpportunityFeedResponse,
 } from './types';
+import { getBrokerToken } from './brokerAuth';
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ||
@@ -140,14 +154,16 @@ export async function getOpportunities(opts?: {
   limit?: number;
   sort_by?: 'score' | 'yield' | 'appreciation';
 }): Promise<OpportunitiesResponse> {
-  const params = new URLSearchParams();
+  // Legacy callers (home/dashboard widgets, areas pages) want only area-derived
+  // signals so the existing OpportunityResult shape is guaranteed. The merged
+  // feed is exposed via `getOpportunitiesFeed`.
+  const params = new URLSearchParams({ kind: 'signals' });
   if (opts?.type) params.set('type', opts.type);
   if (opts?.min_score != null) params.set('min_score', String(opts.min_score));
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.sort_by) params.set('sort_by', opts.sort_by);
-  const q = params.toString();
   return request<OpportunitiesResponse>(
-    `/api/v1/opportunities${q ? `?${q}` : ''}`,
+    `/api/v1/opportunities?${params.toString()}`,
     { revalidate: 300 }
   );
 }
@@ -320,6 +336,235 @@ export async function adminListAuditLog(opts?: {
 export async function adminSeed(): Promise<{ status: string; areas?: number; snapshots?: number }> {
   return request('/api/v1/admin/seed', {
     method: 'POST',
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+// ---------- Supply layer: opportunities feed, brokers, deals, consultations ----------
+
+function brokerAuthHeaders(): HeadersInit {
+  const token = typeof window !== 'undefined' ? getBrokerToken() : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function getOpportunitiesFeed(opts?: {
+  kind?: 'all' | 'signals' | 'deals';
+  area?: string;
+  strategy?: string;
+  min_score?: number;
+  limit?: number;
+  sort_by?: 'score' | 'yield' | 'appreciation';
+}): Promise<OpportunityFeedResponse> {
+  const params = new URLSearchParams();
+  if (opts?.kind) params.set('kind', opts.kind);
+  if (opts?.area) params.set('area', opts.area);
+  if (opts?.strategy) params.set('strategy', opts.strategy);
+  if (opts?.min_score != null) params.set('min_score', String(opts.min_score));
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.sort_by) params.set('sort_by', opts.sort_by);
+  const q = params.toString();
+  return request<OpportunityFeedResponse>(
+    `/api/v1/opportunities${q ? `?${q}` : ''}`,
+    { revalidate: 60 }
+  );
+}
+
+export async function getDeal(id: string): Promise<Deal> {
+  return request<Deal>(`/api/v1/opportunities/deals/${id}`, { revalidate: 60 });
+}
+
+export async function requestDealConsultation(
+  id: string,
+  payload: LeadCreate
+): Promise<ConsultationRequestResponse> {
+  return request<ConsultationRequestResponse>(
+    `/api/v1/opportunities/deals/${id}/request-consultation`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      revalidate: false,
+    }
+  );
+}
+
+export async function requestConsultation(
+  payload: LeadCreate
+): Promise<ConsultationRequestResponse> {
+  return request<ConsultationRequestResponse>('/api/v1/consultations/request', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+// ---- Public broker application ----
+
+export async function applyAsBroker(
+  payload: BrokerApplicationCreate
+): Promise<BrokerApplication> {
+  return request<BrokerApplication>('/api/v1/brokers/apply', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+// ---- Broker self (Bearer token auth) ----
+
+export async function brokerLogin(
+  email: string,
+  password: string
+): Promise<BrokerLoginResponse> {
+  return request<BrokerLoginResponse>('/api/v1/broker/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+    revalidate: false,
+  });
+}
+
+export async function brokerMe(): Promise<Broker> {
+  return request<Broker>('/api/v1/broker/me', {
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+export async function brokerListMyOpportunities(status?: string): Promise<Deal[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<Deal[]>(`/api/v1/broker/opportunities${q}`, {
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+export async function brokerCreateOpportunity(payload: DealCreate): Promise<Deal> {
+  return request<Deal>('/api/v1/broker/opportunities', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+export async function brokerUpdateOpportunity(
+  id: string,
+  payload: DealUpdate
+): Promise<Deal> {
+  return request<Deal>(`/api/v1/broker/opportunities/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+export async function brokerListMyLeads(status?: string): Promise<InvestorLead[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<InvestorLead[]>(`/api/v1/broker/leads${q}`, {
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+export async function brokerUpdateLead(
+  id: string,
+  payload: LeadUpdate
+): Promise<InvestorLead> {
+  return request<InvestorLead>(`/api/v1/broker/leads/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    revalidate: false,
+    headers: brokerAuthHeaders(),
+  });
+}
+
+// ---- Admin (existing role-based auth via cookie) ----
+
+export async function adminListBrokerApplications(
+  status?: string
+): Promise<BrokerApplication[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<BrokerApplication[]>(
+    `/api/v1/admin/broker-applications${q}`,
+    { revalidate: false, withCredentials: true }
+  );
+}
+
+export async function adminApproveBrokerApplication(
+  id: string,
+  password?: string
+): Promise<BrokerApproveResponse> {
+  return request<BrokerApproveResponse>(
+    `/api/v1/admin/broker-applications/${id}/approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify(password ? { password } : {}),
+      revalidate: false,
+      withCredentials: true,
+    }
+  );
+}
+
+export async function adminRejectBrokerApplication(
+  id: string
+): Promise<BrokerApplication> {
+  return request<BrokerApplication>(
+    `/api/v1/admin/broker-applications/${id}/reject`,
+    {
+      method: 'POST',
+      revalidate: false,
+      withCredentials: true,
+    }
+  );
+}
+
+export async function adminListBrokers(status?: string): Promise<Broker[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<Broker[]>(`/api/v1/admin/brokers${q}`, {
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminListPendingOpportunities(): Promise<Deal[]> {
+  return request<Deal[]>('/api/v1/admin/opportunities/pending', {
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminApproveOpportunity(id: string): Promise<Deal> {
+  return request<Deal>(`/api/v1/admin/opportunities/${id}/approve`, {
+    method: 'POST',
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminRejectOpportunity(id: string): Promise<Deal> {
+  return request<Deal>(`/api/v1/admin/opportunities/${id}/reject`, {
+    method: 'POST',
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminListLeads(status?: string): Promise<InvestorLead[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<InvestorLead[]>(`/api/v1/admin/leads${q}`, {
+    revalidate: false,
+    withCredentials: true,
+  });
+}
+
+export async function adminUpdateLead(
+  id: string,
+  payload: LeadUpdate
+): Promise<InvestorLead> {
+  return request<InvestorLead>(`/api/v1/admin/leads/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
     revalidate: false,
     withCredentials: true,
   });

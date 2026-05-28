@@ -3,23 +3,23 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { OpportunitiesClient } from './OpportunitiesClient';
 import { Sparkles } from 'lucide-react';
-import { getOpportunities } from '@/lib/api';
-import type { OpportunityResult } from '@/lib/types';
+import { getOpportunitiesFeed } from '@/lib/api';
+import type { OpportunityFeedItem } from '@/lib/types';
 
 export const metadata = {
-  title: 'Opportunity Engine',
+  title: 'Investment Opportunities',
   description:
-    'AI-ranked UAE real-estate investment opportunities across 70 Dubai areas.',
+    'Curated UAE real estate investment opportunities — AI-derived market signals plus broker-submitted deals, all in one feed.',
 };
 
 export const revalidate = 300;
 
 export default async function OpportunitiesPage() {
-  let opportunities: OpportunityResult[] = [];
+  let opportunities: OpportunityFeedItem[] = [];
   let total = 0;
   let error: string | null = null;
   try {
-    const res = await getOpportunities({ limit: 50, min_score: 0 });
+    const res = await getOpportunitiesFeed({ kind: 'all', limit: 60, min_score: 0 });
     opportunities = res.opportunities ?? [];
     total = res.total ?? 0;
   } catch (e) {
@@ -37,18 +37,14 @@ export default async function OpportunitiesPage() {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight">
-                    Top UAE Investment Opportunities
+                    Curated UAE Investment Opportunities
                   </h1>
-                  <span className="pill pill-accent">Killer feature</span>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted max-w-2xl">
-                  AI-ranked opportunities across 70 Dubai areas. Six categories
-                  (Premium Hold, Growth, Speculative, Income, Value, Balanced).
-                  Every score is reproducible — see{' '}
-                  <Link
-                    href="/methodology"
-                    className="text-accent hover:underline"
-                  >
+                  AI-derived market signals across 70 Dubai areas, alongside
+                  curated deals from verified investment specialists. Every
+                  signal is reproducible — see{' '}
+                  <Link href="/methodology" className="text-accent hover:underline">
                     methodology
                   </Link>
                   .
@@ -66,10 +62,7 @@ export default async function OpportunitiesPage() {
               {error}
             </div>
           ) : (
-            <OpportunitiesClient
-              opportunities={opportunities}
-              total={total}
-            />
+            <OpportunitiesClient opportunities={opportunities} total={total} />
           )}
         </div>
       </Container>
