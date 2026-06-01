@@ -37,7 +37,7 @@ export function Navbar() {
             <span className="text-sm font-semibold tracking-tight text-fg">
               Floxcy
             </span>
-            <span className="hidden sm:inline pill ml-1">UAE · v0.1</span>
+            <span className="hidden sm:inline pill ml-1">Dubai · Beta</span>
           </Link>
 
           <ul className="hidden items-center gap-0.5 md:flex">
