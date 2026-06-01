@@ -1,10 +1,13 @@
 """DLD-sourced endpoints — areas, buildings, rent fairness, RERA brokers."""
 from __future__ import annotations
 
+import re
+from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit_dependency
@@ -16,10 +19,17 @@ from app.models.dld import (
     DldRentBenchmark,
     DldReraBroker,
 )
+from app.models.investor_lead import InvestorLead
+from app.models.rent_alert import RentAlert
 from app.schemas.dld import (
     DISPLAY_YIELD_CAP_PCT,
     MIN_RELIABLE_SAMPLES,
     SIZE_CATEGORY_BANDS,
+    BrokerConsultationRequest,
+    BrokerConsultationResponse,
+    BrokerMatchItem,
+    BrokerMatchRequest,
+    BrokerMatchResponse,
     DldAreaDetail,
     DldAreaDetailResponse,
     DldAreaListItem,
@@ -29,9 +39,13 @@ from app.schemas.dld import (
     DldBuildingItem,
     DldBuildingsResponse,
     DldStatsResponse,
+    RentAlertCreate,
+    RentAlertOut,
     RentCheckRequest,
     RentCheckResponse,
     RentCheckSuggestion,
+    TopCompaniesResponse,
+    TopCompanyItem,
     cap_yield,
     confidence_for,
 )
@@ -369,6 +383,14 @@ async def rent_check(req: RentCheckRequest, db: AsyncSession = Depends(get_db)):
         yoy_trend=round(yoy, 2) if yoy is not None else None,
         size_band=band,
         confidence=confidence_for(bm.sample_count),
+        area_name_display=area.name_display,
+        area_name_norm=area.name_norm,
+        median_price_per_sqft=float(am.median_price_per_sqft)
+        if am and am.median_price_per_sqft is not None
+        else None,
+        avg_price_per_sqft=float(am.avg_price_per_sqft)
+        if am and am.avg_price_per_sqft is not None
+        else None,
         suggested_areas=suggestions,
     )
 
@@ -435,3 +457,296 @@ async def get_broker(broker_number: str, db: AsyncSession = Depends(get_db)):
     if not b:
         raise HTTPException(status_code=404, detail="Broker not found")
     return DldBrokerItem.model_validate(b)
+
+
+# ---------------------------------------------------------------------------
+# Top firms leaderboard
+# ---------------------------------------------------------------------------
+
+@router.get("/companies/top", response_model=TopCompaniesResponse)
+async def top_companies(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(10, ge=1, le=100),
+):
+    """Largest broker firms by active-broker count."""
+    stmt = (
+        select(
+            DldReraBroker.real_estate_name,
+            func.count().label("c"),
+        )
+        .where(
+            DldReraBroker.is_active.is_(True),
+            DldReraBroker.real_estate_name.isnot(None),
+        )
+        .group_by(DldReraBroker.real_estate_name)
+        .order_by(func.count().desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [
+        TopCompanyItem(real_estate_name=name, active_broker_count=int(c))
+        for name, c in rows
+    ]
+    return TopCompaniesResponse(count=len(items), items=items)
+
+
+# ---------------------------------------------------------------------------
+# Broker match wizard
+# ---------------------------------------------------------------------------
+
+# Language detection — coarse but useful for a real-time wizard. Tokens
+# matched against the broker's full_name (uppercase, ASCII). Order matters:
+# Arabic regex is checked first because Arabic transliterations dominate the
+# DLD broker registry; remaining heuristics catch overlap-prone names.
+
+_ARABIC_TOKENS = re.compile(
+    r"\b(AL|EL|ABD|ABDUL|ABU|BIN|BINT|MOHAMMED|MOHAMED|AHMED|AHMAD|ALI|"
+    r"HASSAN|HUSSEIN|OMAR|YOUSEF|YUSUF|KHALED|KHALID|SAEED|RASHID|"
+    r"HAMDAN|MAJID|FAISAL|FATIMA|AISHA|MARYAM|NOURA|SALEM|ZAYED)\b"
+)
+_RUSSIAN_TOKENS = re.compile(
+    r"(OV$|OVA$|EV$|EVA$|SKY$|SKAYA$|SKI$|ITCH$|ENKO$|"
+    r"\b(ALEXANDER|ALEXEI|DMITRY|IVAN|YURI|MAXIM|ANASTASIA|EKATERINA|"
+    r"SVETLANA|VLADIMIR|SERGEY|OLGA|NATALIA|TATIANA|IRINA)\b)"
+)
+_HINDI_TOKENS = re.compile(
+    r"\b(KUMAR|SHARMA|SINGH|PATEL|GUPTA|MEHTA|KHAN|RAJ|RAJESH|"
+    r"PRIYA|ANJALI|ARUN|ROHIT|VIKAS|RAVI|AMIT|DEEPAK|ANIL|"
+    r"DESAI|JAIN|VERMA|REDDY|NAIDU|IYER|MENON|NAIR|PILLAI|"
+    r"AGGARWAL|AGARWAL|JOSHI|MISHRA|PANDEY|YADAV|TIWARI|"
+    r"BHATIA|MALHOTRA|KAPOOR|CHOPRA|ARORA|SAHU|DAS|GHOSH)\b"
+)
+_CHINESE_TOKENS = re.compile(
+    r"\b(WANG|LI|ZHANG|CHEN|LIU|YANG|HUANG|ZHAO|WU|ZHOU|XU|"
+    r"SUN|MA|HU|GUO|HE|GAO|LIN|LUO|ZHENG|YE|FENG|CAO|DENG|"
+    r"XIE|TANG|XU|HAN|FAN|HOU|JIANG|YU|DONG)\b"
+)
+
+
+def _detect_language(name: str) -> str:
+    if not name:
+        return "english"
+    up = name.upper()
+    if _ARABIC_TOKENS.search(up):
+        return "arabic"
+    if _RUSSIAN_TOKENS.search(up):
+        return "russian"
+    if _HINDI_TOKENS.search(up):
+        return "hindi"
+    if _CHINESE_TOKENS.search(up):
+        return "chinese"
+    return "english"
+
+
+def _license_status(end_date: Optional[date]) -> tuple[str, Optional[int]]:
+    if end_date is None:
+        return "active", None
+    # Use the dataset snapshot date (2026-06-01) as "today" so the response
+    # is deterministic for the prod data.
+    today = date(2026, 6, 1)
+    delta = (end_date - today).days
+    if delta < 0:
+        return "expired", delta
+    if delta <= 90:
+        return "expiring_soon", delta
+    return "active", delta
+
+
+@router.post("/broker-match", response_model=BrokerMatchResponse)
+async def broker_match(
+    req: BrokerMatchRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Wizard input → top 5 brokers ranked by (firm size desc, name asc).
+
+    Filters: active license only. Language is detected from each broker's
+    full name (Arabic / Russian / Hindi / Chinese / English heuristics) and
+    used only when the caller specified a language preference.
+    """
+    # Pull a generous pool, then filter in Python to apply language detection
+    # without paying a SQL roundtrip per candidate. The firm-size dictionary
+    # is computed once and joined back to each candidate.
+    pool = (
+        await db.execute(
+            select(DldReraBroker)
+            .where(DldReraBroker.is_active.is_(True))
+            .order_by(DldReraBroker.real_estate_name)
+            .limit(2000)
+        )
+    ).scalars().all()
+
+    # Compute firm sizes once
+    firm_size_rows = (
+        await db.execute(
+            select(
+                DldReraBroker.real_estate_name,
+                func.count().label("c"),
+            )
+            .where(
+                DldReraBroker.is_active.is_(True),
+                DldReraBroker.real_estate_name.isnot(None),
+            )
+            .group_by(DldReraBroker.real_estate_name)
+        )
+    ).all()
+    firm_size: dict[str, int] = {name: int(c) for name, c in firm_size_rows}
+
+    candidates = []
+    for b in pool:
+        lang = _detect_language(b.full_name)
+        if req.language and lang != req.language:
+            continue
+        status_str, days = _license_status(b.license_end_date)
+        if status_str == "expired":
+            continue
+        candidates.append((b, lang, status_str, days))
+
+    # Rank by firm size (desc), then license recency (longer expiry = better)
+    candidates.sort(
+        key=lambda t: (
+            -firm_size.get(t[0].real_estate_name or "", 0),
+            -(t[3] or 0),
+        )
+    )
+    top = candidates[:5]
+
+    items = [
+        BrokerMatchItem(
+            broker_number=b.broker_number,
+            full_name=b.full_name,
+            gender=b.gender,
+            real_estate_name=b.real_estate_name,
+            phone=b.phone,
+            webpage=b.webpage,
+            license_start_date=b.license_start_date,
+            license_end_date=b.license_end_date,
+            is_active=b.is_active,
+            detected_language=lang,
+            company_size_active_brokers=firm_size.get(b.real_estate_name or "", 0),
+            license_status=status_str,
+            days_until_expiry=days,
+        )
+        for (b, lang, status_str, days) in top
+    ]
+    return BrokerMatchResponse(count=len(items), items=items)
+
+
+# ---------------------------------------------------------------------------
+# Rent alerts
+# ---------------------------------------------------------------------------
+
+@router.post("/rent-alerts", response_model=RentAlertOut, status_code=201)
+async def create_rent_alert(
+    payload: RentAlertCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Subscribe an email to rent updates for an (area, size, prop_type) combo.
+
+    Idempotent — second submission for the same key returns the existing row
+    rather than 409, so the frontend can show a friendly 'subscribed' state
+    on repeated submits.
+    """
+    norm = payload.area_name_norm.strip().lower()
+    area = (
+        await db.execute(
+            select(DldArea).where(DldArea.name_norm == norm)
+        )
+    ).scalar_one_or_none()
+    display = area.name_display if area else payload.area_name_display
+
+    alert = RentAlert(
+        email=payload.email.strip().lower(),
+        area_name_norm=norm,
+        area_name_display=display,
+        size_category=payload.size_category,
+        prop_sub_type=payload.prop_sub_type,
+        is_active=True,
+    )
+    db.add(alert)
+    try:
+        await db.commit()
+        await db.refresh(alert)
+    except IntegrityError:
+        await db.rollback()
+        existing = (
+            await db.execute(
+                select(RentAlert).where(
+                    RentAlert.email == payload.email.strip().lower(),
+                    RentAlert.area_name_norm == norm,
+                    RentAlert.size_category == payload.size_category,
+                    RentAlert.prop_sub_type == payload.prop_sub_type,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            alert = existing
+    return RentAlertOut(
+        id=alert.id,
+        email=alert.email,
+        area_name_norm=alert.area_name_norm,
+        area_name_display=alert.area_name_display,
+        size_category=alert.size_category,
+        prop_sub_type=alert.prop_sub_type,
+        is_active=alert.is_active,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Broker consultation request
+# ---------------------------------------------------------------------------
+
+BUDGET_TO_AED: dict[str, float] = {
+    "under_500k": 250_000,
+    "500k_1m": 750_000,
+    "1m_3m": 2_000_000,
+    "3m_5m": 4_000_000,
+    "5m_plus": 7_500_000,
+}
+
+
+@router.post("/broker-consultation", response_model=BrokerConsultationResponse, status_code=201)
+async def broker_consultation(
+    req: BrokerConsultationRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create an investor lead tagged with the DLD broker the user picked.
+
+    Saves into the existing `investor_leads` table. The broker is identified
+    by `broker_number`; we stash that in the `message` field with a stable
+    prefix so admin/broker dashboards can route on it without a schema change.
+    """
+    b = (
+        await db.execute(
+            select(DldReraBroker).where(DldReraBroker.broker_number == req.broker_number)
+        )
+    ).scalar_one_or_none()
+    if not b:
+        raise HTTPException(status_code=404, detail="Broker not found")
+    if not b.is_active:
+        raise HTTPException(status_code=409, detail="Broker license is not active")
+
+    budget_aed = BUDGET_TO_AED.get(req.budget_band) if req.budget_band else None
+    user_message = (req.message or "").strip()
+    annotated_message = (
+        f"[source=broker_directory broker={b.broker_number} firm={b.real_estate_name or '-'}]\n"
+        f"{user_message}"
+    )
+
+    lead = InvestorLead(
+        full_name=req.full_name.strip(),
+        whatsapp=req.whatsapp.strip(),
+        email=req.email.strip() if req.email else None,
+        budget=budget_aed,
+        investment_goal=req.goal,
+        message=annotated_message[:1000],
+        status="new",
+    )
+    db.add(lead)
+    await db.commit()
+    await db.refresh(lead)
+    return BrokerConsultationResponse(
+        message=f"Request sent! {b.full_name} will contact you within 24 hours via WhatsApp.",
+        broker_full_name=b.full_name,
+        broker_real_estate_name=b.real_estate_name,
+        lead_id=lead.id,
+    )

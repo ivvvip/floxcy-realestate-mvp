@@ -163,7 +163,109 @@ class RentCheckResponse(Attribution):
     yoy_trend: Optional[float] = None
     size_band: str
     confidence: str
+    # Enriched fields for the Rent-vs-Buy feature on the frontend
+    area_name_display: Optional[str] = None
+    area_name_norm: Optional[str] = None
+    median_price_per_sqft: Optional[float] = None
+    avg_price_per_sqft: Optional[float] = None
     suggested_areas: List[RentCheckSuggestion] = []
+
+
+# ---------------------------------------------------------------------------
+# Rent alerts
+# ---------------------------------------------------------------------------
+
+class RentAlertCreate(BaseModel):
+    email: str = Field(..., min_length=4, max_length=255)
+    area_name_norm: str = Field(..., min_length=2, max_length=255)
+    area_name_display: Optional[str] = Field(None, max_length=255)
+    size_category: Optional[SizeCategory] = None
+    prop_sub_type: Optional[str] = Field(None, max_length=64)
+
+
+class RentAlertOut(Attribution):
+    id: UUID
+    email: str
+    area_name_norm: str
+    area_name_display: Optional[str] = None
+    size_category: Optional[str] = None
+    prop_sub_type: Optional[str] = None
+    is_active: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Broker match wizard
+# ---------------------------------------------------------------------------
+
+GoalType = Literal["buy", "rent", "sell", "invest"]
+BudgetBand = Literal["under_500k", "500k_1m", "1m_3m", "3m_5m", "5m_plus"]
+LangPref = Literal["arabic", "english", "russian", "chinese", "hindi", "other"]
+
+
+class BrokerMatchRequest(BaseModel):
+    goal: GoalType
+    preferred_area_norm: Optional[str] = Field(None, max_length=255)
+    language: Optional[LangPref] = None
+    budget_band: Optional[BudgetBand] = None
+
+
+class BrokerMatchItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    broker_number: str
+    full_name: str
+    gender: Optional[str] = None
+    real_estate_name: Optional[str] = None
+    phone: Optional[str] = None
+    webpage: Optional[str] = None
+    license_start_date: Optional[date] = None
+    license_end_date: Optional[date] = None
+    is_active: bool
+    detected_language: str
+    company_size_active_brokers: int
+    license_status: str  # active | expiring_soon | expired
+    days_until_expiry: Optional[int] = None
+
+
+class BrokerMatchResponse(Attribution):
+    count: int
+    items: List[BrokerMatchItem]
+
+
+# ---------------------------------------------------------------------------
+# Top firms leaderboard
+# ---------------------------------------------------------------------------
+
+class TopCompanyItem(BaseModel):
+    real_estate_name: str
+    active_broker_count: int
+
+
+class TopCompaniesResponse(Attribution):
+    count: int
+    items: List[TopCompanyItem]
+
+
+# ---------------------------------------------------------------------------
+# Broker consultation request
+# ---------------------------------------------------------------------------
+
+class BrokerConsultationRequest(BaseModel):
+    broker_number: str = Field(..., min_length=1, max_length=32)
+    full_name: str = Field(..., min_length=2, max_length=255)
+    whatsapp: str = Field(..., min_length=4, max_length=64)
+    email: Optional[str] = Field(None, max_length=255)
+    budget_band: Optional[BudgetBand] = None
+    goal: Optional[GoalType] = None
+    message: Optional[str] = Field(None, max_length=500)
+
+
+class BrokerConsultationResponse(BaseModel):
+    success: bool = True
+    message: str
+    broker_full_name: str
+    broker_real_estate_name: Optional[str] = None
+    lead_id: UUID
 
 
 # ---------------------------------------------------------------------------

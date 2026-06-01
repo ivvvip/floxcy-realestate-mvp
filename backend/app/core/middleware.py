@@ -6,6 +6,8 @@ import time
 from typing import Awaitable, Callable
 
 from fastapi import Request, Response
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -79,6 +81,11 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
                 duration_ms,
             )
             return response
+        except (RequestValidationError, StarletteHTTPException):
+            # Let FastAPI's registered exception handlers translate these into
+            # proper 4xx responses (422 / 404 / etc). Swallowing them here
+            # would mask validation errors as 500s.
+            raise
         except Exception:
             duration_ms = (time.perf_counter() - start) * 1000
             logger.exception(

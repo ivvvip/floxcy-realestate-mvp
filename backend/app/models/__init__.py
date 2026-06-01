@@ -16,6 +16,7 @@ from app.models.dld import (
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
 from app.models.market_snapshot import MarketSnapshot
+from app.models.rent_alert import RentAlert
 from app.models.user import User
 
 __all__ = [
@@ -34,5 +35,6 @@ __all__ = [
     "InvestmentOpportunity",
     "InvestorLead",
     "MarketSnapshot",
+    "RentAlert",
     "User",
 ]
