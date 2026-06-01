@@ -50,10 +50,18 @@ class AreaListItem(AreaResponse):
 
 
 class AreaStatsResponse(BaseModel):
-    """Schema for aggregated area stats."""
+    """Schema for aggregated area stats.
+
+    `total_count` reflects all areas tracked (DLD coverage). `curated_count`
+    reflects the editorially curated subset that powers the existing
+    /api/v1/areas list.
+    """
     total_count: int
+    curated_count: int = 0
     count_by_type: Dict[str, int]
     area_names: List[str]
+    data_source: str = "Dubai Land Department Open Data"
+    last_updated: str = "2026-06-01"
 
 
 class AreaSnapshotPoint(BaseModel):

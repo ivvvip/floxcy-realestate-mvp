@@ -29,6 +29,7 @@ from app.api.routes import (
     broker_self,
     consultations,
     webhooks,
+    dld,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -135,6 +136,9 @@ app.include_router(consultations.router)
 app.include_router(broker_self.router)
 app.include_router(broker_admin.router)
 app.include_router(webhooks.router)
+
+# ---- DLD data layer ----
+app.include_router(dld.router)
 
 
 @app.get("/")

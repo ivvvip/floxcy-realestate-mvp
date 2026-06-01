@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
+from app.models.dld import DldArea, DldAreaMetrics
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.area import (
     AreaResponse,
@@ -17,6 +18,7 @@ from app.schemas.area import (
     AreaSnapshotPoint,
     AreaListItem,
 )
+from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield
 from app.services.confidence import build_confidence_report, confidence_to_dict
 
 router = APIRouter(
@@ -28,7 +30,11 @@ router = APIRouter(
 
 @router.get("", response_model=List[AreaListItem])
 async def list_areas(db: AsyncSession = Depends(get_db)):
-    """Get all areas with their latest market snapshot inline."""
+    """Get all curated areas with their latest market snapshot inline.
+
+    DLD-derived metrics override the curated snapshot when available
+    (matched via dld_areas.curated_area_id, 2026-ytd period).
+    """
     latest_date_subq = (
         select(
             MarketSnapshot.area_id,
@@ -38,12 +44,18 @@ async def list_areas(db: AsyncSession = Depends(get_db)):
         .subquery()
     )
     q = (
-        select(Area, MarketSnapshot)
+        select(Area, MarketSnapshot, DldAreaMetrics)
         .outerjoin(MarketSnapshot, MarketSnapshot.area_id == Area.id)
         .outerjoin(
             latest_date_subq,
             (latest_date_subq.c.area_id == MarketSnapshot.area_id)
             & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
+        )
+        .outerjoin(DldArea, DldArea.curated_area_id == Area.id)
+        .outerjoin(
+            DldAreaMetrics,
+            (DldAreaMetrics.dld_area_id == DldArea.id)
+            & (DldAreaMetrics.period == "2026-ytd"),
         )
         .where(
             (latest_date_subq.c.latest_date.isnot(None))
@@ -55,10 +67,24 @@ async def list_areas(db: AsyncSession = Depends(get_db)):
 
     items = []
     seen = set()
-    for area, snap in rows:
+    for area, snap, dld in rows:
         if area.id in seen:
             continue
         seen.add(area.id)
+
+        # Default to curated snapshot
+        ppsf = float(snap.avg_price_per_sqft) if snap else None
+        yld = float(snap.rental_yield) if snap else None
+
+        # Overlay DLD when available
+        if dld:
+            if dld.median_price_per_sqft is not None:
+                ppsf = float(dld.median_price_per_sqft)
+            if (dld.rental_yield_pct is not None
+                    and (dld.sales_count or 0) >= MIN_RELIABLE_SAMPLES
+                    and (dld.rent_count_2026 or 0) >= MIN_RELIABLE_SAMPLES):
+                yld = cap_yield(float(dld.rental_yield_pct))
+
         items.append(AreaListItem(
             id=area.id,
             name=area.name,
@@ -71,8 +97,8 @@ async def list_areas(db: AsyncSession = Depends(get_db)):
             longitude=area.longitude,
             created_at=area.created_at,
             updated_at=area.updated_at,
-            latest_price_per_sqft=float(snap.avg_price_per_sqft) if snap else None,
-            latest_yield=float(snap.rental_yield) if snap else None,
+            latest_price_per_sqft=ppsf,
+            latest_yield=yld,
             appreciation_1y=float(snap.appreciation_1y) if snap and snap.appreciation_1y else None,
             investment_score=float(snap.investment_score) if snap and snap.investment_score else None,
         ))
@@ -81,19 +107,23 @@ async def list_areas(db: AsyncSession = Depends(get_db)):
 
 @router.get("/stats", response_model=AreaStatsResponse)
 async def get_areas_stats(db: AsyncSession = Depends(get_db)):
-    """Aggregate stats across all areas."""
-    total = await db.scalar(select(func.count()).select_from(Area))
+    """Aggregate stats — total reflects full DLD coverage, not just curated."""
+    curated_total = await db.scalar(select(func.count()).select_from(Area))
+    dld_total = await db.scalar(select(func.count()).select_from(DldArea))
 
     type_rows = await db.execute(
         select(Area.area_type, func.count()).group_by(Area.area_type)
     )
     count_by_type = {area_type: count for area_type, count in type_rows.all()}
 
-    name_rows = await db.execute(select(Area.name).order_by(Area.name))
-    area_names = [name for (name,) in name_rows.all()]
+    dld_name_rows = await db.execute(
+        select(DldArea.name_display).order_by(DldArea.name_display)
+    )
+    area_names = [name for (name,) in dld_name_rows.all()]
 
     return AreaStatsResponse(
-        total_count=total or 0,
+        total_count=int(dld_total or 0),
+        curated_count=int(curated_total or 0),
         count_by_type=count_by_type,
         area_names=area_names,
     )
