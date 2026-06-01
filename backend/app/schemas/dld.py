@@ -103,11 +103,69 @@ class DldBuildingItem(BaseModel):
     active_rent_count: int = 0
     occupancy_proxy_pct: Optional[float] = None
     is_freehold: Optional[bool] = None
+    # Derived (computed at response-build time)
+    total_annual_income: Optional[float] = None
+    income_range_label: Optional[str] = None
+    confidence: Optional[str] = None
 
 
 class DldBuildingsResponse(Attribution):
     count: int
     total_available: int
+    items: List[DldBuildingItem]
+
+
+# -----------------------------------------------------------------------------
+# Building detail (X-Ray)
+# -----------------------------------------------------------------------------
+
+class DldBuildingAreaContext(BaseModel):
+    """The parent DLD area's headline figures, embedded for fast comparison."""
+    dld_area_id: UUID
+    name: str
+    name_norm: str
+    median_price_per_sqft: Optional[float] = None
+    median_annual_rent: Optional[float] = None
+    median_rent_per_sqft: Optional[float] = None
+    rental_yield_pct: Optional[float] = None
+    rent_growth_yoy_pct: Optional[float] = None
+    sales_count: int = 0
+    rent_count_2026: int = 0
+
+
+class DldBuildingDetail(DldBuildingItem):
+    """Same shape as the list item plus area context + implied yield."""
+    swimming_pools: Optional[int] = None
+    car_parks: Optional[int] = None
+    elevators: Optional[int] = None
+    bld_levels: Optional[int] = None
+    is_offplan: Optional[bool] = None
+    implied_yield_pct: Optional[float] = None
+    estimated_unit_size_sqft: Optional[float] = None
+    estimated_unit_price: Optional[float] = None
+    area_context: Optional[DldBuildingAreaContext] = None
+
+
+class DldBuildingDetailResponse(BaseModel):
+    """Attribution explicitly cites Ejari, the DLD's rent contract registry."""
+    data_source: str = "Dubai Land Department · Ejari rent contract registry"
+    last_updated: str = LAST_UPDATED
+    building: DldBuildingDetail
+
+
+class DldBuildingsComparableResponse(BaseModel):
+    data_source: str = "Dubai Land Department · Ejari rent contract registry"
+    last_updated: str = LAST_UPDATED
+    base_building_id: UUID
+    count: int
+    items: List[DldBuildingItem]
+
+
+class DldAreaTopBuildingsResponse(BaseModel):
+    data_source: str = "Dubai Land Department · Ejari rent contract registry"
+    last_updated: str = LAST_UPDATED
+    area_name: str
+    count: int
     items: List[DldBuildingItem]
 
 

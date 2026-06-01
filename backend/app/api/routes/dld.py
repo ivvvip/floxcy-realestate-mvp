@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from datetime import date, timedelta
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, or_, select
@@ -34,9 +35,14 @@ from app.schemas.dld import (
     DldAreaDetailResponse,
     DldAreaListItem,
     DldAreaListResponse,
+    DldAreaTopBuildingsResponse,
     DldBrokerItem,
     DldBrokersResponse,
+    DldBuildingAreaContext,
+    DldBuildingDetail,
+    DldBuildingDetailResponse,
     DldBuildingItem,
+    DldBuildingsComparableResponse,
     DldBuildingsResponse,
     DldStatsResponse,
     RentAlertCreate,
@@ -215,12 +221,77 @@ async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
 # Buildings
 # ---------------------------------------------------------------------------
 
+# Income display buckets — we deliberately don't surface exact total rent
+# figures on listing cards (per-building income reveals tenant economics
+# that DLD considers sensitive aggregations). Detail pages show the exact
+# figure for clarity, but card grids are bucketed.
+def _income_range_label(total_aed: Optional[float]) -> Optional[str]:
+    if total_aed is None or total_aed <= 0:
+        return None
+    if total_aed < 1_000_000:
+        return "Under AED 1M/year"
+    if total_aed < 10_000_000:
+        return "AED 1M – 10M/year"
+    if total_aed < 50_000_000:
+        return "AED 10M – 50M/year"
+    if total_aed < 100_000_000:
+        return "AED 50M – 100M/year"
+    if total_aed < 500_000_000:
+        return "AED 100M – 500M/year"
+    if total_aed < 1_000_000_000:
+        return "AED 500M – 1B/year"
+    return "AED 1B+/year"
+
+
+def _total_annual_income(b: DldBuilding) -> Optional[float]:
+    """Sum of active rent contracts × per-contract average. Proxy for the
+    building's aggregate annual rent income."""
+    if b.avg_annual_rent is None or b.active_rent_count <= 0:
+        return None
+    return float(b.avg_annual_rent) * int(b.active_rent_count)
+
+
+def _build_building_item(b: DldBuilding, area_name: Optional[str]) -> DldBuildingItem:
+    total = _total_annual_income(b)
+    return DldBuildingItem(
+        id=b.id,
+        project_name=b.project_name,
+        master_project=b.master_project,
+        area_name=area_name,
+        prop_sub_type=b.prop_sub_type,
+        flats=b.flats,
+        floors=b.floors,
+        avg_annual_rent=float(b.avg_annual_rent) if b.avg_annual_rent is not None else None,
+        avg_rent_per_sqft=float(b.avg_rent_per_sqft) if b.avg_rent_per_sqft is not None else None,
+        active_rent_count=b.active_rent_count,
+        occupancy_proxy_pct=float(b.occupancy_proxy_pct) if b.occupancy_proxy_pct is not None else None,
+        is_freehold=b.is_freehold,
+        total_annual_income=total,
+        income_range_label=_income_range_label(total),
+        confidence=confidence_for(b.active_rent_count),
+    )
+
+
+# Allowed sort keys map to the underlying column. order_by(...desc())
+SORT_COLUMNS = {
+    "rent_count": DldBuilding.active_rent_count,
+    "rent_per_sqft": DldBuilding.avg_rent_per_sqft,
+    "avg_rent": DldBuilding.avg_annual_rent,
+    "occupancy": DldBuilding.occupancy_proxy_pct,
+}
+
+
 @router.get("/buildings", response_model=DldBuildingsResponse)
 async def list_buildings(
     db: AsyncSession = Depends(get_db),
     area: Optional[str] = Query(None, description="filter by area name_norm"),
     project: Optional[str] = Query(None, description="filter by project_name substring"),
+    prop_sub_type: Optional[str] = Query(None, description="e.g. Flat, Villa"),
     min_rents: int = Query(0, ge=0),
+    sort_by: str = Query(
+        "rent_count",
+        description="rent_count | rent_per_sqft | avg_rent | occupancy",
+    ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -233,6 +304,8 @@ async def list_buildings(
         conds.append(DldArea.name_norm == area.strip().lower())
     if project:
         conds.append(DldBuilding.project_name.ilike(f"%{project.strip()}%"))
+    if prop_sub_type:
+        conds.append(DldBuilding.prop_sub_type == prop_sub_type)
     if min_rents > 0:
         conds.append(DldBuilding.active_rent_count >= min_rents)
     if conds:
@@ -247,26 +320,166 @@ async def list_buildings(
         count_stmt = count_stmt.where(and_(*conds))
     total = await db.scalar(count_stmt)
 
-    stmt = stmt.order_by(DldBuilding.active_rent_count.desc()).limit(limit).offset(offset)
+    sort_col = SORT_COLUMNS.get(sort_by, DldBuilding.active_rent_count)
+    # NULLS LAST for derived sorts (rent/sqft, occupancy) — Postgres-friendly
+    stmt = stmt.order_by(sort_col.desc().nullslast()).limit(limit).offset(offset)
     rows = (await db.execute(stmt)).all()
-    items = [
-        DldBuildingItem(
-            id=b.id,
-            project_name=b.project_name,
-            master_project=b.master_project,
-            area_name=area_name,
-            prop_sub_type=b.prop_sub_type,
-            flats=b.flats,
-            floors=b.floors,
-            avg_annual_rent=float(b.avg_annual_rent) if b.avg_annual_rent is not None else None,
-            avg_rent_per_sqft=float(b.avg_rent_per_sqft) if b.avg_rent_per_sqft is not None else None,
-            active_rent_count=b.active_rent_count,
-            occupancy_proxy_pct=float(b.occupancy_proxy_pct) if b.occupancy_proxy_pct is not None else None,
-            is_freehold=b.is_freehold,
-        )
-        for b, area_name in rows
-    ]
+    items = [_build_building_item(b, area_name) for b, area_name in rows]
     return DldBuildingsResponse(count=len(items), total_available=int(total or 0), items=items)
+
+
+async def _load_area_context(
+    db: AsyncSession, dld_area_id: Optional[UUID]
+) -> Optional[DldBuildingAreaContext]:
+    if dld_area_id is None:
+        return None
+    row = (
+        await db.execute(
+            select(DldArea, DldAreaMetrics)
+            .outerjoin(
+                DldAreaMetrics,
+                (DldAreaMetrics.dld_area_id == DldArea.id)
+                & (DldAreaMetrics.period == "2026-ytd"),
+            )
+            .where(DldArea.id == dld_area_id)
+        )
+    ).first()
+    if not row:
+        return None
+    a, m = row
+    sales = m.sales_count if m else 0
+    rents = m.rent_count_2026 if m else 0
+    show_yield = None
+    if (m and m.rental_yield_pct is not None
+            and sales >= MIN_RELIABLE_SAMPLES
+            and rents >= MIN_RELIABLE_SAMPLES):
+        show_yield = cap_yield(float(m.rental_yield_pct))
+    return DldBuildingAreaContext(
+        dld_area_id=a.id,
+        name=a.name_display,
+        name_norm=a.name_norm,
+        median_price_per_sqft=float(m.median_price_per_sqft) if m and m.median_price_per_sqft is not None else None,
+        median_annual_rent=float(m.median_annual_rent) if m and m.median_annual_rent is not None else None,
+        median_rent_per_sqft=float(m.median_rent_per_sqft) if m and m.median_rent_per_sqft is not None else None,
+        rental_yield_pct=show_yield,
+        rent_growth_yoy_pct=float(m.rent_growth_yoy_pct) if m and m.rent_growth_yoy_pct is not None else None,
+        sales_count=sales,
+        rent_count_2026=rents,
+    )
+
+
+@router.get("/buildings/{building_id}", response_model=DldBuildingDetailResponse)
+async def get_building(building_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Per-building income X-Ray. Capped yield uses the parent area's median
+    PPSF — building unit prices aren't in the DLD rent registry."""
+    row = (
+        await db.execute(
+            select(DldBuilding, DldArea.name_display, DldArea.id)
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+            .where(DldBuilding.id == building_id)
+        )
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Building not found")
+    b, area_name, dld_area_id = row
+
+    area_ctx = await _load_area_context(db, dld_area_id)
+
+    # Implied yield: building rent/sqft as a fraction of area median PPSF.
+    # When DLD median PPSF is missing we leave the yield null rather than
+    # invent a number from an unrelated benchmark.
+    implied_yield = None
+    est_sqft = None
+    est_price = None
+    if (b.avg_rent_per_sqft and b.avg_annual_rent and area_ctx
+            and area_ctx.median_price_per_sqft):
+        ratio = float(b.avg_rent_per_sqft) / float(area_ctx.median_price_per_sqft)
+        implied_yield = cap_yield(ratio * 100)
+        est_sqft = float(b.avg_annual_rent) / float(b.avg_rent_per_sqft)
+        est_price = est_sqft * float(area_ctx.median_price_per_sqft)
+
+    base = _build_building_item(b, area_name)
+    detail = DldBuildingDetail(
+        **base.model_dump(),
+        swimming_pools=b.swimming_pools,
+        car_parks=b.car_parks,
+        elevators=b.elevators,
+        bld_levels=b.bld_levels,
+        is_offplan=b.is_offplan,
+        implied_yield_pct=implied_yield,
+        estimated_unit_size_sqft=est_sqft,
+        estimated_unit_price=est_price,
+        area_context=area_ctx,
+    )
+    return DldBuildingDetailResponse(building=detail)
+
+
+@router.get(
+    "/buildings/{building_id}/comparable",
+    response_model=DldBuildingsComparableResponse,
+)
+async def comparable_buildings(
+    building_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    k: int = Query(5, ge=1, le=20),
+):
+    """Same parent area + same prop_sub_type, ranked by occupancy proxy."""
+    base = (
+        await db.execute(select(DldBuilding).where(DldBuilding.id == building_id))
+    ).scalar_one_or_none()
+    if not base:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    stmt = (
+        select(DldBuilding, DldArea.name_display)
+        .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+        .where(
+            DldBuilding.id != building_id,
+            DldBuilding.dld_area_id == base.dld_area_id,
+            DldBuilding.prop_sub_type == base.prop_sub_type,
+        )
+        .order_by(
+            DldBuilding.occupancy_proxy_pct.desc().nullslast(),
+            DldBuilding.active_rent_count.desc(),
+        )
+        .limit(k)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [_build_building_item(b, name) for b, name in rows]
+    return DldBuildingsComparableResponse(
+        base_building_id=building_id, count=len(items), items=items
+    )
+
+
+@router.get(
+    "/areas/{name_norm}/top-buildings",
+    response_model=DldAreaTopBuildingsResponse,
+)
+async def area_top_buildings(
+    name_norm: str,
+    db: AsyncSession = Depends(get_db),
+    k: int = Query(10, ge=1, le=50),
+):
+    """Top-K buildings in an area, ranked by active rent count desc."""
+    norm = name_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    stmt = (
+        select(DldBuilding, DldArea.name_display)
+        .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+        .where(DldBuilding.dld_area_id == area.id)
+        .order_by(DldBuilding.active_rent_count.desc())
+        .limit(k)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [_build_building_item(b, name) for b, name in rows]
+    return DldAreaTopBuildingsResponse(
+        area_name=area.name_display, count=len(items), items=items
+    )
 
 
 # ---------------------------------------------------------------------------
