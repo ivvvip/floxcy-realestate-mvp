@@ -284,6 +284,94 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           </div>
         )}
 
+        {/* DLD live-data overlay (Phase 3) */}
+        {area.dld && (
+          <section
+            id="dld-overlay"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                Dubai Land Department · live benchmark
+              </span>
+              <span className="text-[11px] text-fg-subtle">
+                {area.dld.sales_count.toLocaleString()} sales ·{' '}
+                {area.dld.rent_count_2026.toLocaleString()} rents · confidence{' '}
+                <span
+                  className={cn(
+                    'font-medium',
+                    area.dld.confidence === 'high' && 'text-positive',
+                    area.dld.confidence === 'medium' && 'text-accent',
+                    area.dld.confidence === 'low' && 'text-fg-muted'
+                  )}
+                >
+                  {area.dld.confidence}
+                </span>
+              </span>
+            </div>
+            <div className="grid gap-px bg-border lg:grid-cols-4">
+              <MetricTile
+                label="Median price / sqft"
+                value={
+                  area.dld.median_price_per_sqft
+                    ? formatAED(area.dld.median_price_per_sqft)
+                    : '—'
+                }
+                hint="DLD 2026 YTD"
+                mono
+              />
+              <MetricTile
+                label="Median annual rent"
+                value={
+                  area.dld.median_annual_rent
+                    ? formatAED(area.dld.median_annual_rent)
+                    : '—'
+                }
+                hint="DLD 2026 YTD"
+                mono
+              />
+              <MetricTile
+                label="Rental yield"
+                value={
+                  area.dld.rental_yield_pct != null
+                    ? formatPercent(area.dld.rental_yield_pct)
+                    : '—'
+                }
+                hint={
+                  area.dld.rental_yield_pct == null
+                    ? 'Needs ≥30 sales & ≥30 rents'
+                    : 'Capped at 25%'
+                }
+                tone={area.dld.rental_yield_pct != null ? 'positive' : 'default'}
+                mono
+              />
+              <MetricTile
+                label="YoY rent growth"
+                value={
+                  area.dld.rent_growth_yoy_pct != null
+                    ? `${area.dld.rent_growth_yoy_pct >= 0 ? '+' : ''}${area.dld.rent_growth_yoy_pct.toFixed(1)}%`
+                    : '—'
+                }
+                hint="vs 2025"
+                tone={
+                  area.dld.rent_growth_yoy_pct == null
+                    ? 'default'
+                    : area.dld.rent_growth_yoy_pct >= 0
+                      ? 'positive'
+                      : 'negative'
+                }
+                mono
+              />
+            </div>
+            <div className="px-4 py-2 text-[11px] text-fg-subtle border-t border-border">
+              Source: {area.data_source ?? 'Dubai Land Department Open Data'}.
+              Updated {area.last_updated ?? '2026-06-01'}. Mapped DLD area:{' '}
+              <span className="font-mono text-fg">{area.dld.dld_name}</span>.
+            </div>
+          </section>
+        )}
+
         {/* AI insight card (P2) */}
         <div className="mt-5">
           <AreaAiInsightCard areaId={params.id} />

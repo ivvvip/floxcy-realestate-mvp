@@ -13,6 +13,8 @@ const LINKS = [
   { href: '/opportunities', label: 'Opportunities' },
   { href: '/compare', label: 'Compare' },
   { href: '/advisor', label: 'AI Analyst' },
+  { href: '/rent-check', label: 'Rent Check' },
+  { href: '/brokers/directory', label: 'Brokers' },
   { href: '/roi-calculator', label: 'ROI' },
 ];
 

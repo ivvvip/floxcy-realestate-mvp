@@ -39,6 +39,14 @@ import type {
   LeadCreate,
   LeadUpdate,
   OpportunityFeedResponse,
+  DldAreaListResponse,
+  DldAreaDetailResponse,
+  DldStatsResponse,
+  DldBuildingsResponse,
+  DldBrokersResponse,
+  DldBrokerItem,
+  RentCheckRequest,
+  RentCheckResponse,
 } from './types';
 import { getBrokerToken } from './brokerAuth';
 
@@ -568,6 +576,96 @@ export async function adminUpdateLead(
     revalidate: false,
     withCredentials: true,
   });
+}
+
+// ---------- DLD data layer ----------
+
+export async function getDldStats(): Promise<DldStatsResponse> {
+  return request<DldStatsResponse>('/api/v1/dld/areas/stats', { revalidate: 3600 });
+}
+
+export async function getDldAreas(opts?: {
+  q?: string;
+  min_sales?: number;
+  min_rents?: number;
+  has_yield?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<DldAreaListResponse> {
+  const params = new URLSearchParams();
+  if (opts?.q) params.set('q', opts.q);
+  if (opts?.min_sales != null) params.set('min_sales', String(opts.min_sales));
+  if (opts?.min_rents != null) params.set('min_rents', String(opts.min_rents));
+  if (opts?.has_yield) params.set('has_yield', 'true');
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.offset) params.set('offset', String(opts.offset));
+  const q = params.toString();
+  return request<DldAreaListResponse>(`/api/v1/dld/areas${q ? `?${q}` : ''}`, {
+    revalidate: 600,
+  });
+}
+
+export async function getDldArea(nameNorm: string): Promise<DldAreaDetailResponse> {
+  return request<DldAreaDetailResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getDldBuildings(opts?: {
+  area?: string;
+  project?: string;
+  min_rents?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<DldBuildingsResponse> {
+  const params = new URLSearchParams();
+  if (opts?.area) params.set('area', opts.area);
+  if (opts?.project) params.set('project', opts.project);
+  if (opts?.min_rents != null) params.set('min_rents', String(opts.min_rents));
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.offset) params.set('offset', String(opts.offset));
+  const q = params.toString();
+  return request<DldBuildingsResponse>(
+    `/api/v1/dld/buildings${q ? `?${q}` : ''}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function dldRentCheck(payload: RentCheckRequest): Promise<RentCheckResponse> {
+  return request<RentCheckResponse>('/api/v1/dld/rent-check', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+export async function getDldBrokers(opts?: {
+  q?: string;
+  firm?: string;
+  active?: boolean;
+  gender?: 'male' | 'female';
+  limit?: number;
+  offset?: number;
+}): Promise<DldBrokersResponse> {
+  const params = new URLSearchParams();
+  if (opts?.q) params.set('q', opts.q);
+  if (opts?.firm) params.set('firm', opts.firm);
+  if (opts?.active != null) params.set('active', String(opts.active));
+  if (opts?.gender) params.set('gender', opts.gender);
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  if (opts?.offset) params.set('offset', String(opts.offset));
+  const q = params.toString();
+  return request<DldBrokersResponse>(`/api/v1/dld/brokers${q ? `?${q}` : ''}`, {
+    revalidate: 600,
+  });
+}
+
+export async function getDldBroker(brokerNumber: string): Promise<DldBrokerItem> {
+  return request<DldBrokerItem>(
+    `/api/v1/dld/brokers/${encodeURIComponent(brokerNumber)}`,
+    { revalidate: 600 }
+  );
 }
 
 export { ApiError };

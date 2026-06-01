@@ -65,9 +65,29 @@ export interface AreaLatestSnapshot {
   investment_score: number | null;
 }
 
+export interface AreaDldBlock {
+  dld_area_id: string;
+  dld_name: string;
+  median_price_per_sqft: number | null;
+  median_annual_rent: number | null;
+  median_rent_per_sqft: number | null;
+  avg_price_per_sqft: number | null;
+  avg_annual_rent: number | null;
+  avg_rent_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  sales_count: number;
+  rent_count_2026: number;
+  building_count: number;
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface AreaDetail extends Area {
   latest: AreaLatestSnapshot | null;
   history: AreaSnapshotPoint[];
+  dld?: AreaDldBlock | null;
+  data_source?: string;
+  last_updated?: string;
 }
 
 export interface TopAreaItem {
@@ -104,6 +124,19 @@ export interface CompareSnapshotPoint {
   avg_sale_price: number;
 }
 
+export interface CompareDldBlock {
+  dld_area_id: string;
+  dld_name: string;
+  median_price_per_sqft: number | null;
+  median_annual_rent: number | null;
+  median_rent_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  sales_count: number;
+  rent_count_2026: number;
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface CompareAreaData {
   id: string;
   name: string;
@@ -119,10 +152,127 @@ export interface CompareAreaData {
   risk_score: number | null;
   investment_score: number | null;
   history: CompareSnapshotPoint[];
+  dld?: CompareDldBlock | null;
 }
 
 export interface CompareResponse {
   areas: CompareAreaData[];
+  data_source?: string;
+  last_updated?: string;
+}
+
+// ---------- DLD endpoints ----------
+
+export interface DldAttribution {
+  data_source: string;
+  last_updated: string;
+}
+
+export interface DldAreaListItem {
+  id: string;
+  name: string;
+  name_norm: string;
+  median_price_per_sqft: number | null;
+  median_annual_rent: number | null;
+  median_rent_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  sales_count: number;
+  rent_count_2026: number;
+  confidence: 'low' | 'medium' | 'high';
+}
+
+export interface DldAreaListResponse extends DldAttribution {
+  count: number;
+  total_available: number;
+  items: DldAreaListItem[];
+}
+
+export interface DldAreaDetail extends DldAreaListItem {
+  building_count: number;
+  avg_price_per_sqft: number | null;
+  avg_annual_rent: number | null;
+  avg_rent_per_sqft: number | null;
+}
+
+export interface DldAreaDetailResponse extends DldAttribution {
+  area: DldAreaDetail;
+}
+
+export interface DldStatsResponse extends DldAttribution {
+  total_areas: number;
+  areas_with_metrics: number;
+  areas_with_full_yield: number;
+  total_buildings: number;
+  total_active_brokers: number;
+  total_rent_benchmark_cells: number;
+}
+
+export interface DldBuildingItem {
+  id: string;
+  project_name: string | null;
+  master_project: string | null;
+  area_name: string | null;
+  prop_sub_type: string | null;
+  flats: number | null;
+  floors: number | null;
+  avg_annual_rent: number | null;
+  avg_rent_per_sqft: number | null;
+  active_rent_count: number;
+  occupancy_proxy_pct: number | null;
+  is_freehold: boolean | null;
+}
+
+export interface DldBuildingsResponse extends DldAttribution {
+  count: number;
+  total_available: number;
+  items: DldBuildingItem[];
+}
+
+export interface DldBrokerItem {
+  broker_number: string;
+  full_name: string;
+  gender: string | null;
+  is_active: boolean;
+  license_start_date: string | null;
+  license_end_date: string | null;
+  phone: string | null;
+  webpage: string | null;
+  real_estate_name: string | null;
+}
+
+export interface DldBrokersResponse extends DldAttribution {
+  count: number;
+  total_available: number;
+  items: DldBrokerItem[];
+}
+
+export interface RentCheckRequest {
+  area_name: string;
+  size_sqm: number;
+  annual_rent: number;
+  prop_sub_type?: string;
+}
+
+export interface RentCheckSuggestion {
+  area_name: string;
+  median_annual_rent: number;
+  median_rent_per_sqft: number;
+  saving_pct: number;
+  sample_size: number;
+}
+
+export interface RentCheckResponse extends DldAttribution {
+  user_rent: number;
+  area_median: number;
+  percentile: number;
+  verdict: 'above_market' | 'fair' | 'below_market';
+  percentage_diff: number;
+  sample_size: number;
+  yoy_trend: number | null;
+  size_band: string;
+  confidence: 'low' | 'medium' | 'high';
+  suggested_areas: RentCheckSuggestion[];
 }
 
 export type AdvisorGoal = 'yield' | 'appreciation' | 'balanced';
