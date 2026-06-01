@@ -247,9 +247,12 @@ export interface DldBrokersResponse extends DldAttribution {
   items: DldBrokerItem[];
 }
 
+export type SizeCategory = 'studio' | '1br' | '2br' | '3br' | '4br';
+
 export interface RentCheckRequest {
   area_name: string;
-  size_sqm: number;
+  size_sqm?: number;
+  size_category?: SizeCategory;
   annual_rent: number;
   prop_sub_type?: string;
 }

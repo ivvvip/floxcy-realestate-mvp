@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 DATA_SOURCE = "Dubai Land Department Open Data"
@@ -115,11 +115,34 @@ class DldBuildingsResponse(Attribution):
 # Rent check ("Is your rent fair?")
 # ---------------------------------------------------------------------------
 
+SizeCategory = Literal["studio", "1br", "2br", "3br", "4br"]
+
+# Each category maps to a primary size_band, with optional fallbacks if the
+# primary band has no benchmark for that (area, prop_sub_type).
+SIZE_CATEGORY_BANDS: dict[str, list[str]] = {
+    "studio": ["<50"],
+    "1br": ["50-99"],
+    "2br": ["100-149"],
+    "3br": ["150-199"],
+    "4br": ["200-299", "300+"],
+}
+
+
 class RentCheckRequest(BaseModel):
     area_name: str = Field(..., min_length=2, max_length=128)
-    size_sqm: float = Field(..., gt=0, lt=10000)
+    size_sqm: Optional[float] = Field(None, gt=0, lt=10000)
+    size_category: Optional[SizeCategory] = Field(
+        None,
+        description="Preferred over size_sqm — maps directly to a DLD size band",
+    )
     annual_rent: float = Field(..., gt=0, lt=50_000_000)
     prop_sub_type: str = Field("Flat", max_length=64)
+
+    @model_validator(mode="after")
+    def _must_have_size(self) -> "RentCheckRequest":
+        if self.size_sqm is None and self.size_category is None:
+            raise ValueError("Provide either size_sqm or size_category")
+        return self
 
 
 class RentCheckSuggestion(BaseModel):

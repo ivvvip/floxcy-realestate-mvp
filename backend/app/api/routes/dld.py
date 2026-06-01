@@ -19,6 +19,7 @@ from app.models.dld import (
 from app.schemas.dld import (
     DISPLAY_YIELD_CAP_PCT,
     MIN_RELIABLE_SAMPLES,
+    SIZE_CATEGORY_BANDS,
     DldAreaDetail,
     DldAreaDetailResponse,
     DldAreaListItem,
@@ -261,7 +262,12 @@ async def list_buildings(
 @router.post("/rent-check", response_model=RentCheckResponse)
 async def rent_check(req: RentCheckRequest, db: AsyncSession = Depends(get_db)):
     norm_area = req.area_name.strip().lower()
-    band = _size_band(req.size_sqm)
+
+    # Derive the list of size bands to try, in priority order
+    if req.size_category is not None:
+        bands_to_try = SIZE_CATEGORY_BANDS[req.size_category]
+    else:
+        bands_to_try = [_size_band(req.size_sqm or 0.0)]
 
     # Resolve area
     area = (
@@ -270,22 +276,30 @@ async def rent_check(req: RentCheckRequest, db: AsyncSession = Depends(get_db)):
     if not area:
         raise HTTPException(status_code=404, detail=f"Area '{req.area_name}' not found in DLD data")
 
-    # Lookup benchmark for this (area, prop_sub_type, size_band)
-    bm = (
-        await db.execute(
-            select(DldRentBenchmark).where(
-                DldRentBenchmark.dld_area_id == area.id,
-                DldRentBenchmark.prop_sub_type == req.prop_sub_type,
-                DldRentBenchmark.size_band == band,
-                DldRentBenchmark.period == "2026",
+    # Try each candidate band until we find a benchmark
+    bm = None
+    band = bands_to_try[0]
+    for candidate in bands_to_try:
+        row = (
+            await db.execute(
+                select(DldRentBenchmark).where(
+                    DldRentBenchmark.dld_area_id == area.id,
+                    DldRentBenchmark.prop_sub_type == req.prop_sub_type,
+                    DldRentBenchmark.size_band == candidate,
+                    DldRentBenchmark.period == "2026",
+                )
             )
-        )
-    ).scalar_one_or_none()
+        ).scalar_one_or_none()
+        if row is not None:
+            bm = row
+            band = candidate
+            break
+
     if not bm:
         raise HTTPException(
             status_code=404,
-            detail=f"No rent benchmark for {area.name_display} / {req.prop_sub_type} / size {band}sqm. "
-                   f"Try a different size band or property type.",
+            detail=f"No rent benchmark for {area.name_display} / {req.prop_sub_type} / size {bands_to_try[0]}sqm. "
+                   f"Try a different size or property type.",
         )
 
     median = float(bm.median_annual_rent)

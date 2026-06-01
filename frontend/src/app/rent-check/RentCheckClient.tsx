@@ -1,84 +1,154 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { ArrowRight, CheckCircle2, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
+import {
+  ArrowRight,
+  ChevronDown,
+  Copy,
+  Search,
+  Share2,
+  TrendingDown,
+  TrendingUp,
+  Lightbulb,
+} from 'lucide-react';
 import { dldRentCheck } from '@/lib/api';
-import { formatAED, formatPercent } from '@/lib/format';
+import { formatAED } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { RentCheckResponse } from '@/lib/types';
+import type {
+  RentCheckResponse,
+  SizeCategory,
+} from '@/lib/types';
+
+export interface RentCheckAreaOption {
+  name: string;
+  name_norm: string;
+  rent_count: number;
+  median_annual_rent: number | null;
+}
+
+const SQM_TO_SQFT = 10.7639;
+
+interface SizeOption {
+  key: SizeCategory;
+  label: string;
+  sub: string;
+  sqmHint: string;
+  sqftHint: string;
+}
+
+const SIZE_OPTIONS: SizeOption[] = [
+  {
+    key: 'studio',
+    label: 'Studio',
+    sub: 'No separate bedroom',
+    sqmHint: 'Under 50 sqm',
+    sqftHint: `Under ${Math.round(50 * SQM_TO_SQFT)} sqft`,
+  },
+  {
+    key: '1br',
+    label: '1 Bedroom',
+    sub: '1 BR apartment',
+    sqmHint: '50–99 sqm',
+    sqftHint: `${Math.round(50 * SQM_TO_SQFT)}–${Math.round(99 * SQM_TO_SQFT)} sqft`,
+  },
+  {
+    key: '2br',
+    label: '2 Bedrooms',
+    sub: '2 BR apartment',
+    sqmHint: '100–149 sqm',
+    sqftHint: `${Math.round(100 * SQM_TO_SQFT)}–${Math.round(149 * SQM_TO_SQFT)} sqft`,
+  },
+  {
+    key: '3br',
+    label: '3 Bedrooms',
+    sub: '3 BR apartment / townhouse',
+    sqmHint: '150–199 sqm',
+    sqftHint: `${Math.round(150 * SQM_TO_SQFT)}–${Math.round(199 * SQM_TO_SQFT)} sqft`,
+  },
+  {
+    key: '4br',
+    label: '4+ Bedrooms',
+    sub: 'Villa / large unit',
+    sqmHint: '200+ sqm',
+    sqftHint: `${Math.round(200 * SQM_TO_SQFT)}+ sqft`,
+  },
+];
 
 const PROP_TYPES = ['Flat', 'Villa', 'Hotel Apartment'] as const;
+type PropType = (typeof PROP_TYPES)[number];
 
-const DEFAULTS = {
-  area_name: 'Al Barsha First',
-  size_sqm: '90',
-  annual_rent: '75000',
-  prop_sub_type: 'Flat' as (typeof PROP_TYPES)[number],
-};
+interface RentCheckClientProps {
+  areaOptions: RentCheckAreaOption[];
+}
 
-const VERDICT_COPY: Record<
-  RentCheckResponse['verdict'],
-  { label: string; tone: 'positive' | 'negative' | 'warning' }
-> = {
-  fair: { label: 'Fair', tone: 'positive' },
-  above_market: { label: 'Above market', tone: 'negative' },
-  below_market: { label: 'Below market', tone: 'warning' },
-};
-
-const CONFIDENCE_COPY: Record<
-  RentCheckResponse['confidence'],
-  { label: string; hint: string }
-> = {
-  high: { label: 'High confidence', hint: '≥100 comparable rent contracts' },
-  medium: { label: 'Medium confidence', hint: '30–99 comparable rent contracts' },
-  low: { label: 'Low confidence', hint: '<30 comparable rent contracts' },
-};
-
-export function RentCheckClient() {
-  const [form, setForm] = useState(DEFAULTS);
+export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
+  const [propType, setPropType] = useState<PropType>('Flat');
+  const [area, setArea] = useState<RentCheckAreaOption | null>(null);
+  const [size, setSize] = useState<SizeCategory | null>(null);
+  const [rent, setRent] = useState('');
   const [result, setResult] = useState<RentCheckResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function update<K extends keyof typeof DEFAULTS>(key: K) {
-    return (v: (typeof DEFAULTS)[K]) => setForm((f) => ({ ...f, [key]: v }));
-  }
+  // Always re-scroll to the result after a successful check (mobile especially)
+  const resultRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [result]);
+
+  // Derived rent guidance for selected area
+  const rentHint = useMemo(() => {
+    if (!area || area.median_annual_rent == null) return null;
+    const med = area.median_annual_rent;
+    return `Most people in ${area.name} pay around ${formatAED(med)} (median).`;
+  }, [area]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const size = Number(form.size_sqm);
-    const rent = Number(form.annual_rent);
-    if (!form.area_name.trim() || form.area_name.trim().length < 2) {
-      setError('Enter the area name.');
+    setError(null);
+    if (!area) {
+      setError('Pick an area from the list.');
       return;
     }
-    if (!Number.isFinite(size) || size <= 0) {
-      setError('Size (sqm) must be greater than 0.');
+    if (!size) {
+      setError('Pick your home size.');
       return;
     }
-    if (!Number.isFinite(rent) || rent <= 0) {
-      setError('Annual rent must be greater than 0.');
+    const rentNum = Number(rent.replace(/[, ]/g, ''));
+    if (!Number.isFinite(rentNum) || rentNum <= 0) {
+      setError('Enter your annual rent in AED.');
       return;
     }
     setLoading(true);
-    setError(null);
     try {
       const res = await dldRentCheck({
-        area_name: form.area_name.trim(),
-        size_sqm: size,
-        annual_rent: rent,
-        prop_sub_type: form.prop_sub_type,
+        area_name: area.name_norm,
+        size_category: size,
+        annual_rent: rentNum,
+        prop_sub_type: propType,
       });
       setResult(res);
     } catch (err) {
-      const msg =
+      const detail =
         err instanceof Error && 'body' in err
           ? // @ts-expect-error ApiError shape
-            err.body?.detail ?? err.message
+            err.body?.detail
+          : null;
+      setError(
+        typeof detail === 'string'
+          ? detail
           : err instanceof Error
             ? err.message
-            : 'Could not run rent check. Please try again.';
-      setError(String(msg));
+            : 'Could not run the check. Please try again.'
+      );
       setResult(null);
     } finally {
       setLoading(false);
@@ -86,111 +156,106 @@ export function RentCheckClient() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-      {/* Form */}
-      <form
-        onSubmit={onSubmit}
-        className="card p-5 h-fit space-y-4"
-        aria-labelledby="rent-check-form"
-      >
-        <h2 id="rent-check-form" className="text-sm font-semibold text-fg">
-          Your rental
-        </h2>
-
-        <div>
-          <label
-            htmlFor="area_name"
-            className="block text-[11px] uppercase tracking-wide text-fg-subtle font-medium"
-          >
-            Area
-          </label>
-          <input
-            id="area_name"
-            type="text"
-            value={form.area_name}
-            onChange={(e) => update('area_name')(e.target.value)}
-            placeholder="e.g. Al Barsha First, Business Bay"
-            className="input-field mt-1"
-            required
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,400px)_1fr]">
+      {/* Form column */}
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Step n={1} title="Pick your area">
+          <AreaSelect
+            value={area}
+            onChange={setArea}
+            options={areaOptions}
           />
-          <p className="mt-1 text-[11px] text-fg-subtle">
-            Use the official DLD area name (case insensitive).
-          </p>
-        </div>
+          {areaOptions.length === 0 && (
+            <p className="mt-2 text-[11px] text-warning">
+              Could not load area list. Refresh the page in a moment.
+            </p>
+          )}
+        </Step>
 
-        <div>
-          <label
-            htmlFor="prop_sub_type"
-            className="block text-[11px] uppercase tracking-wide text-fg-subtle font-medium"
-          >
-            Property type
-          </label>
-          <select
-            id="prop_sub_type"
-            value={form.prop_sub_type}
-            onChange={(e) =>
-              update('prop_sub_type')(
-                e.target.value as (typeof PROP_TYPES)[number]
-              )
-            }
-            className="input-field mt-1"
-          >
-            {PROP_TYPES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              htmlFor="size_sqm"
-              className="block text-[11px] uppercase tracking-wide text-fg-subtle font-medium"
-            >
-              Size (sqm)
-            </label>
-            <input
-              id="size_sqm"
-              type="number"
-              inputMode="decimal"
-              min={1}
-              step="any"
-              value={form.size_sqm}
-              onChange={(e) => update('size_sqm')(e.target.value)}
-              className="input-field mt-1"
-              required
-            />
+        <Step n={2} title="Pick your home size">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {SIZE_OPTIONS.map((opt) => {
+              const active = size === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSize(opt.key)}
+                  className={cn(
+                    'rounded-md border px-3 py-2.5 text-left transition-colors min-h-[56px]',
+                    active
+                      ? 'border-accent bg-accent/10 text-fg'
+                      : 'border-border bg-bg-card text-fg-muted hover:border-fg-subtle hover:text-fg'
+                  )}
+                >
+                  <div className="text-sm font-medium">{opt.label}</div>
+                  <div className="mt-0.5 text-[11px] text-fg-subtle">
+                    {opt.sqmHint} · {opt.sqftHint}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          <div>
-            <label
-              htmlFor="annual_rent"
-              className="block text-[11px] uppercase tracking-wide text-fg-subtle font-medium"
-            >
-              Annual rent
-            </label>
-            <div className="relative mt-1">
-              <input
-                id="annual_rent"
-                type="number"
-                inputMode="decimal"
-                min={1}
-                step="any"
-                value={form.annual_rent}
-                onChange={(e) => update('annual_rent')(e.target.value)}
-                className="input-field pr-12"
-                required
+
+          {/* Property type — tucked under size, defaults to Flat */}
+          <details className="mt-3 group">
+            <summary className="cursor-pointer text-[11px] text-fg-subtle hover:text-fg inline-flex items-center gap-1.5 list-none">
+              <ChevronDown
+                className="h-3 w-3 transition-transform group-open:rotate-180"
+                strokeWidth={2.5}
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-fg-subtle">
-                AED
-              </span>
+              Property type: {propType}
+            </summary>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {PROP_TYPES.map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setPropType(p)}
+                  className={cn(
+                    'rounded border px-2 py-1.5 text-[12px]',
+                    propType === p
+                      ? 'border-accent bg-accent/10 text-fg'
+                      : 'border-border bg-bg-card text-fg-muted hover:text-fg'
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
+          </details>
+        </Step>
+
+        <Step n={3} title="Enter your annual rent">
+          <div className="relative">
+            <input
+              id="annual_rent"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={rent}
+              onChange={(e) =>
+                setRent(e.target.value.replace(/[^0-9,]/g, ''))
+              }
+              placeholder="e.g. 85,000"
+              className="input-field pr-14 text-base"
+              required
+              aria-describedby="rent-hint"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-subtle">
+              AED
+            </span>
           </div>
-        </div>
+          <p id="rent-hint" className="mt-1.5 text-[11px] text-fg-subtle">
+            {rentHint ?? 'Enter your annual rent in AED.'}
+          </p>
+        </Step>
 
         {error && (
-          <div className="rounded border border-negative/40 bg-negative/10 px-3 py-2 text-xs text-negative">
+          <div
+            role="alert"
+            className="rounded border border-negative/40 bg-negative/10 px-3 py-2 text-sm text-negative"
+          >
             {error}
           </div>
         )}
@@ -198,118 +263,334 @@ export function RentCheckClient() {
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full inline-flex items-center justify-center gap-2"
+          className="btn-primary w-full inline-flex items-center justify-center gap-2 h-11 text-sm"
         >
           {loading ? 'Checking…' : 'Check my rent'}
-          <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
+          <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
         </button>
       </form>
 
-      {/* Result */}
-      <div className="space-y-4">
-        {!result && !loading && !error && (
-          <div className="card p-8 text-center text-sm text-fg-subtle">
-            Enter your rental details to compare against the Dubai Land
-            Department benchmark for your area, property type and size band.
-          </div>
+      {/* Result column */}
+      <div ref={resultRef} className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        {!result && !loading && (
+          <EmptyState />
         )}
-
-        {result && <RentCheckResult result={result} />}
+        {loading && <LoadingState />}
+        {result && (
+          <ResultPanel
+            result={result}
+            areaName={area?.name ?? result.user_rent.toString()}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function RentCheckResult({ result }: { result: RentCheckResponse }) {
-  const v = VERDICT_COPY[result.verdict];
-  const conf = CONFIDENCE_COPY[result.confidence];
-  const verdictIcon =
-    result.verdict === 'fair' ? (
-      <CheckCircle2 className="h-5 w-5" strokeWidth={2} />
-    ) : (
-      <AlertTriangle className="h-5 w-5" strokeWidth={2} />
-    );
+// ---------------------------------------------------------------------------
+// Step shell
+// ---------------------------------------------------------------------------
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="card p-4 sm:p-5">
+      <div className="flex items-center gap-2">
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-accent/15 text-[11px] font-semibold text-accent">
+          {n}
+        </span>
+        <h2 className="text-sm font-semibold text-fg">{title}</h2>
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
 
-  const pct = Math.min(100, Math.max(0, result.percentile));
+// ---------------------------------------------------------------------------
+// Area searchable select
+// ---------------------------------------------------------------------------
+function AreaSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: RentCheckAreaOption | null;
+  onChange: (v: RentCheckAreaOption) => void;
+  options: RentCheckAreaOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options.slice(0, 50);
+    return options
+      .filter((o) => o.name.toLowerCase().includes(q))
+      .slice(0, 80);
+  }, [options, query]);
+
+  function pick(o: RentCheckAreaOption) {
+    onChange(o);
+    setQuery('');
+    setOpen(false);
+  }
 
   return (
-    <>
-      {/* Headline verdict */}
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((v) => !v);
+          setTimeout(() => inputRef.current?.focus(), 50);
+        }}
+        className={cn(
+          'w-full flex items-center justify-between gap-2 rounded-md border bg-bg-card px-3 py-2.5 text-left text-sm min-h-[44px]',
+          open ? 'border-accent' : 'border-border hover:border-fg-subtle'
+        )}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className={cn(value ? 'text-fg' : 'text-fg-subtle')}>
+          {value
+            ? `${value.name} · ${value.rent_count.toLocaleString()} contracts`
+            : 'Search 280+ Dubai areas…'}
+        </span>
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 text-fg-subtle transition-transform',
+            open && 'rotate-180'
+          )}
+          strokeWidth={2}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-bg-card shadow-lg max-h-[60vh] overflow-hidden flex flex-col">
+          <div className="relative border-b border-border">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
+              strokeWidth={2}
+            />
+            <input
+              ref={inputRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type to filter…"
+              className="w-full bg-transparent pl-9 pr-3 py-2.5 text-sm outline-none placeholder:text-fg-subtle"
+            />
+          </div>
+          <ul role="listbox" className="overflow-y-auto py-1">
+            {filtered.length === 0 && (
+              <li className="px-3 py-3 text-xs text-fg-subtle">
+                No areas match &ldquo;{query}&rdquo;.
+              </li>
+            )}
+            {filtered.map((o) => {
+              const active = value?.name_norm === o.name_norm;
+              return (
+                <li key={o.name_norm}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => pick(o)}
+                    className={cn(
+                      'w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elev',
+                      active && 'bg-accent/10'
+                    )}
+                  >
+                    <span className={cn(active ? 'text-accent' : 'text-fg')}>
+                      {o.name}
+                    </span>
+                    <span className="text-[11px] tabular text-fg-subtle">
+                      {o.rent_count.toLocaleString()} contracts
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty + loading
+// ---------------------------------------------------------------------------
+function EmptyState() {
+  return (
+    <div className="card p-6 text-center">
+      <Scale />
+      <p className="text-sm text-fg-muted">
+        Pick an area, choose your home size, enter your rent — see exactly
+        where you sit in the Dubai market.
+      </p>
+      <p className="mt-3 text-[11px] text-fg-subtle">
+        Powered by Dubai Land Department open rent contract data.
+      </p>
+    </div>
+  );
+}
+
+function Scale() {
+  // little inline emoji-ish flourish; kept tiny on purpose
+  return (
+    <div className="mb-3 text-2xl" aria-hidden>
+      ⚖️
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="card p-6">
+      <div className="h-5 w-32 rounded bg-bg-elev animate-pulse" />
+      <div className="mt-4 h-12 w-full rounded bg-bg-elev animate-pulse" />
+      <div className="mt-3 h-3 w-2/3 rounded bg-bg-elev animate-pulse" />
+      <div className="mt-2 h-3 w-1/2 rounded bg-bg-elev animate-pulse" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Result panel
+// ---------------------------------------------------------------------------
+function ResultPanel({
+  result,
+  areaName,
+}: {
+  result: RentCheckResponse;
+  areaName: string;
+}) {
+  const diffAed = result.user_rent - result.area_median;
+  const absDiff = Math.abs(diffAed);
+
+  const verdict = result.verdict;
+  const isAbove = verdict === 'above_market';
+  const isBelow = verdict === 'below_market';
+  const isFair = verdict === 'fair';
+
+  const headline = isFair
+    ? '✅ Your rent is fair'
+    : isAbove
+      ? '⚠️ You pay above market'
+      : '💡 You pay below market';
+
+  const subHeadline = isFair
+    ? `You're paying about the same as everyone else in ${areaName}.`
+    : isAbove
+      ? `You pay ${formatAED(absDiff)} MORE than the typical contract in ${areaName}.`
+      : `You pay ${formatAED(absDiff)} LESS than the typical contract in ${areaName}.`;
+
+  // Range = p25..p75 — i.e. what "most people" pay
+  // We don't get p25/p75 directly in the response; use ±~10% of median as a
+  // rough "most people" band. The percentile from the server is the
+  // authoritative position.
+  const lowBand = result.area_median * 0.85;
+  const highBand = result.area_median * 1.15;
+
+  return (
+    <div className="space-y-3">
+      {/* Big verdict tile */}
       <div
         className={cn(
-          'card p-5 flex items-start gap-4',
-          v.tone === 'positive' && 'border-positive/40',
-          v.tone === 'negative' && 'border-negative/40',
-          v.tone === 'warning' && 'border-warning/40'
+          'card p-5 sm:p-6 border-2',
+          isFair && 'border-positive/50',
+          isAbove && 'border-negative/50',
+          isBelow && 'border-warning/50'
         )}
       >
         <div
           className={cn(
-            'mt-0.5',
-            v.tone === 'positive' && 'text-positive',
-            v.tone === 'negative' && 'text-negative',
-            v.tone === 'warning' && 'text-warning'
+            'text-xl sm:text-2xl font-semibold leading-tight',
+            isFair && 'text-positive',
+            isAbove && 'text-negative',
+            isBelow && 'text-warning'
           )}
         >
-          {verdictIcon}
+          {headline}
         </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'text-base font-semibold',
-                v.tone === 'positive' && 'text-positive',
-                v.tone === 'negative' && 'text-negative',
-                v.tone === 'warning' && 'text-warning'
-              )}
-            >
-              {v.label}
-            </span>
-            <span className="text-[11px] text-fg-subtle">
-              · {result.percentage_diff >= 0 ? '+' : ''}
-              {result.percentage_diff.toFixed(1)}% vs area median
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-fg">
-            Your annual rent of{' '}
-            <span className="font-mono">{formatAED(result.user_rent)}</span>{' '}
-            sits at the{' '}
-            <span className="font-mono">{result.percentile.toFixed(0)}th</span>{' '}
-            percentile of comparable contracts (median{' '}
-            <span className="font-mono">{formatAED(result.area_median)}</span>,
-            size band <span className="font-mono">{result.size_band} sqm</span>).
-          </p>
+        <p className="mt-2 text-sm text-fg">{subHeadline}</p>
 
-          {/* Percentile bar */}
-          <div className="mt-3">
-            <div className="relative h-2 rounded-full bg-bg-elev overflow-hidden">
-              <div
-                className={cn(
-                  'absolute inset-y-0 left-0',
-                  v.tone === 'positive' && 'bg-positive/70',
-                  v.tone === 'negative' && 'bg-negative/70',
-                  v.tone === 'warning' && 'bg-warning/70'
-                )}
-                style={{ width: `${pct}%` }}
-              />
-              <div
-                className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-fg"
-                style={{ left: '50%' }}
-                aria-hidden
-              />
-            </div>
-            <div className="mt-1 flex justify-between text-[10px] text-fg-subtle">
-              <span>cheapest 10%</span>
-              <span>median</span>
-              <span>priciest 10%</span>
-            </div>
+        <div className="mt-4 grid grid-cols-3 gap-px bg-border rounded overflow-hidden">
+          <Cell
+            label="Your rent"
+            value={formatAED(result.user_rent)}
+          />
+          <Cell
+            label="Area median"
+            value={formatAED(result.area_median)}
+            sub={`${result.sample_size.toLocaleString()} contracts`}
+          />
+          <Cell
+            label="Vs market"
+            value={`${result.percentage_diff >= 0 ? '+' : ''}${result.percentage_diff.toFixed(1)}%`}
+            tone={isFair ? 'positive' : isAbove ? 'negative' : 'warning'}
+          />
+        </div>
+
+        {/* Percentile bar */}
+        <div className="mt-4">
+          <div className="relative h-2.5 rounded-full bg-bg-elev overflow-hidden">
+            <div
+              className={cn(
+                'absolute inset-y-0 left-0 transition-all',
+                isFair && 'bg-positive/70',
+                isAbove && 'bg-negative/70',
+                isBelow && 'bg-warning/70'
+              )}
+              style={{
+                width: `${Math.min(100, Math.max(2, result.percentile))}%`,
+              }}
+            />
+            <div
+              className="absolute top-1/2 h-3.5 w-px -translate-y-1/2 bg-fg/60"
+              style={{ left: '50%' }}
+              aria-hidden
+            />
           </div>
+          <div className="mt-1 flex justify-between text-[10px] text-fg-subtle">
+            <span>Cheapest 10%</span>
+            <span>Median</span>
+            <span>Priciest 10%</span>
+          </div>
+          <p className="mt-2 text-xs text-fg-muted">
+            You sit at the{' '}
+            <span className="font-semibold text-fg">
+              {result.percentile.toFixed(0)}
+              <sup>th</sup>
+            </span>{' '}
+            percentile — most contracts in {areaName} fall between{' '}
+            <span className="font-mono text-fg">{formatAED(lowBand)}</span> and{' '}
+            <span className="font-mono text-fg">{formatAED(highBand)}</span>.
+          </p>
         </div>
       </div>
 
-      {/* Stats row */}
+      {/* Context strip */}
       <div className="card flex flex-wrap divide-x divide-border">
-        <Stat label="Sample size" value={result.sample_size.toLocaleString()} hint={conf.label} />
         <Stat
           label="YoY rent trend"
           value={
@@ -319,60 +600,112 @@ function RentCheckResult({ result }: { result: RentCheckResponse }) {
           }
           icon={
             result.yoy_trend == null ? null : result.yoy_trend >= 0 ? (
-              <TrendingUp className="h-3 w-3 text-positive" strokeWidth={2.5} />
+              <TrendingUp
+                className="h-3 w-3 text-positive"
+                strokeWidth={2.5}
+              />
             ) : (
-              <TrendingDown className="h-3 w-3 text-negative" strokeWidth={2.5} />
+              <TrendingDown
+                className="h-3 w-3 text-negative"
+                strokeWidth={2.5}
+              />
             )
           }
           hint="vs 2025"
         />
-        <Stat label="Confidence" value={conf.label} hint={conf.hint} />
-        <Stat label="Size band" value={`${result.size_band} sqm`} hint="DLD bucket" />
+        <Stat
+          label="Confidence"
+          value={result.confidence}
+          hint={
+            result.confidence === 'high'
+              ? '100+ contracts'
+              : result.confidence === 'medium'
+                ? '30+ contracts'
+                : 'Few contracts'
+          }
+        />
+        <Stat
+          label="Size band"
+          value={`${result.size_band} sqm`}
+          hint="DLD bucket used"
+        />
       </div>
 
-      {/* Suggested cheaper alternatives */}
+      {/* Cheaper alternatives */}
       {result.suggested_areas.length > 0 && (
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-fg">
-            Cheaper alternatives — same property type and size band
-          </h3>
-          <p className="mt-1 text-[11px] text-fg-subtle">
-            Lower-median areas with at least one comparable contract band. Tap
-            to explore.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="h-4 w-4 text-accent shrink-0 mt-0.5" strokeWidth={2} />
+            <div>
+              <h3 className="text-sm font-semibold text-fg">
+                Want cheaper? Try these areas
+              </h3>
+              <p className="mt-0.5 text-[11px] text-fg-subtle">
+                Same size, same property type, lower typical rent.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
             {result.suggested_areas.map((s) => (
               <div
                 key={s.area_name}
-                className="rounded border border-border bg-bg-elev px-3 py-2.5"
+                className="flex items-center justify-between gap-3 rounded border border-border bg-bg-elev px-3 py-2.5"
               >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium text-fg truncate">
-                    {s.area_name}
-                  </span>
-                  <span className="text-[11px] font-mono text-positive">
-                    −{s.saving_pct.toFixed(1)}%
-                  </span>
+                <div className="min-w-0">
+                  <div className="text-sm text-fg truncate">{s.area_name}</div>
+                  <div className="text-[11px] text-fg-subtle">
+                    Median {formatAED(s.median_annual_rent)} · {s.sample_size}{' '}
+                    contracts
+                  </div>
                 </div>
-                <div className="mt-1 text-[11px] text-fg-subtle">
-                  Median{' '}
-                  <span className="font-mono text-fg">
-                    {formatAED(s.median_annual_rent)}
-                  </span>{' '}
-                  · {s.sample_size} contracts
-                </div>
+                <span className="rounded bg-positive/15 px-2 py-0.5 text-[11px] font-mono text-positive whitespace-nowrap">
+                  Save {s.saving_pct.toFixed(0)}%
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <p className="text-[11px] text-fg-subtle">
-        Source: {result.data_source}. Benchmark last updated{' '}
-        {result.last_updated}. Verdict bands: rent below DLD p25 → below market,
-        between p25 and p75 → fair, above p75 → above market.
+      <ShareRow result={result} areaName={areaName} />
+
+      <p className="text-[10px] text-fg-subtle leading-relaxed">
+        Source: {result.data_source}. Updated {result.last_updated}. Verdict
+        bands: rent below the area&apos;s 25th percentile → below market,
+        between 25–75 → fair, above 75 → above market.
       </p>
-    </>
+    </div>
+  );
+}
+
+function Cell({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'positive' | 'negative' | 'warning';
+}) {
+  return (
+    <div className="bg-bg-card px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-1 text-sm sm:text-base font-mono leading-tight',
+          tone === 'positive' && 'text-positive',
+          tone === 'negative' && 'text-negative',
+          tone === 'warning' && 'text-warning'
+        )}
+      >
+        {value}
+      </div>
+      {sub && <div className="mt-0.5 text-[10px] text-fg-subtle">{sub}</div>}
+    </div>
   );
 }
 
@@ -388,15 +721,111 @@ function Stat({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 min-w-[150px] px-5 py-4">
-      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+    <div className="flex-1 min-w-[120px] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
         {label}
       </div>
-      <div className="mt-1.5 text-lg leading-tight text-fg flex items-center gap-1.5 tabular">
+      <div className="mt-1 text-sm text-fg flex items-center gap-1.5 capitalize">
         {icon}
         <span>{value}</span>
       </div>
-      {hint && <div className="mt-1 text-[11px] text-fg-subtle">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[10px] text-fg-subtle">{hint}</div>}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Share row
+// ---------------------------------------------------------------------------
+function ShareRow({
+  result,
+  areaName,
+}: {
+  result: RentCheckResponse;
+  areaName: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const message = useMemo(() => {
+    const v =
+      result.verdict === 'fair'
+        ? `My rent in ${areaName} is fair vs the Dubai market.`
+        : result.verdict === 'above_market'
+          ? `My rent in ${areaName} is ${result.percentage_diff.toFixed(0)}% ABOVE the Dubai market median.`
+          : `My rent in ${areaName} is ${Math.abs(result.percentage_diff).toFixed(0)}% BELOW the Dubai market median.`;
+    return `${v} Source: Dubai Land Department via Floxcy.\n\nCheck yours: https://floxcy.com/rent-check`;
+  }, [result, areaName]);
+
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+  async function copy() {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = message;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function nativeShare() {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Is my rent fair? — Floxcy',
+          text: message,
+          url: 'https://floxcy.com/rent-check',
+        });
+      } catch {
+        // user cancelled — no-op
+      }
+    } else {
+      copy();
+    }
+  }
+
+  return (
+    <div className="card p-3 sm:p-4">
+      <div className="flex items-center gap-2 text-[11px] text-fg-subtle">
+        <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+        Share this result
+      </div>
+      <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <a
+          href={waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-xs font-medium text-fg hover:bg-bg-elev min-h-[40px]"
+        >
+          <span aria-hidden>💬</span> WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-xs font-medium text-fg hover:bg-bg-elev min-h-[40px]"
+        >
+          <Copy className="h-3.5 w-3.5" strokeWidth={2} />
+          {copied ? 'Copied!' : 'Copy link'}
+        </button>
+        <button
+          type="button"
+          onClick={nativeShare}
+          className="hidden sm:inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-xs font-medium text-fg hover:bg-bg-elev min-h-[40px]"
+        >
+          <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
+          More…
+        </button>
+      </div>
+    </div>
+  );
+}
+
