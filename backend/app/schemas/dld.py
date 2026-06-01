@@ -5,7 +5,7 @@ from datetime import date
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 DATA_SOURCE = "Dubai Land Department Open Data"
@@ -137,12 +137,12 @@ class RentCheckRequest(BaseModel):
     )
     annual_rent: float = Field(..., gt=0, lt=50_000_000)
     prop_sub_type: str = Field("Flat", max_length=64)
-
-    @model_validator(mode="after")
-    def _must_have_size(self) -> "RentCheckRequest":
-        if self.size_sqm is None and self.size_category is None:
-            raise ValueError("Provide either size_sqm or size_category")
-        return self
+    # NOTE: "one of size_sqm or size_category" is enforced in the endpoint
+    # (raises HTTPException(422)). Tried a @model_validator(mode='after')
+    # raising ValueError — Pydantic wraps it as ValidationError but FastAPI
+    # 0.115 doesn't translate model-level validation errors to
+    # RequestValidationError reliably, so they surface as 500. Keeping the
+    # check at the endpoint level guarantees the right status code.
 
 
 class RentCheckSuggestion(BaseModel):
