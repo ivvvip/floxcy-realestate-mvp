@@ -7,8 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.area import Area
+from app.models.dld import DldArea, DldAreaMetrics
 from app.models.market_snapshot import MarketSnapshot
-from app.schemas.compare import CompareResponse, CompareAreaData, CompareSnapshotPoint
+from app.schemas.compare import (
+    CompareAreaData,
+    CompareDldBlock,
+    CompareResponse,
+    CompareSnapshotPoint,
+)
+from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield, confidence_for
 
 router = APIRouter(prefix="/api/v1/areas", tags=["compare"])
 
@@ -18,7 +25,7 @@ async def compare_areas(
     ids: str = Query(..., description="Comma-separated area UUIDs (2-4)"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Side-by-side comparison of 2-4 areas with 12-month history."""
+    """Side-by-side comparison of 2-4 areas with 12-month history + DLD overlay."""
     try:
         id_list = [UUID(x.strip()) for x in ids.split(",") if x.strip()]
     except ValueError:
@@ -42,6 +49,22 @@ async def compare_areas(
     for s in all_snaps:
         by_area.setdefault(s.area_id, []).append(s)
 
+    # DLD overlay for the same area set (matched by curated_area_id)
+    dld_rows = (
+        await db.execute(
+            select(DldArea, DldAreaMetrics)
+            .outerjoin(
+                DldAreaMetrics,
+                (DldAreaMetrics.dld_area_id == DldArea.id)
+                & (DldAreaMetrics.period == "2026-ytd"),
+            )
+            .where(DldArea.curated_area_id.in_(id_list))
+        )
+    ).all()
+    dld_by_curated: dict = {}
+    for da, dm in dld_rows:
+        dld_by_curated[da.curated_area_id] = (da, dm)
+
     result: List[CompareAreaData] = []
     for area in areas:
         snaps = by_area.get(area.id, [])
@@ -57,6 +80,30 @@ async def compare_areas(
             )
             for s in snaps
         ]
+
+        dld_block = None
+        if area.id in dld_by_curated:
+            da, dm = dld_by_curated[area.id]
+            sales = dm.sales_count if dm else 0
+            rents = dm.rent_count_2026 if dm else 0
+            show_yield = None
+            if (dm and dm.rental_yield_pct is not None
+                    and sales >= MIN_RELIABLE_SAMPLES
+                    and rents >= MIN_RELIABLE_SAMPLES):
+                show_yield = cap_yield(float(dm.rental_yield_pct))
+            dld_block = CompareDldBlock(
+                dld_area_id=da.id,
+                dld_name=da.name_display,
+                median_price_per_sqft=float(dm.median_price_per_sqft) if dm and dm.median_price_per_sqft is not None else None,
+                median_annual_rent=float(dm.median_annual_rent) if dm and dm.median_annual_rent is not None else None,
+                median_rent_per_sqft=float(dm.median_rent_per_sqft) if dm and dm.median_rent_per_sqft is not None else None,
+                rental_yield_pct=show_yield,
+                rent_growth_yoy_pct=float(dm.rent_growth_yoy_pct) if dm and dm.rent_growth_yoy_pct is not None else None,
+                sales_count=sales,
+                rent_count_2026=rents,
+                confidence=confidence_for(max(sales, rents)),
+            )
+
         result.append(CompareAreaData(
             id=str(area.id),
             name=area.name,
@@ -72,6 +119,7 @@ async def compare_areas(
             risk_score=float(latest.risk_score) if latest.risk_score else None,
             investment_score=float(latest.investment_score) if latest.investment_score else None,
             history=history,
+            dld=dld_block,
         ))
 
     return CompareResponse(areas=result)

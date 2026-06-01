@@ -14,11 +14,12 @@ from app.schemas.area import (
     AreaResponse,
     AreaStatsResponse,
     AreaDetailResponse,
+    AreaDldBlock,
     AreaLatestSnapshot,
     AreaSnapshotPoint,
     AreaListItem,
 )
-from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield
+from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield, confidence_for
 from app.services.confidence import build_confidence_report, confidence_to_dict
 
 router = APIRouter(
@@ -175,7 +176,7 @@ async def area_confidence(area_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.get("/{area_id}", response_model=AreaDetailResponse)
 async def get_area(area_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Get area detail including latest snapshot and 12-month history."""
+    """Get area detail including latest snapshot, 12-month history, and DLD overlay."""
     result = await db.execute(select(Area).where(Area.id == area_id))
     area = result.scalar_one_or_none()
 
@@ -220,6 +221,46 @@ async def get_area(area_id: UUID, db: AsyncSession = Depends(get_db)):
             for s in snaps
         ]
 
+    # DLD overlay (matched by dld_areas.curated_area_id, 2026-ytd period)
+    dld_row = (
+        await db.execute(
+            select(DldArea, DldAreaMetrics)
+            .outerjoin(
+                DldAreaMetrics,
+                (DldAreaMetrics.dld_area_id == DldArea.id)
+                & (DldAreaMetrics.period == "2026-ytd"),
+            )
+            .where(DldArea.curated_area_id == area_id)
+        )
+    ).first()
+
+    dld_block = None
+    if dld_row:
+        dld_area, dm = dld_row
+        sales = dm.sales_count if dm else 0
+        rents = dm.rent_count_2026 if dm else 0
+        show_yield = None
+        if (dm and dm.rental_yield_pct is not None
+                and sales >= MIN_RELIABLE_SAMPLES
+                and rents >= MIN_RELIABLE_SAMPLES):
+            show_yield = cap_yield(float(dm.rental_yield_pct))
+        dld_block = AreaDldBlock(
+            dld_area_id=dld_area.id,
+            dld_name=dld_area.name_display,
+            median_price_per_sqft=float(dm.median_price_per_sqft) if dm and dm.median_price_per_sqft is not None else None,
+            median_annual_rent=float(dm.median_annual_rent) if dm and dm.median_annual_rent is not None else None,
+            median_rent_per_sqft=float(dm.median_rent_per_sqft) if dm and dm.median_rent_per_sqft is not None else None,
+            avg_price_per_sqft=float(dm.avg_price_per_sqft) if dm and dm.avg_price_per_sqft is not None else None,
+            avg_annual_rent=float(dm.avg_annual_rent) if dm and dm.avg_annual_rent is not None else None,
+            avg_rent_per_sqft=float(dm.avg_rent_per_sqft) if dm and dm.avg_rent_per_sqft is not None else None,
+            rental_yield_pct=show_yield,
+            rent_growth_yoy_pct=float(dm.rent_growth_yoy_pct) if dm and dm.rent_growth_yoy_pct is not None else None,
+            sales_count=sales,
+            rent_count_2026=rents,
+            building_count=dld_area.building_count,
+            confidence=confidence_for(max(sales, rents)),
+        )
+
     return AreaDetailResponse(
         id=area.id,
         name=area.name,
@@ -234,4 +275,5 @@ async def get_area(area_id: UUID, db: AsyncSession = Depends(get_db)):
         updated_at=area.updated_at,
         latest=latest,
         history=history,
+        dld=dld_block,
     )

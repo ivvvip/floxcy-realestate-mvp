@@ -169,5 +169,12 @@ async def root():
             "broker_me": "/api/v1/broker/me",
             "consultation_request": "/api/v1/consultations/request",
             "deal_detail": "/api/v1/opportunities/deals/{id}",
+            "dld_areas": "/api/v1/dld/areas",
+            "dld_area_detail": "/api/v1/dld/areas/{name_norm}",
+            "dld_areas_stats": "/api/v1/dld/areas/stats",
+            "dld_buildings": "/api/v1/dld/buildings",
+            "dld_rent_check": "/api/v1/dld/rent-check",
+            "dld_brokers": "/api/v1/dld/brokers",
+            "dld_broker_detail": "/api/v1/dld/brokers/{broker_number}",
         },
     }

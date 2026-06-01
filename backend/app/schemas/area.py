@@ -88,7 +88,28 @@ class AreaLatestSnapshot(BaseModel):
     investment_score: Optional[float] = None
 
 
+class AreaDldBlock(BaseModel):
+    """DLD-sourced metrics for an area (matched via dld_areas.curated_area_id)."""
+    dld_area_id: UUID
+    dld_name: str
+    median_price_per_sqft: Optional[float] = None
+    median_annual_rent: Optional[float] = None
+    median_rent_per_sqft: Optional[float] = None
+    avg_price_per_sqft: Optional[float] = None
+    avg_annual_rent: Optional[float] = None
+    avg_rent_per_sqft: Optional[float] = None
+    rental_yield_pct: Optional[float] = None
+    rent_growth_yoy_pct: Optional[float] = None
+    sales_count: int = 0
+    rent_count_2026: int = 0
+    building_count: int = 0
+    confidence: str = "low"
+
+
 class AreaDetailResponse(AreaResponse):
-    """Area detail: base info + latest snapshot + 12-month history."""
+    """Area detail: base info + latest snapshot + 12-month history + DLD overlay."""
     latest: Optional[AreaLatestSnapshot] = None
     history: List[AreaSnapshotPoint] = []
+    dld: Optional[AreaDldBlock] = None
+    data_source: str = "Dubai Land Department Open Data"
+    last_updated: str = "2026-06-01"
