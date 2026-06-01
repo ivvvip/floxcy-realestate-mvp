@@ -102,6 +102,7 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
   const [result, setResult] = useState<RentCheckResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noDataNotice, setNoDataNotice] = useState<string | null>(null);
 
   // Deep-link prefill: ?area=business+bay&size=1br lands users with the
   // wizard already populated — used by the share-on-WhatsApp flow.
@@ -139,6 +140,7 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNoDataNotice(null);
     if (!area) {
       setError('Pick an area from the list.');
       return;
@@ -152,6 +154,15 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
       setError('Enter your annual rent in AED.');
       return;
     }
+    // Short-circuit: if the area has 0 rent contracts, skip the API call and
+    // show the friendly notice directly. Saves a round-trip + a 404.
+    if (area.rent_count === 0) {
+      setNoDataNotice(
+        `No rent data available yet for ${area.name}. The Dubai Land Department snapshot hasn't published rent contracts for this area in 2026 — try a neighboring community.`
+      );
+      setResult(null);
+      return;
+    }
     setLoading(true);
     try {
       const res = await dldRentCheck({
@@ -162,19 +173,19 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
       });
       setResult(res);
     } catch (err) {
-      const detail =
-        err instanceof Error && 'body' in err
-          ? // @ts-expect-error ApiError shape
-            err.body?.detail
-          : null;
-      setError(
-        typeof detail === 'string'
-          ? detail
-          : err instanceof Error
-            ? err.message
-            : 'Could not run the check. Please try again.'
-      );
-      setResult(null);
+      const e = err as { status?: number; body?: { detail?: string }; message?: string };
+      const status = typeof e.status === 'number' ? e.status : 0;
+      const detail = typeof e.body?.detail === 'string' ? e.body.detail : null;
+      if (status === 404) {
+        setNoDataNotice(
+          detail ??
+            `No rent benchmark for ${area.name} at your size band. Try another size or property type.`
+        );
+        setResult(null);
+      } else {
+        setError(detail ?? e.message ?? 'Could not run the check. Please try again.');
+        setResult(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -187,12 +198,28 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
         <Step n={1} title="Pick your area">
           <AreaSelect
             value={area}
-            onChange={setArea}
+            onChange={(o) => {
+              setArea(o);
+              setNoDataNotice(null);
+            }}
             options={areaOptions}
           />
           {areaOptions.length === 0 && (
             <p className="mt-2 text-[11px] text-warning">
               Could not load area list. Refresh the page in a moment.
+            </p>
+          )}
+          {area && area.rent_count === 0 && (
+            <p className="mt-2 text-[11px] text-warning">
+              ⚠️ No rent data published yet for {area.name} in 2026 — you can
+              still submit, but we&apos;ll suggest neighboring areas instead.
+            </p>
+          )}
+          {area && area.rent_count > 0 && area.rent_count < 30 && (
+            <p className="mt-2 text-[11px] text-fg-subtle">
+              ℹ️ Limited data for {area.name} ({area.rent_count} contracts).
+              The benchmark is directional — use it alongside a comparable
+              high-data area.
             </p>
           )}
         </Step>
@@ -297,10 +324,23 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
 
       {/* Result column */}
       <div ref={resultRef} className="space-y-4">
-        {!result && !loading && (
+        {!result && !loading && !noDataNotice && (
           <EmptyState />
         )}
         {loading && <LoadingState />}
+        {noDataNotice && !result && (
+          <NoDataNotice
+            areaName={area?.name ?? 'this area'}
+            message={noDataNotice}
+            suggestions={areaOptions
+              .filter((o) => o.rent_count >= 100)
+              .slice(0, 5)}
+            onPick={(o) => {
+              setArea(o);
+              setNoDataNotice(null);
+            }}
+          />
+        )}
         {result && size && area && (
           <ResultPanel
             result={result}
@@ -338,6 +378,25 @@ function Step({
     </section>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Data-availability tier for an area (drives dropdown label + result UX)
+// ---------------------------------------------------------------------------
+type DataTier = 'high' | 'medium' | 'limited' | 'none';
+
+function dataTier(rentCount: number): DataTier {
+  if (rentCount >= 100) return 'high';
+  if (rentCount >= 30) return 'medium';
+  if (rentCount >= 1) return 'limited';
+  return 'none';
+}
+
+const TIER_LABEL: Record<DataTier, string> = {
+  high: '',
+  medium: '',
+  limited: '(limited data)',
+  none: '(no rent data)',
+};
 
 // ---------------------------------------------------------------------------
 // Area searchable select
@@ -396,10 +455,21 @@ function AreaSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className={cn(value ? 'text-fg' : 'text-fg-subtle')}>
-          {value
-            ? `${value.name} · ${value.rent_count.toLocaleString()} contracts`
-            : 'Search 280+ Dubai areas…'}
+        <span className={cn(value ? 'text-fg' : 'text-fg-subtle', 'truncate')}>
+          {value ? (
+            <>
+              {value.name}
+              {value.rent_count > 0 ? (
+                <span className="text-fg-subtle">
+                  {' '}· {value.rent_count.toLocaleString()} contracts
+                </span>
+              ) : (
+                <span className="text-warning"> · no rent data</span>
+              )}
+            </>
+          ) : (
+            'Search all 362 Dubai areas…'
+          )}
         </span>
         <ChevronDown
           className={cn(
@@ -434,6 +504,7 @@ function AreaSelect({
             )}
             {filtered.map((o) => {
               const active = value?.name_norm === o.name_norm;
+              const tier = dataTier(o.rent_count);
               return (
                 <li key={o.name_norm}>
                   <button
@@ -446,16 +517,91 @@ function AreaSelect({
                       active && 'bg-accent/10'
                     )}
                   >
-                    <span className={cn(active ? 'text-accent' : 'text-fg')}>
+                    <span
+                      className={cn(
+                        'truncate',
+                        active
+                          ? 'text-accent'
+                          : tier === 'none'
+                            ? 'text-fg-muted'
+                            : 'text-fg'
+                      )}
+                    >
                       {o.name}
+                      {TIER_LABEL[tier] && (
+                        <span
+                          className={cn(
+                            'ml-1.5 text-[10px]',
+                            tier === 'none' && 'text-warning',
+                            tier === 'limited' && 'text-fg-subtle'
+                          )}
+                        >
+                          {TIER_LABEL[tier]}
+                        </span>
+                      )}
                     </span>
-                    <span className="text-[11px] tabular text-fg-subtle">
-                      {o.rent_count.toLocaleString()} contracts
+                    <span className="text-[11px] tabular text-fg-subtle whitespace-nowrap">
+                      {o.rent_count > 0
+                        ? `${o.rent_count.toLocaleString()} contracts`
+                        : '—'}
                     </span>
                   </button>
                 </li>
               );
             })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// No-data notice — shown when the selected area has 0 contracts or when the
+// backend 404s on the (area, prop_sub_type, size_band) combo.
+// ---------------------------------------------------------------------------
+function NoDataNotice({
+  areaName,
+  message,
+  suggestions,
+  onPick,
+}: {
+  areaName: string;
+  message: string;
+  suggestions: RentCheckAreaOption[];
+  onPick: (o: RentCheckAreaOption) => void;
+}) {
+  return (
+    <div className="card p-5 border border-warning/40">
+      <div className="flex items-start gap-2">
+        <span aria-hidden className="text-lg leading-none">⚠️</span>
+        <div>
+          <h3 className="text-sm font-semibold text-warning">
+            No rent data available yet for {areaName}
+          </h3>
+          <p className="mt-1 text-xs text-fg-muted leading-relaxed">{message}</p>
+        </div>
+      </div>
+      {suggestions.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+            Areas with rich rent data
+          </div>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            {suggestions.map((s) => (
+              <li key={s.name_norm}>
+                <button
+                  type="button"
+                  onClick={() => onPick(s)}
+                  className="w-full flex items-center justify-between gap-2 rounded border border-border bg-bg-elev px-3 py-2 text-left text-xs hover:border-accent/40 min-h-[40px]"
+                >
+                  <span className="text-fg truncate">{s.name}</span>
+                  <span className="text-[10px] font-mono text-fg-subtle whitespace-nowrap">
+                    {s.rent_count.toLocaleString()}
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       )}

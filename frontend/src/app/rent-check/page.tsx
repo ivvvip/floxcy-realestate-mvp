@@ -15,16 +15,19 @@ export const revalidate = 3600;
 
 export default async function RentCheckPage() {
   // Prefetch in parallel; both are heavily cached server-side.
+  // Fetch ALL 362 DLD areas — we show every area in the dropdown and tag
+  // each with a data-availability label so users can see the limits before
+  // they submit. Filtering to ≥30 rents hid 197/362 areas (54%), forcing
+  // users into a "my area isn't here" dead end.
   const [stats, areas] = await Promise.all([
     getDldStats().catch(() => null),
-    // Only areas with enough rent contracts to support a benchmark
-    getDldAreas({ min_rents: 30, limit: 500 }).catch(() => null),
+    getDldAreas({ limit: 500 }).catch(() => null),
   ]);
 
-  // Sort areas by sample size (most contracts first) so the dropdown
-  // suggests the popular areas at the top after a search.
+  // Sort by sample size descending — high-data areas float to the top of
+  // the unfiltered list (also after a search), and zero-data areas land at
+  // the bottom.
   const areaOptions = (areas?.items ?? [])
-    .filter((a) => a.rent_count_2026 >= 30)
     .map((a) => ({
       name: a.name,
       name_norm: a.name_norm,
