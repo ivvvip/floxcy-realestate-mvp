@@ -277,11 +277,20 @@ async def list_buildings(
 async def rent_check(req: RentCheckRequest, db: AsyncSession = Depends(get_db)):
     norm_area = req.area_name.strip().lower()
 
-    # Derive the list of size bands to try, in priority order
+    # Derive the list of size bands to try, in priority order. We re-validate
+    # the "at least one size hint" rule here too — the model_validator handles
+    # it for typed clients, but raising HTTPException(422) defensively at the
+    # endpoint guarantees a clean 422 even if the model_validator's ValueError
+    # ever surfaces as something other than RequestValidationError.
     if req.size_category is not None:
         bands_to_try = SIZE_CATEGORY_BANDS[req.size_category]
+    elif req.size_sqm is not None:
+        bands_to_try = [_size_band(req.size_sqm)]
     else:
-        bands_to_try = [_size_band(req.size_sqm or 0.0)]
+        raise HTTPException(
+            status_code=422,
+            detail="Provide either size_category (studio | 1br | 2br | 3br | 4br) or size_sqm.",
+        )
 
     # Resolve area
     area = (
