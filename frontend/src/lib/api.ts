@@ -47,6 +47,13 @@ import type {
   DldBrokerItem,
   RentCheckRequest,
   RentCheckResponse,
+  BrokerMatchRequest,
+  BrokerMatchResponse,
+  TopCompaniesResponse,
+  RentAlertCreate,
+  RentAlertOut,
+  BrokerConsultationRequestBody,
+  BrokerConsultationResponse,
 } from './types';
 import { getBrokerToken } from './brokerAuth';
 
@@ -666,6 +673,39 @@ export async function getDldBroker(brokerNumber: string): Promise<DldBrokerItem>
     `/api/v1/dld/brokers/${encodeURIComponent(brokerNumber)}`,
     { revalidate: 600 }
   );
+}
+
+export async function getTopCompanies(limit = 10): Promise<TopCompaniesResponse> {
+  return request<TopCompaniesResponse>(
+    `/api/v1/dld/companies/top?limit=${limit}`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function brokerMatch(req: BrokerMatchRequest): Promise<BrokerMatchResponse> {
+  return request<BrokerMatchResponse>('/api/v1/dld/broker-match', {
+    method: 'POST',
+    body: JSON.stringify(req),
+    revalidate: false,
+  });
+}
+
+export async function createRentAlert(payload: RentAlertCreate): Promise<RentAlertOut> {
+  return request<RentAlertOut>('/api/v1/dld/rent-alerts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+export async function brokerConsultation(
+  payload: BrokerConsultationRequestBody
+): Promise<BrokerConsultationResponse> {
+  return request<BrokerConsultationResponse>('/api/v1/dld/broker-consultation', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
 }
 
 export { ApiError };

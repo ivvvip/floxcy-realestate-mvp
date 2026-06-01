@@ -275,7 +275,102 @@ export interface RentCheckResponse extends DldAttribution {
   yoy_trend: number | null;
   size_band: string;
   confidence: 'low' | 'medium' | 'high';
+  area_name_display?: string | null;
+  area_name_norm?: string | null;
+  median_price_per_sqft?: number | null;
+  avg_price_per_sqft?: number | null;
   suggested_areas: RentCheckSuggestion[];
+}
+
+// Wizard / matching / alerts / consultation
+
+export type BrokerGoal = 'buy' | 'rent' | 'sell' | 'invest';
+export type BudgetBand =
+  | 'under_500k'
+  | '500k_1m'
+  | '1m_3m'
+  | '3m_5m'
+  | '5m_plus';
+export type LangPref =
+  | 'arabic'
+  | 'english'
+  | 'russian'
+  | 'chinese'
+  | 'hindi'
+  | 'other';
+
+export interface BrokerMatchRequest {
+  goal: BrokerGoal;
+  preferred_area_norm?: string;
+  language?: LangPref;
+  budget_band?: BudgetBand;
+}
+
+export interface BrokerMatchItem {
+  broker_number: string;
+  full_name: string;
+  gender: string | null;
+  real_estate_name: string | null;
+  phone: string | null;
+  webpage: string | null;
+  license_start_date: string | null;
+  license_end_date: string | null;
+  is_active: boolean;
+  detected_language: string;
+  company_size_active_brokers: number;
+  license_status: 'active' | 'expiring_soon' | 'expired';
+  days_until_expiry: number | null;
+}
+
+export interface BrokerMatchResponse extends DldAttribution {
+  count: number;
+  items: BrokerMatchItem[];
+}
+
+export interface TopCompanyItem {
+  real_estate_name: string;
+  active_broker_count: number;
+}
+
+export interface TopCompaniesResponse extends DldAttribution {
+  count: number;
+  items: TopCompanyItem[];
+}
+
+export interface RentAlertCreate {
+  email: string;
+  area_name_norm: string;
+  area_name_display?: string;
+  size_category?: SizeCategory;
+  prop_sub_type?: string;
+}
+
+export interface RentAlertOut extends DldAttribution {
+  id: string;
+  email: string;
+  area_name_norm: string;
+  area_name_display: string | null;
+  size_category: string | null;
+  prop_sub_type: string | null;
+  is_active: boolean;
+}
+
+export interface BrokerConsultationRequestBody {
+  broker_number: string;
+  full_name: string;
+  whatsapp: string;
+  email?: string;
+  budget_band?: BudgetBand;
+  goal?: BrokerGoal;
+  message?: string;
+}
+
+export interface BrokerConsultationResponse {
+  success: boolean;
+  message: string;
+  broker_full_name: string;
+  broker_real_estate_name: string | null;
+  lead_id: string;
 }
 
 export type AdvisorGoal = 'yield' | 'appreciation' | 'balanced';

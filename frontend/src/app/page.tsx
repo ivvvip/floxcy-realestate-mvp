@@ -12,6 +12,7 @@ import {
   Briefcase,
   LineChart as LineChartIcon,
   Activity,
+  Scale,
 } from 'lucide-react';
 import { getDashboardSummary, getAreaStats } from '@/lib/api';
 import type { DashboardSummary, AreaStats, TopAreaItem } from '@/lib/types';
@@ -157,8 +158,15 @@ export default async function HomePage() {
                   Explore Opportunities
                 </Link>
                 <Link
+                  href="/rent-check"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                >
+                  <Scale className="h-3.5 w-3.5" strokeWidth={2} />
+                  Is Your Rent Fair?
+                </Link>
+                <Link
                   href="/brokers/apply"
-                  className="inline-flex h-9 items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-3.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
                 >
                   Join as Broker
                   <ArrowRight className="h-3 w-3" strokeWidth={2} />
@@ -609,10 +617,10 @@ export default async function HomePage() {
               icon={Database}
               title="Data sources"
               points={[
-                'DLD transaction registry',
-                'REIDIN price indices',
-                'Public rental contracts',
-                'Broker-verified feedback',
+                'Dubai Land Department open data (sales, rents, RERA registry)',
+                '362 DLD-tracked areas + 70 curated investment areas',
+                '34,396 active RERA brokers + 2,086 rent benchmark cells',
+                'Snapshot refresh: 2026-06-01',
               ]}
             />
             <TrustCard

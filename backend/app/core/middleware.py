@@ -6,10 +6,7 @@ import time
 from typing import Awaitable, Callable
 
 from fastapi import Request, Response
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
 
 logger = logging.getLogger("floxcy.http")
@@ -70,31 +67,19 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         method = request.method
         path = request.url.path
-        try:
-            response = await call_next(request)
-            duration_ms = (time.perf_counter() - start) * 1000
-            logger.info(
-                "request method=%s path=%s status=%d duration_ms=%.1f",
-                method,
-                path,
-                response.status_code,
-                duration_ms,
-            )
-            return response
-        except (RequestValidationError, StarletteHTTPException):
-            # Let FastAPI's registered exception handlers translate these into
-            # proper 4xx responses (422 / 404 / etc). Swallowing them here
-            # would mask validation errors as 500s.
-            raise
-        except Exception:
-            duration_ms = (time.perf_counter() - start) * 1000
-            logger.exception(
-                "request method=%s path=%s status=500 duration_ms=%.1f",
-                method,
-                path,
-                duration_ms,
-            )
-            return JSONResponse(
-                status_code=500,
-                content={"error": "internal_error", "message": "An unexpected error occurred."},
-            )
+        # Do NOT wrap exceptions here — let FastAPI's exception handler
+        # middleware translate RequestValidationError → 422,
+        # HTTPException → its declared code, etc. Catching Exception here
+        # masks 4xx as 500s (see prior incident with the rent-check
+        # size_category validator).  Starlette's ServerErrorMiddleware
+        # still wraps any truly uncaught exception as 500.
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "request method=%s path=%s status=%d duration_ms=%.1f",
+            method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+        return response

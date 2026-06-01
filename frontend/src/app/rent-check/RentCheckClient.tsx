@@ -24,6 +24,13 @@ import type {
   RentCheckResponse,
   SizeCategory,
 } from '@/lib/types';
+import {
+  NegotiationPower,
+  RERALegalCalculator,
+  RentVsBuy,
+  BestTimeToNegotiate,
+  RentAlertSignup,
+} from './RentCheckExtras';
 
 export interface RentCheckAreaOption {
   name: string;
@@ -95,6 +102,24 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
   const [result, setResult] = useState<RentCheckResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Deep-link prefill: ?area=business+bay&size=1br lands users with the
+  // wizard already populated — used by the share-on-WhatsApp flow.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const a = params.get('area')?.toLowerCase();
+    const s = params.get('size') as SizeCategory | null;
+    if (a) {
+      const match = areaOptions.find((o) => o.name_norm === a);
+      if (match) setArea(match);
+    }
+    if (s && ['studio', '1br', '2br', '3br', '4br'].includes(s)) {
+      setSize(s);
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Always re-scroll to the result after a successful check (mobile especially)
   const resultRef = useRef<HTMLDivElement | null>(null);
@@ -271,15 +296,17 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
       </form>
 
       {/* Result column */}
-      <div ref={resultRef} className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+      <div ref={resultRef} className="space-y-4">
         {!result && !loading && (
           <EmptyState />
         )}
         {loading && <LoadingState />}
-        {result && (
+        {result && size && area && (
           <ResultPanel
             result={result}
-            areaName={area?.name ?? result.user_rent.toString()}
+            area={area}
+            sizeCategory={size}
+            propSubType={propType}
           />
         )}
       </div>
@@ -479,11 +506,16 @@ function LoadingState() {
 // ---------------------------------------------------------------------------
 function ResultPanel({
   result,
-  areaName,
+  area,
+  sizeCategory,
+  propSubType,
 }: {
   result: RentCheckResponse;
-  areaName: string;
+  area: RentCheckAreaOption;
+  sizeCategory: SizeCategory;
+  propSubType: PropType;
 }) {
+  const areaName = result.area_name_display ?? area.name;
   const diffAed = result.user_rent - result.area_median;
   const absDiff = Math.abs(diffAed);
 
@@ -631,7 +663,20 @@ function ResultPanel({
         />
       </div>
 
-      {/* Cheaper alternatives */}
+      {/* F1: Negotiation Power */}
+      <NegotiationPower result={result} />
+
+      {/* F2: RERA Legal Calculator */}
+      <RERALegalCalculator result={result} />
+
+      {/* F3: Rent vs Buy */}
+      <RentVsBuy
+        result={result}
+        sizeCategory={sizeCategory}
+        areaDisplayName={areaName}
+      />
+
+      {/* F4: Cheaper alternatives (enhanced) */}
       {result.suggested_areas.length > 0 && (
         <div className="card p-4 sm:p-5">
           <div className="flex items-start gap-2">
@@ -641,33 +686,73 @@ function ResultPanel({
                 Want cheaper? Try these areas
               </h3>
               <p className="mt-0.5 text-[11px] text-fg-subtle">
-                Same size, same property type, lower typical rent.
+                Same {sizeCategory.toUpperCase()} / {propSubType}, lower typical rent.
               </p>
             </div>
           </div>
-          <div className="mt-3 space-y-2">
-            {result.suggested_areas.map((s) => (
-              <div
-                key={s.area_name}
-                className="flex items-center justify-between gap-3 rounded border border-border bg-bg-elev px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm text-fg truncate">{s.area_name}</div>
-                  <div className="text-[11px] text-fg-subtle">
-                    Median {formatAED(s.median_annual_rent)} · {s.sample_size}{' '}
-                    contracts
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {result.suggested_areas.map((s) => {
+              const saving = result.area_median - s.median_annual_rent;
+              const href = `/rent-check?area=${encodeURIComponent(s.area_name.toLowerCase())}&size=${sizeCategory}`;
+              return (
+                <div
+                  key={s.area_name}
+                  className="rounded border border-border bg-bg-elev p-3 flex flex-col"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-medium text-fg truncate">
+                      {s.area_name}
+                    </span>
+                    <span className="rounded bg-positive/15 px-1.5 py-0.5 text-[11px] font-mono text-positive whitespace-nowrap">
+                      −{s.saving_pct.toFixed(0)}%
+                    </span>
                   </div>
+                  <div className="mt-1 text-[11px] text-fg-subtle">
+                    Median{' '}
+                    <span className="font-mono text-fg">
+                      {formatAED(s.median_annual_rent)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-fg-subtle">
+                    Save{' '}
+                    <span className="font-mono text-positive">
+                      {formatAED(Math.max(0, saving))}/year
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-fg-subtle">
+                    {s.sample_size} contracts
+                  </div>
+                  <a
+                    href={href}
+                    className="mt-2 inline-flex items-center justify-center rounded border border-accent/30 bg-accent/10 px-2 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20"
+                  >
+                    Check rent in {s.area_name.split(' ')[0]} →
+                  </a>
                 </div>
-                <span className="rounded bg-positive/15 px-2 py-0.5 text-[11px] font-mono text-positive whitespace-nowrap">
-                  Save {s.saving_pct.toFixed(0)}%
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      <ShareRow result={result} areaName={areaName} />
+      {/* F6: Best time to negotiate */}
+      <BestTimeToNegotiate result={result} />
+
+      {/* F7: Rent alert signup */}
+      <RentAlertSignup
+        areaNorm={result.area_name_norm ?? area.name_norm}
+        areaDisplay={areaName}
+        sizeCategory={sizeCategory}
+        propSubType={propSubType}
+      />
+
+      {/* F5: Share */}
+      <ShareRow
+        result={result}
+        areaName={areaName}
+        sizeCategory={sizeCategory}
+        areaNorm={result.area_name_norm ?? area.name_norm}
+      />
 
       <p className="text-[10px] text-fg-subtle leading-relaxed">
         Source: {result.data_source}. Updated {result.last_updated}. Verdict
@@ -740,21 +825,42 @@ function Stat({
 function ShareRow({
   result,
   areaName,
+  sizeCategory,
+  areaNorm,
 }: {
   result: RentCheckResponse;
   areaName: string;
+  sizeCategory: SizeCategory;
+  areaNorm: string;
 }) {
   const [copied, setCopied] = useState(false);
 
+  // Deep-link URL so the recipient lands on the form with everything pre-filled
+  const shareUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      area: areaNorm,
+      size: sizeCategory,
+    });
+    return `https://floxcy.com/rent-check?${params.toString()}`;
+  }, [areaNorm, sizeCategory]);
+
   const message = useMemo(() => {
-    const v =
+    const verdictLine =
       result.verdict === 'fair'
         ? `My rent in ${areaName} is fair vs the Dubai market.`
         : result.verdict === 'above_market'
           ? `My rent in ${areaName} is ${result.percentage_diff.toFixed(0)}% ABOVE the Dubai market median.`
           : `My rent in ${areaName} is ${Math.abs(result.percentage_diff).toFixed(0)}% BELOW the Dubai market median.`;
-    return `${v} Source: Dubai Land Department via Floxcy.\n\nCheck yours: https://floxcy.com/rent-check`;
-  }, [result, areaName]);
+    return [
+      'I checked my rent on Floxcy (powered by DLD data):',
+      `${areaName} ${sizeCategory.toUpperCase()}: my rent vs market`,
+      `Verdict: ${result.verdict.replace('_', ' ').toUpperCase()}`,
+      verdictLine,
+      `Based on ${result.sample_size.toLocaleString()} DLD contracts.`,
+      '',
+      `Check yours: ${shareUrl}`,
+    ].join('\n');
+  }, [result, areaName, sizeCategory, shareUrl]);
 
   const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
 
@@ -783,7 +889,7 @@ function ShareRow({
         await navigator.share({
           title: 'Is my rent fair? — Floxcy',
           text: message,
-          url: 'https://floxcy.com/rent-check',
+          url: shareUrl,
         });
       } catch {
         // user cancelled — no-op
