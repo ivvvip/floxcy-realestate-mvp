@@ -13,7 +13,11 @@ LAST_UPDATED = "2026-06-01"
 
 # Per-area presentation rules (locked by spec)
 MIN_RELIABLE_SAMPLES = 30
-DISPLAY_YIELD_CAP_PCT = 25.0
+# Lowered from 25.0 to 20.0 on 2026-06-02. Raw yields above 20% in DLD data
+# almost always reflect a unit-type mismatch (commercial rent vs residential
+# sale) or a tiny sample; capping at 20 hides those artefacts. The frontend
+# renders capped cells as "≥20%" with a footnote so users know it's bounded.
+DISPLAY_YIELD_CAP_PCT = 20.0
 
 
 def confidence_for(n: int) -> str:
@@ -137,6 +141,34 @@ class TopAppreciationItem(BaseModel):
 class TopAppreciationResponse(Attribution):
     count: int
     items: List[TopAppreciationItem]
+
+
+# ---------------------------------------------------------------------------
+# Market overview — homepage KPI tiles
+# ---------------------------------------------------------------------------
+
+class MarketOverviewResponse(Attribution):
+    """Single-call snapshot for the homepage 'Market at a Glance' tiles.
+
+    Cached in Redis for 1h. Source counts are live from the DLD tables we
+    already ETL; the 'top' picks require both a real number and a real area
+    so missing tables degrade gracefully to None rather than zero.
+    """
+    # Volume / breadth
+    total_sales: int
+    total_volume_aed: float
+    areas_covered: int
+    active_brokers: int
+    buildings_tracked: int
+    rent_contracts: int
+    # Headline yield + appreciation
+    avg_yield_pct: Optional[float] = None
+    top_yield_area: Optional[str] = None
+    top_yield_pct: Optional[float] = None
+    top_appreciation_area: Optional[str] = None
+    top_appreciation_pct: Optional[float] = None
+    offplan_percentage: Optional[float] = None
+    cached: bool = False
 
 
 class DldRentHistoryResponse(Attribution):

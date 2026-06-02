@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaYieldHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { PriceTrend } from '@/components/charts/PriceTrend';
@@ -123,6 +123,19 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // has no qualifying Sales-of-Unit rows in the 2021–2026 export.
   const priceHistory = area.dld?.dld_name
     ? await getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(
+        () => null
+      )
+    : null;
+
+  // Rent + yield history from etl_dld_rent_history.py — both hidden cleanly
+  // when no data is available for the area.
+  const rentHistory = area.dld?.dld_name
+    ? await getDldAreaRentHistory(area.dld.dld_name.toLowerCase()).catch(
+        () => null
+      )
+    : null;
+  const yieldHistory = area.dld?.dld_name
+    ? await getDldAreaYieldHistory(area.dld.dld_name.toLowerCase()).catch(
         () => null
       )
     : null;
@@ -506,6 +519,123 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             </div>
           </section>
         )}
+
+        {/* Rent & Yield History (2021-2026) — DLD Ejari + derived yield */}
+        {yieldHistory && yieldHistory.points.filter(p => p.gross_yield_pct != null).length >= 2 && (() => {
+          const validYields = yieldHistory.points.filter(p => p.gross_yield_pct != null);
+          const startYield = validYields[0].gross_yield_pct!;
+          const endYield = validYields[validYields.length - 1].gross_yield_pct!;
+          const yieldDeltaPp = endYield - startYield;
+          const trendBadge =
+            yieldHistory.trend === 'rising'
+              ? { emoji: '🟢', label: 'Rising', tone: 'positive' as const }
+              : yieldHistory.trend === 'falling'
+                ? { emoji: '🔴', label: 'Falling', tone: 'negative' as const }
+                : { emoji: '🟡', label: 'Flat', tone: 'default' as const };
+          const compressionPhrase =
+            Math.abs(yieldDeltaPp) < 0.25
+              ? `Yields held flat ${validYields[0].year}→${validYields[validYields.length - 1].year}`
+              : yieldDeltaPp < 0
+                ? `Yields compressed ${Math.abs(yieldDeltaPp).toFixed(2)}pp since ${validYields[0].year} — prices outran rents.`
+                : `Yields expanded ${yieldDeltaPp.toFixed(2)}pp since ${validYields[0].year} — rents outran prices.`;
+          // Find latest rent point for tile
+          const latestRent = rentHistory?.points[rentHistory.points.length - 1] ?? null;
+          return (
+            <section
+              id="rent-yield-history"
+              className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+            >
+              <div className="chart-header">
+                <span className="chart-header-label inline-flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                  Rent & Yield History · {yieldHistory.area_name_display} · 2021–2026
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                    trendBadge.tone === 'positive' && 'bg-positive/15 text-positive',
+                    trendBadge.tone === 'negative' && 'bg-negative/15 text-negative',
+                    trendBadge.tone === 'default' && 'bg-warning/15 text-warning'
+                  )}
+                >
+                  <span aria-hidden>{trendBadge.emoji}</span>
+                  Yield {trendBadge.label}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
+                <MetricTile
+                  label="Latest gross yield"
+                  value={
+                    endYield >= 20
+                      ? '≥20%'
+                      : `${endYield.toFixed(2)}%`
+                  }
+                  hint={`${validYields[validYields.length - 1].year} · sample ${validYields[validYields.length - 1].sample_score}`}
+                  tone="positive"
+                  mono
+                />
+                <MetricTile
+                  label="Yield change since 2021"
+                  value={
+                    `${yieldDeltaPp >= 0 ? '+' : ''}${yieldDeltaPp.toFixed(2)}pp`
+                  }
+                  hint={trendBadge.label.toLowerCase()}
+                  tone={
+                    yieldDeltaPp > 0.25
+                      ? 'positive'
+                      : yieldDeltaPp < -0.25
+                        ? 'negative'
+                        : 'default'
+                  }
+                  mono
+                />
+                <MetricTile
+                  label="Latest avg rent/sqft"
+                  value={
+                    latestRent?.avg_rent_per_sqft != null
+                      ? `AED ${formatNumber(latestRent.avg_rent_per_sqft, 0)}`
+                      : '—'
+                  }
+                  hint="DLD Ejari"
+                  mono
+                />
+                <MetricTile
+                  label="Latest avg annual rent"
+                  value={
+                    latestRent?.avg_annual_rent != null
+                      ? formatAED(latestRent.avg_annual_rent)
+                      : '—'
+                  }
+                  hint={
+                    latestRent != null
+                      ? `${latestRent.contract_count.toLocaleString()} contracts`
+                      : '—'
+                  }
+                  mono
+                />
+              </div>
+              <div className="p-4 sm:p-5">
+                <p className="text-sm text-fg mb-3">{compressionPhrase}</p>
+                <PriceTrend
+                  data={yieldHistory.points.map((p) => ({
+                    label: String(p.year),
+                    yield:
+                      p.gross_yield_pct != null
+                        ? Math.min(p.gross_yield_pct, 20)
+                        : undefined,
+                  }))}
+                  height={220}
+                  showYield={true}
+                />
+                <p className="mt-2 text-[10px] text-fg-subtle">
+                  Series: gross yield = avg rent/sqft ÷ avg sale PPSF × 100,
+                  display-capped at 20%. Source: DLD Ejari rents + registered
+                  Sales-of-Unit, 2021–2026.
+                </p>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Top buildings in this area — Building X-Ray integration */}
         {topBuildings && topBuildings.items.length > 0 && (

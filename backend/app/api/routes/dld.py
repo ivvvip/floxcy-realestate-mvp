@@ -48,6 +48,7 @@ from app.schemas.dld import (
     DldPriceHistoryResponse,
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
+    MarketOverviewResponse,
     PriceHistoryPoint,
     RentHistoryPoint,
     YieldHistoryPoint,
@@ -170,6 +171,139 @@ async def list_dld_areas(
     rows = (await db.execute(stmt)).all()
     items = [_build_area_item(a, m) for a, m in rows]
     return DldAreaListResponse(count=len(items), total_available=int(total or 0), items=items)
+
+
+MARKET_OVERVIEW_CACHE_KEY = "dld:market-overview:v1"
+MARKET_OVERVIEW_TTL_S = 3600  # 1h per spec
+
+
+@router.get("/market-overview", response_model=MarketOverviewResponse)
+async def dld_market_overview(db: AsyncSession = Depends(get_db)):
+    """One-call snapshot for the homepage. Cached 1h in Redis."""
+    import json
+    from app.redis_client import redis_client
+
+    # Cache check
+    cached_blob = None
+    try:
+        cached_blob = await redis_client.get(MARKET_OVERVIEW_CACHE_KEY)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob if isinstance(cached_blob, str) else cached_blob.decode())
+            return MarketOverviewResponse(**payload, cached=True)
+        except Exception:
+            pass  # fall through and rebuild
+
+    # Aggregate counts (parallel-friendly)
+    total_sales = await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.transaction_count), 0))
+    )
+    total_volume = await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.total_value_aed), 0))
+    )
+    areas_covered = await db.scalar(select(func.count()).select_from(DldArea))
+    active_brokers = await db.scalar(
+        select(func.count()).select_from(DldReraBroker).where(DldReraBroker.is_active.is_(True))
+    )
+    buildings_tracked = await db.scalar(select(func.count()).select_from(DldBuilding))
+    rent_contracts = await db.scalar(
+        select(func.coalesce(func.sum(DldRentHistory.contract_count), 0))
+    )
+
+    # Avg yield (latest year per-area, weighted equally)
+    avg_yield_row = await db.execute(
+        select(func.avg(DldYieldHistory.gross_yield_pct))
+        .where(
+            DldYieldHistory.year == (
+                select(func.max(DldYieldHistory.year)).scalar_subquery()
+            ),
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+    )
+    avg_yield_val = avg_yield_row.scalar()
+    avg_yield_pct = float(avg_yield_val) if avg_yield_val is not None else None
+
+    # Top yield area (current year, sample-floor enforced)
+    top_yield_row = (await db.execute(
+        select(DldYieldHistory)
+        .where(
+            DldYieldHistory.year == (
+                select(func.max(DldYieldHistory.year)).scalar_subquery()
+            ),
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+        .order_by(DldYieldHistory.gross_yield_pct.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    top_yield_area = None
+    top_yield_pct = None
+    if top_yield_row is not None:
+        # Resolve display name
+        area_disp = (await db.execute(
+            select(DldArea.name_display).where(DldArea.name_norm == top_yield_row.area_name_norm)
+        )).scalar_one_or_none()
+        top_yield_area = area_disp or top_yield_row.area_name_norm.title()
+        top_yield_pct = float(top_yield_row.gross_yield_pct)
+
+    # Top 5y appreciation area
+    top_app_row = (await db.execute(
+        select(DldAreaAppreciation)
+        .where(
+            DldAreaAppreciation.appreciation_5y_pct.isnot(None),
+            DldAreaAppreciation.years_of_data >= 5,
+        )
+        .order_by(DldAreaAppreciation.appreciation_5y_pct.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    top_app_area = None
+    top_app_pct = None
+    if top_app_row is not None:
+        area_disp = (await db.execute(
+            select(DldArea.name_display).where(DldArea.name_norm == top_app_row.area_name_norm)
+        )).scalar_one_or_none()
+        top_app_area = area_disp or top_app_row.area_name_norm.title()
+        top_app_pct = float(top_app_row.appreciation_5y_pct)
+
+    # Off-plan % across all years (volume-weighted)
+    offplan_row = await db.execute(
+        select(
+            func.sum(DldPriceHistory.transaction_count_offplan),
+            func.sum(DldPriceHistory.transaction_count),
+        )
+    )
+    op_count, all_count = offplan_row.one()
+    offplan_pct = None
+    if op_count is not None and all_count and all_count > 0:
+        offplan_pct = round(float(op_count) / float(all_count) * 100, 1)
+
+    payload = {
+        "total_sales": int(total_sales or 0),
+        "total_volume_aed": float(total_volume or 0),
+        "areas_covered": int(areas_covered or 0),
+        "active_brokers": int(active_brokers or 0),
+        "buildings_tracked": int(buildings_tracked or 0),
+        "rent_contracts": int(rent_contracts or 0),
+        "avg_yield_pct": round(avg_yield_pct, 2) if avg_yield_pct is not None else None,
+        "top_yield_area": top_yield_area,
+        "top_yield_pct": round(top_yield_pct, 2) if top_yield_pct is not None else None,
+        "top_appreciation_area": top_app_area,
+        "top_appreciation_pct": round(top_app_pct, 1) if top_app_pct is not None else None,
+        "offplan_percentage": offplan_pct,
+    }
+
+    try:
+        await redis_client.setex(
+            MARKET_OVERVIEW_CACHE_KEY, MARKET_OVERVIEW_TTL_S, json.dumps(payload)
+        )
+    except Exception:
+        pass  # cache failure is non-fatal
+
+    return MarketOverviewResponse(**payload, cached=False)
 
 
 @router.get("/areas/top-appreciation", response_model=TopAppreciationResponse)

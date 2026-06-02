@@ -45,6 +45,9 @@ import type {
   DldAreaListResponse,
   DldAreaDetailResponse,
   DldPriceHistoryResponse,
+  DldRentHistoryResponse,
+  DldYieldHistoryResponse,
+  MarketOverviewResponse,
   DldStatsResponse,
   DldBuildingsResponse,
   TopAppreciationResponse,
@@ -666,6 +669,30 @@ export async function getDldAreaPriceHistory(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/price-history`,
     { revalidate: 3600 }
   );
+}
+
+export async function getDldAreaRentHistory(
+  nameNorm: string
+): Promise<DldRentHistoryResponse> {
+  return request<DldRentHistoryResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/rent-history`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDldAreaYieldHistory(
+  nameNorm: string
+): Promise<DldYieldHistoryResponse> {
+  return request<DldYieldHistoryResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/yield-history`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getMarketOverview(): Promise<MarketOverviewResponse> {
+  return request<MarketOverviewResponse>('/api/v1/dld/market-overview', {
+    revalidate: 3600,
+  });
 }
 
 export async function getTopAppreciation(

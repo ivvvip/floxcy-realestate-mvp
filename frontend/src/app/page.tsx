@@ -14,12 +14,13 @@ import {
   Activity,
   Scale,
 } from 'lucide-react';
-import { getDashboardSummary, getAreaStats, getDldStats } from '@/lib/api';
+import { getDashboardSummary, getAreaStats, getDldStats, getMarketOverview } from '@/lib/api';
 import type {
   DashboardSummary,
   AreaStats,
   TopAreaItem,
   DldStatsResponse,
+  MarketOverviewResponse,
 } from '@/lib/types';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { Container } from '@/components/Container';
@@ -38,11 +39,13 @@ export default async function HomePage() {
   let summary: DashboardSummary | null = null;
   let stats: AreaStats | null = null;
   let dld: DldStatsResponse | null = null;
+  let market: MarketOverviewResponse | null = null;
   try {
-    [summary, stats, dld] = await Promise.all([
+    [summary, stats, dld, market] = await Promise.all([
       getDashboardSummary(),
       getAreaStats(),
       getDldStats().catch(() => null),
+      getMarketOverview().catch(() => null),
     ]);
   } catch {
     // fallthrough
@@ -137,6 +140,105 @@ export default async function HomePage() {
           </div>
         </Container>
       </section>
+
+      {/* Market At a Glance — driven by /dld/market-overview (Redis cache 1h) */}
+      {market && (
+        <section className="border-b border-border bg-bg-card/40">
+          <Container>
+            <div className="py-6">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
+                    <Database className="h-3 w-3 text-accent" strokeWidth={2} />
+                    Dubai market · at a glance
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold text-fg">
+                    Live DLD coverage
+                  </h2>
+                </div>
+                <span className="text-[11px] text-fg-subtle">
+                  Source: Dubai Land Department · Updated {market.last_updated}
+                  {market.cached && ' · cached'}
+                </span>
+              </div>
+              {/* 6 KPI tiles */}
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-border border border-border rounded-lg overflow-hidden">
+                <KpiTile
+                  label="Sales transactions"
+                  value={formatNumber(market.total_sales)}
+                  hint="2021–2026"
+                />
+                <KpiTile
+                  label="Total volume"
+                  value={formatAED(market.total_volume_aed, { compact: true })}
+                  hint="AED total"
+                />
+                <KpiTile
+                  label="Rent contracts"
+                  value={formatNumber(market.rent_contracts)}
+                  hint="2021–2026"
+                />
+                <KpiTile
+                  label="Areas covered"
+                  value={formatNumber(market.areas_covered)}
+                  hint="DLD"
+                />
+                <KpiTile
+                  label="Active brokers"
+                  value={formatNumber(market.active_brokers)}
+                  hint="RERA"
+                />
+                <KpiTile
+                  label="Buildings tracked"
+                  value={formatNumber(market.buildings_tracked)}
+                  hint="Ejari"
+                />
+              </div>
+              {/* Top picks row */}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-[11px]">
+                {market.avg_yield_pct != null && (
+                  <PicksTile
+                    label="Average yield"
+                    value={
+                      market.avg_yield_pct >= 20
+                        ? '≥20%'
+                        : `${market.avg_yield_pct.toFixed(2)}%`
+                    }
+                    sub="across covered areas (sample ≥30)"
+                  />
+                )}
+                {market.top_yield_area && market.top_yield_pct != null && (
+                  <PicksTile
+                    label="Highest current yield"
+                    value={
+                      market.top_yield_pct >= 20
+                        ? '≥20%'
+                        : `${market.top_yield_pct.toFixed(1)}%`
+                    }
+                    sub={market.top_yield_area}
+                    tone="positive"
+                  />
+                )}
+                {market.top_appreciation_area && market.top_appreciation_pct != null && (
+                  <PicksTile
+                    label="Top 5y appreciation"
+                    value={`+${market.top_appreciation_pct.toFixed(0)}%`}
+                    sub={market.top_appreciation_area}
+                    tone="positive"
+                  />
+                )}
+                {market.offplan_percentage != null && (
+                  <PicksTile
+                    label="Off-plan share"
+                    value={`${market.offplan_percentage.toFixed(1)}%`}
+                    sub="of all sales · 2021–2026"
+                  />
+                )}
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* Hero */}
       <section className="border-b border-border">
@@ -886,6 +988,57 @@ function TrustCard({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="bg-bg-card px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        {label}
+      </div>
+      <div className="mt-1 text-xl sm:text-2xl leading-tight font-mono tabular text-fg">
+        {value}
+      </div>
+      {hint && <div className="mt-0.5 text-[10px] text-fg-subtle">{hint}</div>}
+    </div>
+  );
+}
+
+function PicksTile({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone?: 'positive';
+}) {
+  return (
+    <div className="rounded border border-border bg-bg-card px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-0.5 text-base font-mono tabular',
+          tone === 'positive' ? 'text-positive' : 'text-fg'
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-0.5 text-[11px] text-fg-muted truncate">{sub}</div>
     </div>
   );
 }

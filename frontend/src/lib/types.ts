@@ -291,6 +291,55 @@ export interface TopAppreciationResponse extends DldAttribution {
   items: TopAppreciationItem[];
 }
 
+export interface RentHistoryPoint {
+  year: number;
+  avg_annual_rent: number | null;
+  avg_rent_per_sqft: number | null;
+  median_annual_rent: number | null;
+  contract_count: number;
+  renewal_rate_pct: number | null;
+}
+
+export interface YieldHistoryPoint {
+  year: number;
+  gross_yield_pct: number | null;
+  sale_ppsf: number | null;
+  rent_psf: number | null;
+  yield_delta_yoy_pct: number | null;
+  sample_score: number;
+}
+
+export interface DldRentHistoryResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string;
+  points: RentHistoryPoint[];
+  years_of_history: number;
+}
+
+export interface DldYieldHistoryResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string;
+  points: YieldHistoryPoint[];
+  years_of_history: number;
+  trend: 'rising' | 'falling' | 'flat' | null;
+}
+
+export interface MarketOverviewResponse extends DldAttribution {
+  total_sales: number;
+  total_volume_aed: number;
+  areas_covered: number;
+  active_brokers: number;
+  buildings_tracked: number;
+  rent_contracts: number;
+  avg_yield_pct: number | null;
+  top_yield_area: string | null;
+  top_yield_pct: number | null;
+  top_appreciation_area: string | null;
+  top_appreciation_pct: number | null;
+  offplan_percentage: number | null;
+  cached: boolean;
+}
+
 export interface DldAreaDetailResponse extends DldAttribution {
   area: DldAreaDetail;
 }

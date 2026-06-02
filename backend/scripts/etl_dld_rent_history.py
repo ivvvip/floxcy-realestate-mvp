@@ -192,7 +192,7 @@ def get_sync_db_url() -> str:
     raise RuntimeError("DATABASE_URL not found in backend/.env")
 
 
-YIELD_CAP_PCT = 25.0
+YIELD_CAP_PCT = 20.0
 
 
 def write_rent_history_and_derive_yields(rent_rows: list[dict]) -> dict:

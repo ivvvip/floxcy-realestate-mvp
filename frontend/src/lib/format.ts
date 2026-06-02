@@ -18,6 +18,21 @@ export function formatPercent(value: number, digits = 2) {
   return `${value.toFixed(digits)}%`;
 }
 
+// Display cap mirrors the backend (DISPLAY_YIELD_CAP_PCT in schemas/dld.py).
+// Yields at or above the cap are presented as "≥20%" so users know the
+// number is bounded — raw DLD yields above 20% are nearly always artefacts.
+export const YIELD_DISPLAY_CAP = 20.0;
+
+export function formatYield(value: number | null | undefined, digits = 2): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  if (value >= YIELD_DISPLAY_CAP) return `≥${YIELD_DISPLAY_CAP.toFixed(0)}%`;
+  return `${value.toFixed(digits)}%`;
+}
+
+export function isYieldCapped(value: number | null | undefined): boolean {
+  return value != null && Number.isFinite(value) && value >= YIELD_DISPLAY_CAP;
+}
+
 export function formatNumber(value: number, digits = 0) {
   if (!Number.isFinite(value)) return '—';
   return new Intl.NumberFormat('en-US', {
