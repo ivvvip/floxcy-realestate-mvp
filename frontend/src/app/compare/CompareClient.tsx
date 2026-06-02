@@ -11,6 +11,7 @@ import { ComparisonRadar } from '@/components/charts/ComparisonRadar';
 import { MultiLine } from '@/components/charts/MultiLine';
 import { FilterChip } from '@/components/data/FilterChip';
 import { DataBadge } from '@/components/data/DataBadge';
+import { CompareInsights } from './CompareInsights';
 
 interface Props {
   areas: Area[];
@@ -162,6 +163,9 @@ export function CompareClient({ areas }: Props) {
 
       {data && data.areas.length > 0 && (
         <>
+          {/* CompareInsights: winner table + AED 1M simulator + AI verdict + share */}
+          <CompareInsights areas={data.areas} />
+
           <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
             <div className="border-b border-border flex items-center text-xs">
               {(['overlay', 'metrics', 'radar'] as Tab[]).map((t) => (
