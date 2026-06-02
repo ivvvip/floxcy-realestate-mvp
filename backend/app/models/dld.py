@@ -201,3 +201,55 @@ class DldAreaAppreciation(Base):
     cagr_5y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     years_of_data: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DldRentHistory(Base):
+    """Per-(area, year) Ejari rent aggregates from 2021–2026 export.
+
+    Populated by scripts/etl_dld_rent_history.py. UNIQUE(area_name_norm, year).
+    """
+    __tablename__ = "dld_rent_history"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    avg_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    median_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    median_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    renew_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    renewal_rate_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("area_name_norm", "year", name="uq_dld_rent_history_area_year"),
+    )
+
+
+class DldYieldHistory(Base):
+    """Derived per-(area, year) gross yield: rent_per_sqft / sale_ppsf × 100,
+    capped at 25%. Built by the rent ETL via SQL join over price+rent.
+    """
+    __tablename__ = "dld_yield_history"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    gross_yield_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    sale_ppsf: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    rent_psf: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    yield_delta_yoy_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    sample_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("area_name_norm", "year", name="uq_dld_yield_history_area_year"),
+    )

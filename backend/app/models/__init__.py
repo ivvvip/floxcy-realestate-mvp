@@ -13,7 +13,9 @@ from app.models.dld import (
     DldBuilding,
     DldPriceHistory,
     DldRentBenchmark,
+    DldRentHistory,
     DldReraBroker,
+    DldYieldHistory,
 )
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
@@ -35,7 +37,9 @@ __all__ = [
     "DldBuilding",
     "DldPriceHistory",
     "DldRentBenchmark",
+    "DldRentHistory",
     "DldReraBroker",
+    "DldYieldHistory",
     "InvestmentOpportunity",
     "InvestorLead",
     "MarketSnapshot",

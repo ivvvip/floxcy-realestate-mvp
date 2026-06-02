@@ -25,7 +25,9 @@ from app.models.dld import (
     DldBuilding,
     DldPriceHistory,
     DldRentBenchmark,
+    DldRentHistory,
     DldReraBroker,
+    DldYieldHistory,
 )
 from app.models.investor_lead import InvestorLead
 from app.models.rent_alert import RentAlert
@@ -44,7 +46,11 @@ from app.schemas.dld import (
     DldAreaListResponse,
     DldAreaTopBuildingsResponse,
     DldPriceHistoryResponse,
+    DldRentHistoryResponse,
+    DldYieldHistoryResponse,
     PriceHistoryPoint,
+    RentHistoryPoint,
+    YieldHistoryPoint,
     TopAppreciationItem,
     TopAppreciationResponse,
     DldBrokerItem,
@@ -300,6 +306,68 @@ async def _load_price_history_block(
     }
 
 
+async def _load_rent_history(
+    db: AsyncSession, area_name_norm: str
+) -> list[RentHistoryPoint]:
+    rows = (
+        await db.execute(
+            select(DldRentHistory)
+            .where(DldRentHistory.area_name_norm == area_name_norm)
+            .order_by(DldRentHistory.year)
+        )
+    ).scalars().all()
+    return [
+        RentHistoryPoint(
+            year=int(r.year),
+            avg_annual_rent=float(r.avg_annual_rent) if r.avg_annual_rent is not None else None,
+            avg_rent_per_sqft=float(r.avg_rent_per_sqft) if r.avg_rent_per_sqft is not None else None,
+            median_annual_rent=float(r.median_annual_rent) if r.median_annual_rent is not None else None,
+            contract_count=int(r.contract_count or 0),
+            renewal_rate_pct=float(r.renewal_rate_pct) if r.renewal_rate_pct is not None else None,
+        )
+        for r in rows
+    ]
+
+
+async def _load_yield_history(
+    db: AsyncSession, area_name_norm: str
+) -> tuple[list[YieldHistoryPoint], Optional[str]]:
+    """Return (points, trend) where trend ∈ {'rising','falling','flat',None}.
+
+    Trend is computed from the first vs last non-null gross_yield_pct.
+    Threshold: ±0.25 percentage points is 'flat'.
+    """
+    rows = (
+        await db.execute(
+            select(DldYieldHistory)
+            .where(DldYieldHistory.area_name_norm == area_name_norm)
+            .order_by(DldYieldHistory.year)
+        )
+    ).scalars().all()
+    points = [
+        YieldHistoryPoint(
+            year=int(r.year),
+            gross_yield_pct=float(r.gross_yield_pct) if r.gross_yield_pct is not None else None,
+            sale_ppsf=float(r.sale_ppsf) if r.sale_ppsf is not None else None,
+            rent_psf=float(r.rent_psf) if r.rent_psf is not None else None,
+            yield_delta_yoy_pct=float(r.yield_delta_yoy_pct) if r.yield_delta_yoy_pct is not None else None,
+            sample_score=int(r.sample_score or 0),
+        )
+        for r in rows
+    ]
+    non_null = [p for p in points if p.gross_yield_pct is not None]
+    trend: Optional[str] = None
+    if len(non_null) >= 2:
+        delta = non_null[-1].gross_yield_pct - non_null[0].gross_yield_pct
+        if delta > 0.25:
+            trend = "rising"
+        elif delta < -0.25:
+            trend = "falling"
+        else:
+            trend = "flat"
+    return points, trend
+
+
 @router.get("/areas/{name_or_norm}", response_model=DldAreaDetailResponse)
 async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
     """Get one area by name_norm (case-insensitive). Now includes the
@@ -321,6 +389,8 @@ async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
     area, m = row
 
     price_history, appreciation = await _load_price_history_block(db, area.name_norm)
+    rent_history = await _load_rent_history(db, area.name_norm)
+    yield_history, yield_trend = await _load_yield_history(db, area.name_norm)
 
     base = _build_area_item(area, m)
     detail = DldAreaDetail(
@@ -335,8 +405,59 @@ async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
         cagr_5y_pct=(appreciation or {}).get("cagr_5y_pct"),
         years_of_history=(appreciation or {}).get("years_of_data", len(price_history)),
         price_history=price_history,
+        rent_history=rent_history,
+        yield_history=yield_history,
+        yield_trend=yield_trend,
     )
     return DldAreaDetailResponse(area=detail)
+
+
+@router.get(
+    "/areas/{name_or_norm}/rent-history",
+    response_model=DldRentHistoryResponse,
+)
+async def get_dld_area_rent_history(
+    name_or_norm: str, db: AsyncSession = Depends(get_db)
+):
+    """Per-year rent series from Ejari 2021–2026."""
+    norm = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+    points = await _load_rent_history(db, area.name_norm)
+    return DldRentHistoryResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        points=points,
+        years_of_history=len(points),
+    )
+
+
+@router.get(
+    "/areas/{name_or_norm}/yield-history",
+    response_model=DldYieldHistoryResponse,
+)
+async def get_dld_area_yield_history(
+    name_or_norm: str, db: AsyncSession = Depends(get_db)
+):
+    """Per-year gross yield (rent_psf / sale_ppsf × 100, capped 25%)
+    plus YoY delta, derived from joining price + rent histories."""
+    norm = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+    points, trend = await _load_yield_history(db, area.name_norm)
+    return DldYieldHistoryResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        points=points,
+        years_of_history=len(points),
+        trend=trend,
+    )
 
 
 @router.get(

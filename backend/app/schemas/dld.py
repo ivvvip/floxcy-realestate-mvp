@@ -74,6 +74,24 @@ class PriceHistoryPoint(BaseModel):
     offplan_pct: Optional[float] = None
 
 
+class RentHistoryPoint(BaseModel):
+    year: int
+    avg_annual_rent: Optional[float] = None
+    avg_rent_per_sqft: Optional[float] = None
+    median_annual_rent: Optional[float] = None
+    contract_count: int = 0
+    renewal_rate_pct: Optional[float] = None
+
+
+class YieldHistoryPoint(BaseModel):
+    year: int
+    gross_yield_pct: Optional[float] = None
+    sale_ppsf: Optional[float] = None
+    rent_psf: Optional[float] = None
+    yield_delta_yoy_pct: Optional[float] = None
+    sample_score: int = 0
+
+
 class DldAreaDetail(DldAreaListItem):
     building_count: int = 0
     avg_price_per_sqft: Optional[float] = None
@@ -86,6 +104,9 @@ class DldAreaDetail(DldAreaListItem):
     cagr_5y_pct: Optional[float] = None
     years_of_history: int = 0
     price_history: List[PriceHistoryPoint] = []
+    rent_history: List[RentHistoryPoint] = []
+    yield_history: List[YieldHistoryPoint] = []
+    yield_trend: Optional[str] = None  # 'rising' | 'falling' | 'flat'
 
 
 class DldAreaDetailResponse(Attribution):
@@ -116,6 +137,22 @@ class TopAppreciationItem(BaseModel):
 class TopAppreciationResponse(Attribution):
     count: int
     items: List[TopAppreciationItem]
+
+
+class DldRentHistoryResponse(Attribution):
+    area_name_norm: str
+    area_name_display: str
+    points: List[RentHistoryPoint]
+    years_of_history: int = 0
+
+
+class DldYieldHistoryResponse(Attribution):
+    area_name_norm: str
+    area_name_display: str
+    points: List[YieldHistoryPoint]
+    years_of_history: int = 0
+    # Direction of travel (latest vs first non-null in the series)
+    trend: Optional[str] = None  # 'rising' | 'falling' | 'flat' | None
 
 
 class DldStatsResponse(Attribution):
