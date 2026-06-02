@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Noto_Sans_Arabic } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { dirFor } from '@/i18n';
+import { getLocale } from '@/i18n/server';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -14,6 +16,16 @@ const mono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
   display: 'swap',
+});
+
+// Arabic font — loaded so the browser preloads it, even though Arabic
+// strings aren't displayed yet. Setting the CSS variable lets us flip
+// the font stack via `lang="ar"` in globals.css without a code change.
+const arabic = Noto_Sans_Arabic({
+  subsets: ['arabic'],
+  variable: '--font-arabic',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -47,10 +59,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const locale = getLocale();
+  const dir = dirFor(locale);
+
   return (
     <html
-      lang="en"
-      className={`${inter.variable} ${mono.variable}`}
+      lang={locale}
+      dir={dir}
+      className={`${inter.variable} ${mono.variable} ${arabic.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col font-sans">

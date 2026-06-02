@@ -1,0 +1,151 @@
+{
+  "_meta": {
+    "locale": "ar",
+    "name": "العربية",
+    "dir": "rtl",
+    "note": "Placeholder Arabic translations — currently mirrors English. Replace values when Arabic content is ready. DO NOT change keys or add new keys without updating en.json first."
+  },
+
+  "nav": {
+    "dashboard": "Dashboard",
+    "areas": "Areas",
+    "buildings": "Buildings",
+    "opportunities": "Opportunities",
+    "compare": "Compare",
+    "ai_analyst": "AI Analyst",
+    "rent_check": "Rent Check",
+    "brokers": "Brokers",
+    "roi": "ROI",
+    "calculate_roi": "Calculate ROI",
+    "brand_tag": "Dubai · Beta"
+  },
+
+  "common": {
+    "source": "Source",
+    "updated": "Updated",
+    "back_home": "← Back home",
+    "see_all": "See all →",
+    "open": "Open",
+    "explore": "Explore",
+    "limited_data": "Limited data",
+    "data_coming_soon": "Data coming soon",
+    "no_data_yet": "No data yet",
+    "loading": "Loading…",
+    "checking": "Checking…",
+    "error": "Could not reach the API.",
+    "search": "Search",
+    "filter": "Filter",
+    "sort_by": "Sort by",
+    "type": "Type",
+    "coverage": "Coverage",
+    "name": "Name",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page",
+    "of": "of",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "close": "Close",
+    "share": "Share",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "more": "More…"
+  },
+
+  "tiers": {
+    "full": "Full data",
+    "partial": "Partial data",
+    "limited": "Limited data",
+    "none": "Data coming soon",
+    "high": "High confidence",
+    "medium": "Medium confidence",
+    "low": "Low confidence"
+  },
+
+  "areas": {
+    "title": "All Dubai Areas",
+    "subtitle": "DLD-tracked areas · sort, filter, and screen. Limited-data areas shown honestly — never fabricated.",
+    "search_placeholder": "e.g. Business Bay, Damac",
+    "type_all": "All types",
+    "type_residential": "Residential",
+    "type_commercial": "Commercial",
+    "type_mixed": "Mixed-use",
+    "coverage_all": "All coverage",
+    "sort_volume": "Volume (sales + rents)",
+    "sort_score": "Investment score",
+    "sort_yield": "Yield %",
+    "sort_name": "Name A→Z",
+    "card_median_ppsf": "Median AED/sqft",
+    "card_yield": "Yield (capped)",
+    "card_sales": "Sales 2026",
+    "card_rents": "Rent contracts",
+    "card_yoy": "YoY rent",
+    "card_score": "Score",
+    "card_dld_only": "DLD only",
+    "card_curated": "curated",
+    "limited_why_title": "Why is data limited?",
+    "limited_why_copy": "This area isn't one of Floxcy's curated investment-grade areas yet — so we don't have a hand-tuned investment score, 1-year appreciation, or risk rating here. The numbers above are the DLD figures we DO have; nothing is fabricated.",
+    "empty_title": "Data coming soon",
+    "empty_copy": "The Dubai Land Department lists this area but hasn't published transaction or rent contract data for 2026 yet."
+  },
+
+  "buildings": {
+    "title": "Building X-Ray",
+    "subtitle_prefix": "Per-project rent intelligence on",
+    "subtitle_suffix": "Dubai buildings.",
+    "card_income_range": "Income range",
+    "card_occupancy": "Occupancy",
+    "tile_total_income": "Total annual income",
+    "tile_implied_yield": "Implied yield",
+    "tile_yoy": "YoY rent trend",
+    "section_per_contract": "Per-contract economics",
+    "section_footprint": "Building footprint",
+    "section_area_context": "Area context",
+    "section_comparable": "Comparable buildings",
+    "cta_consult": "Request consultation"
+  },
+
+  "rent_check": {
+    "title": "Is Your Rent Fair?",
+    "subtitle_prefix": "Benchmark against",
+    "subtitle_suffix": "Dubai Land Department rent cells. Three taps, real numbers, no signup.",
+    "step1_title": "Pick your area",
+    "step2_title": "Pick your home size",
+    "step3_title": "Enter your annual rent",
+    "cta_submit": "Check my rent"
+  },
+
+  "brokers_directory": {
+    "title": "RERA Broker Directory",
+    "subtitle": "Verified against the official Dubai Land Department broker registry. Take the 4-tap wizard, browse, or filter.",
+    "wizard_title": "Find My Broker — 4-tap smart match",
+    "step1": "What do you need?",
+    "step2": "Preferred area?",
+    "step3": "Preferred language?",
+    "step4": "Budget range?",
+    "goal_buy": "Buy Property",
+    "goal_rent": "Rent Property",
+    "goal_sell": "Sell Property"
+  },
+
+  "advisor": {
+    "title": "AI Investment Analyst",
+    "subtitle": "Capital deployment intelligence · budget, goal & risk → ranked areas with transparent rationale"
+  },
+
+  "homepage": {
+    "hero_headline_pre": "Find UAE Real Estate Opportunities",
+    "hero_headline_post": "Before the Market Does",
+    "hero_subhead": "Floxcy combines market intelligence, AI analysis, and verified investment specialists to help investors discover and act on high-quality UAE property opportunities.",
+    "cta_explore": "Explore Opportunities",
+    "cta_rent_check": "Is Your Rent Fair?",
+    "cta_join_broker": "Join as Broker",
+    "cta_dashboard": "Market dashboard"
+  },
+
+  "disclaimer": {
+    "ai_short": "AI-generated insights for informational purposes only. Not financial, legal, or tax advice."
+  }
+}

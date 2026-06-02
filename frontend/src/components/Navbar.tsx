@@ -6,22 +6,26 @@ import { useState } from 'react';
 import { Building2, Menu, X } from 'lucide-react';
 import { Container } from './Container';
 import { cn } from '@/lib/cn';
+import { useT } from '@/i18n/useT';
 
+// href + i18n key. Adding a new nav link? Add the key to en.json + ar.json
+// under `nav.*` and reference here.
 const LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/areas', label: 'Areas' },
-  { href: '/buildings', label: 'Buildings' },
-  { href: '/opportunities', label: 'Opportunities' },
-  { href: '/compare', label: 'Compare' },
-  { href: '/advisor', label: 'AI Analyst' },
-  { href: '/rent-check', label: 'Rent Check' },
-  { href: '/brokers/directory', label: 'Brokers' },
-  { href: '/roi-calculator', label: 'ROI' },
+  { href: '/dashboard', key: 'nav.dashboard' },
+  { href: '/areas', key: 'nav.areas' },
+  { href: '/buildings', key: 'nav.buildings' },
+  { href: '/opportunities', key: 'nav.opportunities' },
+  { href: '/compare', key: 'nav.compare' },
+  { href: '/advisor', key: 'nav.ai_analyst' },
+  { href: '/rent-check', key: 'nav.rent_check' },
+  { href: '/brokers/directory', key: 'nav.brokers' },
+  { href: '/roi-calculator', key: 'nav.roi' },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useT();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur-md">
@@ -38,7 +42,7 @@ export function Navbar() {
             <span className="text-sm font-semibold tracking-tight text-fg">
               Floxcy
             </span>
-            <span className="hidden sm:inline pill ml-1">Dubai · Beta</span>
+            <span className="hidden sm:inline pill ml-1">{t('nav.brand_tag')}</span>
           </Link>
 
           <ul className="hidden items-center gap-0.5 md:flex">
@@ -58,7 +62,7 @@ export function Navbar() {
                         : 'text-fg-muted hover:text-fg'
                     )}
                   >
-                    {l.label}
+                    {t(l.key)}
                   </Link>
                 </li>
               );
@@ -70,7 +74,7 @@ export function Navbar() {
               href="/roi-calculator"
               className="inline-flex h-8 items-center justify-center rounded-md bg-accent px-3 text-xs font-medium text-accent-fg transition-colors hover:bg-accent/90"
             >
-              Calculate ROI
+              {t('nav.calculate_roi')}
             </Link>
           </div>
 
@@ -107,7 +111,7 @@ export function Navbar() {
                           : 'text-fg-muted hover:text-fg'
                       )}
                     >
-                      {l.label}
+                      {t(l.key)}
                     </Link>
                   </li>
                 );
@@ -118,7 +122,7 @@ export function Navbar() {
                   onClick={() => setOpen(false)}
                   className="block w-full rounded-md bg-accent px-4 py-2.5 text-center text-sm font-medium text-accent-fg"
                 >
-                  Calculate ROI
+                  {t('nav.calculate_roi')}
                 </Link>
               </li>
             </ul>
