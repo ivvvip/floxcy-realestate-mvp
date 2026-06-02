@@ -878,16 +878,20 @@ export async function getDldBuilding(id: string): Promise<DldBuildingDetailRespo
 
 export async function getDldBuildingsDerived(opts?: {
   area?: string;
+  master_project?: string;
+  q?: string;
   page?: number;
   page_size?: number;
 }): Promise<DldBuildingsResponse> {
   const params = new URLSearchParams();
   if (opts?.area) params.set('area', opts.area);
+  if (opts?.master_project) params.set('master_project', opts.master_project);
+  if (opts?.q) params.set('q', opts.q);
   if (opts?.page) params.set('page', String(opts.page));
   if (opts?.page_size) params.set('page_size', String(opts.page_size));
-  const q = params.toString();
+  const qs = params.toString();
   return request<DldBuildingsResponse>(
-    `/api/v1/dld/buildings-derived${q ? `?${q}` : ''}`,
+    `/api/v1/dld/buildings-derived${qs ? `?${qs}` : ''}`,
     { revalidate: 600 }
   );
 }

@@ -135,6 +135,36 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                     area-level signal, not per-building.
                   </p>
                 )}
+                {/* Provenance: derived buildings get an explicit "from Ejari"
+                    line; official buildings get "Registered in DLD". The
+                    contract count grounds the claim. */}
+                {b.data_source === 'ejari_derived' && (
+                  <p className="mt-1 text-[11px] text-accent bg-accent/10 border border-accent/30 rounded px-2 py-1">
+                    📊 Known from{' '}
+                    <span className="font-mono">
+                      {b.active_rent_count.toLocaleString()}
+                    </span>{' '}
+                    Ejari rent contracts (2021–2026). Not registered in the
+                    official DLD buildings dataset — identity inferred from
+                    the rent stream.
+                  </p>
+                )}
+                {b.data_source === 'dld_official' && (
+                  <p className="mt-1 text-[11px] text-positive bg-positive/10 border border-positive/30 rounded px-2 py-1">
+                    ✅ Registered in the official DLD buildings dataset.
+                  </p>
+                )}
+                {b.master_project && (
+                  <p className="mt-1 text-xs text-fg">
+                    Part of{' '}
+                    <Link
+                      href={`/buildings?master_project=${encodeURIComponent(b.master_project)}`}
+                      className="font-medium text-accent hover:underline"
+                    >
+                      {b.master_project}
+                    </Link>
+                  </p>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg-muted">
                   {b.area_name && (
                     <span>

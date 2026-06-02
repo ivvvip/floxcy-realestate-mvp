@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { Building2 } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getDldBuildings, getCanonicalAreas } from '@/lib/api';
+import { getDldStats, getDldBuildings, getDldBuildingsDerived, getCanonicalAreas } from '@/lib/api';
 import { BuildingsIndexClient } from './BuildingsIndexClient';
 
 export const metadata: Metadata = {
@@ -18,9 +19,13 @@ export default async function BuildingsIndexPage() {
   // to those actually linked to ≥1 building so the dropdown stays usable.
   // Canonical areas — single source of truth across all Floxcy dropdowns.
   // min_occurrences=5 filters the ~26 noise areas (one-off DLD entries).
-  const [stats, initial, canon] = await Promise.all([
+  // Derived total: just need the count for the tab badge; page_size=1 keeps
+  // the prefetch cheap. Soft-fail so the official tab still renders if the
+  // derived endpoint is briefly unavailable.
+  const [stats, initial, derived, canon] = await Promise.all([
     getDldStats().catch(() => null),
     getDldBuildings({ sort_by: 'rent_count', limit: 50 }).catch(() => null),
+    getDldBuildingsDerived({ page: 1, page_size: 1 }).catch(() => null),
     getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
   ]);
 
@@ -65,11 +70,16 @@ export default async function BuildingsIndexPage() {
 
       <Container>
         <div className="py-4 sm:py-6">
-          <BuildingsIndexClient
-            initialItems={initial?.items ?? []}
-            initialTotal={initial?.total_available ?? 0}
-            areaOptions={areaOptions}
-          />
+          {/* Suspense wrap required by Next 14 because the child reads
+              search params via useSearchParams() and this page is ISR. */}
+          <Suspense fallback={<div className="card p-8 text-sm text-fg-subtle">Loading…</div>}>
+            <BuildingsIndexClient
+              initialItems={initial?.items ?? []}
+              initialTotal={initial?.total_available ?? 0}
+              initialDerivedTotal={derived?.total_available ?? 0}
+              areaOptions={areaOptions}
+            />
+          </Suspense>
         </div>
       </Container>
     </div>

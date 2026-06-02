@@ -3471,6 +3471,8 @@ def _build_derived_building_item(
 async def list_buildings_derived(
     db: AsyncSession = Depends(get_db),
     area: Optional[str] = None,
+    master_project: Optional[str] = None,
+    q: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
 ):
@@ -3478,28 +3480,45 @@ async def list_buildings_derived(
     rents_2021_2026.csv. Use this in addition to /dld/buildings to surface
     real per-tower entities (SIRAJ TOWER, ORBIT RESIDENCES, etc) that the
     47-row official dld_buildings table doesn't carry.
+
+    Filters:
+      area              — DLD area name_norm (exact lower-case match)
+      master_project    — case-insensitive substring match on master_project_en
+      q                 — case-insensitive substring across project_name_en
+                          and master_project_en
     """
+    filters = []
+    if area:
+        filters.append(func.lower(DldArea.name_norm) == area.strip().lower())
+    if master_project:
+        filters.append(
+            DldBuildingDerived.master_project_en.ilike(f"%{master_project.strip()}%")
+        )
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(
+            or_(
+                DldBuildingDerived.project_name_en.ilike(needle),
+                DldBuildingDerived.master_project_en.ilike(needle),
+            )
+        )
+
     base = (
         select(DldBuildingDerived, DldArea.name_display)
         .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
     )
-    if area:
-        norm_area = area.strip().lower()
-        base = base.where(
-            func.lower(DldArea.name_norm) == norm_area
-        )
-    total = (
-        await db.scalar(
-            select(func.count()).select_from(DldBuildingDerived)
-            .where(*([func.lower(DldArea.name_norm) == area.strip().lower()] if area else []))
-        )
-        if not area else
-        await db.scalar(
-            select(func.count(DldBuildingDerived.id))
-            .join(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
-            .where(func.lower(DldArea.name_norm) == area.strip().lower())
-        )
+    if filters:
+        base = base.where(and_(*filters))
+
+    total_q = (
+        select(func.count(DldBuildingDerived.id))
+        .select_from(DldBuildingDerived)
+        .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
     )
+    if filters:
+        total_q = total_q.where(and_(*filters))
+    total = await db.scalar(total_q) or 0
+
     rows = (
         await db.execute(
             base.order_by(DldBuildingDerived.contract_count.desc())
@@ -3509,7 +3528,7 @@ async def list_buildings_derived(
     ).all()
     items = [_build_derived_building_item(d, name) for d, name in rows]
     return DldBuildingsResponse(
-        count=len(items), total_available=int(total or 0), items=items
+        count=len(items), total_available=int(total), items=items
     )
 
 
