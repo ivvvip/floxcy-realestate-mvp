@@ -20,6 +20,8 @@ import {
   ApiError,
   getDldBuilding,
   getDldBuildingComparable,
+  getDldBuildingLeaseExpiry,
+  getDldBuildingRentHistory,
 } from '@/lib/api';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -57,6 +59,23 @@ export default async function BuildingDetailPage({ params }: PageProps) {
     comparable = await getDldBuildingComparable(params.id, 5);
   } catch {
     // soft-fail — comparable is non-critical
+  }
+
+  // Rent history + expiry calendar — both soft-fail. Rent history may be
+  // empty when the project never matched a building row by project_number
+  // or (project_name, area). Expiry may be empty for buildings that haven't
+  // yet had Person residential leases land in the forecast horizon.
+  let rentHistory = null;
+  let leaseExpiry = null;
+  try {
+    rentHistory = await getDldBuildingRentHistory(params.id);
+  } catch {
+    // soft-fail
+  }
+  try {
+    leaseExpiry = await getDldBuildingLeaseExpiry(params.id);
+  } catch {
+    // soft-fail
   }
 
   const b = detailRes.building;
@@ -348,6 +367,109 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                     </div>
                   </Link>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {/* Rent History (2021-2026) */}
+          {rentHistory && rentHistory.points.length > 0 && (
+            <section className="card p-4 sm:p-5">
+              <h2 className="text-sm font-semibold text-fg flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-fg-muted" strokeWidth={2} />
+                Rent history (2021–2026)
+              </h2>
+              <p className="mt-1 text-[11px] text-fg-subtle">
+                Per-year average Person residential rent — Authority and
+                labor-camp contracts are excluded so the year-over-year signal
+                reflects what private tenants actually pay.
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-fg-subtle border-b border-border">
+                      <th className="py-2 pr-3 font-medium">Year</th>
+                      <th className="py-2 pr-3 font-medium">Avg rent</th>
+                      <th className="py-2 pr-3 font-medium">Median rent</th>
+                      <th className="py-2 pr-3 font-medium">Contracts</th>
+                      <th className="py-2 pr-3 font-medium">New / Renew</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rentHistory.points.map((p) => (
+                      <tr key={p.year} className="border-b border-border/40">
+                        <td className="py-2 pr-3 font-mono text-fg">{p.year}</td>
+                        <td className="py-2 pr-3 font-mono text-fg">
+                          {p.avg_annual_rent != null
+                            ? formatAED(p.avg_annual_rent)
+                            : '—'}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-fg-muted">
+                          {p.median_annual_rent != null
+                            ? formatAED(p.median_annual_rent)
+                            : '—'}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-fg-muted">
+                          {p.contract_count.toLocaleString()}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-fg-subtle">
+                          {p.new_count} / {p.renew_count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Lease Expiry Calendar */}
+          {leaseExpiry && leaseExpiry.months.length > 0 && (
+            <section className="card p-4 sm:p-5">
+              <h2 className="text-sm font-semibold text-fg flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-fg-muted" strokeWidth={2} />
+                Lease expiry calendar
+              </h2>
+              <p className="mt-1 text-[11px] text-fg-subtle">
+                {leaseExpiry.total_expiring.toLocaleString()} Person residential
+                contracts expire in the months ahead. Estimated availability
+                applies a blended 39% non-renewal rate; per-month renewal
+                probability is computed from the New/Renew mix in each bucket.
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-fg-subtle border-b border-border">
+                      <th className="py-2 pr-3 font-medium">Month</th>
+                      <th className="py-2 pr-3 font-medium">Expiring</th>
+                      <th className="py-2 pr-3 font-medium">Est. available</th>
+                      <th className="py-2 pr-3 font-medium">Avg rent</th>
+                      <th className="py-2 pr-3 font-medium">Renewal prob.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaseExpiry.months.map((m) => (
+                      <tr key={m.expiry_month} className="border-b border-border/40">
+                        <td className="py-2 pr-3 font-mono text-fg">{m.expiry_month}</td>
+                        <td className="py-2 pr-3 font-mono text-fg">
+                          {m.contract_count.toLocaleString()}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-accent">
+                          {m.estimated_available.toLocaleString()}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-fg-muted">
+                          {m.avg_last_rent != null
+                            ? formatAED(m.avg_last_rent)
+                            : '—'}
+                        </td>
+                        <td className="py-2 pr-3 font-mono text-fg-muted">
+                          {m.renewal_probability_pct != null
+                            ? `${m.renewal_probability_pct.toFixed(0)}%`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}

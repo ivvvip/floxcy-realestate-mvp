@@ -23,7 +23,9 @@ from app.models.dld import (
     DldAreaAppreciation,
     DldAreaMetrics,
     DldBuilding,
+    DldBuildingRentHistory,
     DldCanonicalArea,
+    DldLeaseExpiryForecast,
     DldPriceHistory,
     DldRentBenchmark,
     DldRentHistory,
@@ -85,7 +87,13 @@ from app.schemas.dld import (
     DldPriceHistoryResponse,
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
+    BuildingLeaseExpiryResponse,
+    BuildingRentHistoryPoint,
+    DldBuildingRentHistoryResponse,
+    LeaseExpiryMonthBucket,
     MarketOverviewResponse,
+    UpcomingAvailabilityItem,
+    UpcomingAvailabilityResponse,
     PriceHistoryPoint,
     RentHistoryPoint,
     YieldHistoryPoint,
@@ -3193,4 +3201,210 @@ async def dld_roi_calculate(
         insight=insight,
         cost_breakdown=cost_breakdown,
         defaults_used=defaults,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Building rent history (5y)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/buildings/{building_id}/rent-history",
+    response_model=DldBuildingRentHistoryResponse,
+)
+async def building_rent_history(
+    building_id: UUID, db: AsyncSession = Depends(get_db)
+):
+    """Per-(building, year) Person-residential rent series 2021-2026.
+
+    Built by etl_dld_rent_history.py from rents_2021_2026.csv. Rows are
+    keyed to dld_buildings by project_number first, then by
+    (project_name, area_name_norm) as a fallback. When neither matches the
+    history is still in the table (dld_building_id IS NULL); this endpoint
+    returns the building-matched subset.
+    """
+    bldg = (
+        await db.execute(
+            select(DldBuilding, DldArea.name_display)
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+            .where(DldBuilding.id == building_id)
+        )
+    ).first()
+    if not bldg:
+        raise HTTPException(status_code=404, detail="Building not found")
+    b, area_name = bldg
+
+    rows = (
+        await db.execute(
+            select(DldBuildingRentHistory)
+            .where(DldBuildingRentHistory.dld_building_id == building_id)
+            .order_by(DldBuildingRentHistory.year)
+        )
+    ).scalars().all()
+
+    points = [
+        BuildingRentHistoryPoint(
+            year=int(r.year),
+            avg_annual_rent=float(r.avg_annual_rent) if r.avg_annual_rent is not None else None,
+            median_annual_rent=float(r.median_annual_rent) if r.median_annual_rent is not None else None,
+            avg_rent_per_sqft=float(r.avg_rent_per_sqft) if r.avg_rent_per_sqft is not None else None,
+            contract_count=int(r.contract_count or 0),
+            new_count=int(r.new_count or 0),
+            renew_count=int(r.renew_count or 0),
+        )
+        for r in rows
+    ]
+    return DldBuildingRentHistoryResponse(
+        building_id=building_id,
+        project_name=b.project_name,
+        area_name=area_name,
+        points=points,
+        years_of_history=len(points),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Availability Tracker
+# ---------------------------------------------------------------------------
+
+def _months_ahead(window_days: int) -> str:
+    """Snapshot date is 2026-06-01 so 'today' is deterministic. Returns
+    inclusive YYYY-MM end-of-window."""
+    today = date(2026, 6, 1)
+    end = today + timedelta(days=window_days)
+    return end.strftime("%Y-%m")
+
+
+@router.get(
+    "/areas/{name_or_norm}/upcoming-availability",
+    response_model=UpcomingAvailabilityResponse,
+)
+async def area_upcoming_availability(
+    name_or_norm: str,
+    db: AsyncSession = Depends(get_db),
+    window_days: int = Query(90, ge=30, le=180),
+):
+    """Units expiring in the next N days, bucketed by 1BR/2BR/Studio etc.
+
+    Derived from dld_lease_expiry_forecast (Person residential only). The
+    expiry_month string is compared lexicographically against the snapshot
+    horizon, so '2026-08' <= '2026-08' includes August expiries when the
+    window catches it.
+    """
+    norm_s = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm_s))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    horizon = _months_ahead(window_days)
+    rows = (
+        await db.execute(
+            select(
+                DldLeaseExpiryForecast.property_sub_type,
+                func.sum(DldLeaseExpiryForecast.contract_count).label("cc"),
+                func.sum(DldLeaseExpiryForecast.estimated_available).label("ea"),
+                func.avg(DldLeaseExpiryForecast.avg_last_rent).label("alr"),
+                func.avg(DldLeaseExpiryForecast.renewal_probability).label("rp"),
+            )
+            .where(
+                DldLeaseExpiryForecast.area_name_norm == area.name_norm,
+                DldLeaseExpiryForecast.expiry_month <= horizon,
+            )
+            .group_by(DldLeaseExpiryForecast.property_sub_type)
+            .order_by(func.sum(DldLeaseExpiryForecast.contract_count).desc())
+        )
+    ).all()
+
+    items = [
+        UpcomingAvailabilityItem(
+            property_sub_type=sub,
+            contract_count=int(cc or 0),
+            estimated_available=int(ea or 0),
+            avg_last_rent=float(alr) if alr is not None else None,
+            renewal_probability_pct=float(rp) if rp is not None else None,
+        )
+        for sub, cc, ea, alr, rp in rows
+    ]
+    return UpcomingAvailabilityResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        window_days=window_days,
+        horizon_month_end=horizon,
+        total_expiring=sum(i.contract_count for i in items),
+        total_estimated_available=sum(i.estimated_available for i in items),
+        by_sub_type=items,
+    )
+
+
+@router.get(
+    "/buildings/{building_id}/lease-expiry",
+    response_model=BuildingLeaseExpiryResponse,
+)
+async def building_lease_expiry(
+    building_id: UUID, db: AsyncSession = Depends(get_db),
+):
+    """Monthly expiry calendar for a specific building.
+
+    Matches dld_lease_expiry_forecast rows by (area_name_norm, project_name_en)
+    — the forecast table stores project_name as a text key (not building_id)
+    since contracts predate the dld_buildings dim, so the join is on the
+    canonical strings.
+    """
+    row = (
+        await db.execute(
+            select(DldBuilding, DldArea.name_display, DldArea.name_norm)
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+            .where(DldBuilding.id == building_id)
+        )
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Building not found")
+    b, area_display, area_norm = row
+    if not b.project_name or not area_norm:
+        return BuildingLeaseExpiryResponse(
+            building_id=building_id,
+            project_name=b.project_name,
+            area_name=area_display,
+            months=[],
+            total_expiring=0,
+            total_estimated_available=0,
+        )
+
+    rows = (
+        await db.execute(
+            select(
+                DldLeaseExpiryForecast.expiry_month,
+                func.sum(DldLeaseExpiryForecast.contract_count).label("cc"),
+                func.sum(DldLeaseExpiryForecast.estimated_available).label("ea"),
+                func.avg(DldLeaseExpiryForecast.avg_last_rent).label("alr"),
+                func.avg(DldLeaseExpiryForecast.renewal_probability).label("rp"),
+            )
+            .where(
+                DldLeaseExpiryForecast.area_name_norm == area_norm,
+                DldLeaseExpiryForecast.project_name_en == b.project_name,
+            )
+            .group_by(DldLeaseExpiryForecast.expiry_month)
+            .order_by(DldLeaseExpiryForecast.expiry_month)
+        )
+    ).all()
+
+    months = [
+        LeaseExpiryMonthBucket(
+            expiry_month=m,
+            contract_count=int(cc or 0),
+            estimated_available=int(ea or 0),
+            avg_last_rent=float(alr) if alr is not None else None,
+            renewal_probability_pct=float(rp) if rp is not None else None,
+        )
+        for m, cc, ea, alr, rp in rows
+    ]
+    return BuildingLeaseExpiryResponse(
+        building_id=building_id,
+        project_name=b.project_name,
+        area_name=area_display,
+        months=months,
+        total_expiring=sum(m.contract_count for m in months),
+        total_estimated_available=sum(m.estimated_available for m in months),
     )

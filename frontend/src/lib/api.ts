@@ -45,8 +45,11 @@ import type {
   DldAreaListResponse,
   DldAreaDetailResponse,
   DldPriceHistoryResponse,
+  BuildingLeaseExpiryResponse,
+  DldBuildingRentHistoryResponse,
   DldRentHistoryResponse,
   DldYieldHistoryResponse,
+  UpcomingAvailabilityResponse,
   CanonicalAreasResponse,
   DashboardDataResponse,
   MarketOverviewResponse,
@@ -694,6 +697,34 @@ export async function getDldAreaYieldHistory(
 ): Promise<DldYieldHistoryResponse> {
   return request<DldYieldHistoryResponse>(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/yield-history`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDldBuildingRentHistory(
+  buildingId: string
+): Promise<DldBuildingRentHistoryResponse> {
+  return request<DldBuildingRentHistoryResponse>(
+    `/api/v1/dld/buildings/${encodeURIComponent(buildingId)}/rent-history`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDldAreaUpcomingAvailability(
+  nameNorm: string,
+  windowDays: 30 | 60 | 90 = 90
+): Promise<UpcomingAvailabilityResponse> {
+  return request<UpcomingAvailabilityResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/upcoming-availability?window_days=${windowDays}`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDldBuildingLeaseExpiry(
+  buildingId: string
+): Promise<BuildingLeaseExpiryResponse> {
+  return request<BuildingLeaseExpiryResponse>(
+    `/api/v1/dld/buildings/${encodeURIComponent(buildingId)}/lease-expiry`,
     { revalidate: 3600 }
   );
 }

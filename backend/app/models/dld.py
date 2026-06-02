@@ -142,6 +142,9 @@ class DldRentBenchmark(Base):
     prop_sub_type: Mapped[str] = mapped_column(String(64), nullable=False)
     size_band: Mapped[str] = mapped_column(String(32), nullable=False)
     period: Mapped[str] = mapped_column(String(32), nullable=False, default="2026")
+    property_usage: Mapped[str] = mapped_column(String(32), nullable=False, default="Residential")
+    property_category: Mapped[str] = mapped_column(String(32), nullable=False, default="apartment")
+    is_bulk_contract: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
     p10_annual_rent: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     p25_annual_rent: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
@@ -156,6 +159,7 @@ class DldRentBenchmark(Base):
     __table_args__ = (
         UniqueConstraint(
             "dld_area_id", "prop_sub_type", "size_band", "period",
+            "property_usage", "property_category",
             name="uq_dld_rent_benchmark_key",
         ),
     )
@@ -233,11 +237,48 @@ class DldRentHistory(Base):
     new_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     renew_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     renewal_rate_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    # Tenant-type audit: how many of the surviving contracts were Person vs
+    # Authority. We filter to Person for benchmark/yield math; these columns
+    # let us see what the filter dropped.
+    person_contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    authority_contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint("area_name_norm", "year", name="uq_dld_rent_history_area_year"),
     )
+
+
+class DldBuildingRentHistory(Base):
+    """Per-(building, year) Ejari rent aggregates from 2021–2026 export.
+
+    Matched to dld_buildings via project_number when present, falling back to
+    (project_name, area_name_norm). Populated by etl_dld_rent_history.py
+    alongside the area-level rent history.
+    """
+    __tablename__ = "dld_building_rent_history"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_building_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_buildings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    project_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    project_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    avg_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    median_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    median_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    renew_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    person_contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    authority_contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class DldYieldHistory(Base):
@@ -292,6 +333,92 @@ class DldCanonicalArea(Base):
     coords_confidence: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     # GeoJSON polygon shape from OSM Overpass (Polygon or MultiPolygon)
     polygon: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DldLaborCampStats(Base):
+    """Per-(area, year) bulk Labor Camp aggregates.
+
+    Labor camps run AED 1.7M–9.5M average annual contracts — including them
+    in the residential benchmark inflates every number. This table keeps the
+    signal accessible for B2B (property managers, institutional investors)
+    without contaminating consumer-facing residential rent comparisons.
+    """
+    __tablename__ = "dld_labor_camp_stats"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    avg_rooms_per_contract: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    avg_annual_amount: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    median_annual_amount: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    total_annual_income: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("area_name_norm", "year", name="uq_dld_labor_camp_stats_area_year"),
+    )
+
+
+class DldCommercialBenchmark(Base):
+    """Per-(area, property_category, year) office/retail/warehouse benchmarks.
+
+    Separate from dld_rent_benchmarks because commercial economics aren't
+    interchangeable with residential — same building can host a flat and a
+    shop with wildly different per-sqft economics, and consumer-facing rent
+    queries should never accidentally blend the two.
+    """
+    __tablename__ = "dld_commercial_benchmarks"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    property_category: Mapped[str] = mapped_column(String(32), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    avg_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    median_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    median_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    sample_size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "area_name_norm", "property_category", "year",
+            name="uq_dld_commercial_benchmarks_key",
+        ),
+    )
+
+
+class DldLeaseExpiryForecast(Base):
+    """Per-(area, project, sub_type, expiry_month) forward-looking availability.
+
+    Derived from Person residential contracts whose end_date falls in a future
+    month. estimated_available is contract_count × 0.39 (blended non-renewal
+    rate from historical Person + Renewed = 61%, Person + New = 45%).
+    renewal_probability is the bucket-level blend so frontends can show the
+    "X units expiring next month, ~Y% likely to renew" signal honestly.
+    """
+    __tablename__ = "dld_lease_expiry_forecast"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_name_en: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    property_sub_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    expiry_month: Mapped[str] = mapped_column(String(7), nullable=False)  # 'YYYY-MM'
+    contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    estimated_available: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    avg_last_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    renewal_probability: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

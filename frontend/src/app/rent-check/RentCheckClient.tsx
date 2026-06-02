@@ -884,6 +884,12 @@ function ResultPanel({
       {/* F6: Best time to negotiate */}
       <BestTimeToNegotiate result={result} />
 
+      {/* Availability tracker: forward-looking signal — when many leases
+          expire in the user's area, landlords face more competition and the
+          tenant has leverage. Soft-fails when the area has nothing in the
+          forecast horizon. */}
+      <UpcomingExpiryTip areaNorm={result.area_name_norm ?? area.name_norm} />
+
       {/* Building X-Ray suggestion — quietly hide if no mapped buildings */}
       <BuildingsInArea areaNorm={result.area_name_norm ?? area.name_norm} />
 
@@ -1090,6 +1096,63 @@ function ShareRow({
 // Building X-Ray suggestion — shown on /rent-check after a successful check.
 // Hidden when the picked area has no mapped buildings (community↔admin gap).
 // ---------------------------------------------------------------------------
+function UpcomingExpiryTip({ areaNorm }: { areaNorm: string }) {
+  const [data, setData] = useState<{
+    total: number;
+    estAvailable: number;
+    areaName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('@/lib/api');
+        const res = await mod.getDldAreaUpcomingAvailability(areaNorm, 60);
+        if (cancelled) return;
+        if (res.total_expiring > 0) {
+          setData({
+            total: res.total_expiring,
+            estAvailable: res.total_estimated_available,
+            areaName: res.area_name_display,
+          });
+        }
+      } catch {
+        // soft-fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [areaNorm]);
+
+  if (!data) return null;
+
+  return (
+    <section className="card p-4 sm:p-5 border-2 border-accent/30">
+      <div className="flex items-start gap-2">
+        <span aria-hidden className="text-lg">📅</span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-fg">
+            {data.total.toLocaleString()} units expire in {data.areaName} in the
+            next 60 days — leverage time
+          </h3>
+          <p className="mt-1 text-xs text-fg-muted">
+            Roughly{' '}
+            <span className="font-mono text-fg">
+              {data.estAvailable.toLocaleString()}
+            </span>{' '}
+            of those won&apos;t renew. When supply spikes locally, landlords
+            soften — push back on your renewal now while comparable units are
+            coming online.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 function BuildingsInArea({ areaNorm }: { areaNorm: string }) {
   const [items, setItems] = useState<
     Array<{ id: string; project_name: string | null; active_rent_count: number; income_range_label: string | null }>

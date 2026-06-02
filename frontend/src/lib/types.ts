@@ -329,6 +329,59 @@ export interface DldYieldHistoryResponse extends DldAttribution {
   trend: 'rising' | 'falling' | 'flat' | null;
 }
 
+export interface BuildingRentHistoryPoint {
+  year: number;
+  avg_annual_rent: number | null;
+  median_annual_rent: number | null;
+  avg_rent_per_sqft: number | null;
+  contract_count: number;
+  new_count: number;
+  renew_count: number;
+}
+
+export interface DldBuildingRentHistoryResponse extends DldAttribution {
+  building_id: string;
+  project_name: string | null;
+  area_name: string | null;
+  points: BuildingRentHistoryPoint[];
+  years_of_history: number;
+}
+
+export interface UpcomingAvailabilityItem {
+  property_sub_type: string;
+  contract_count: number;
+  estimated_available: number;
+  avg_last_rent: number | null;
+  renewal_probability_pct: number | null;
+}
+
+export interface UpcomingAvailabilityResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string;
+  window_days: number;
+  horizon_month_end: string;
+  total_expiring: number;
+  total_estimated_available: number;
+  by_sub_type: UpcomingAvailabilityItem[];
+}
+
+export interface LeaseExpiryMonthBucket {
+  expiry_month: string;
+  contract_count: number;
+  estimated_available: number;
+  avg_last_rent: number | null;
+  renewal_probability_pct: number | null;
+}
+
+export interface BuildingLeaseExpiryResponse extends DldAttribution {
+  building_id: string;
+  project_name: string | null;
+  area_name: string | null;
+  months: LeaseExpiryMonthBucket[];
+  total_expiring: number;
+  total_estimated_available: number;
+}
+
 export interface CanonicalAreaBbox {
   north: number;
   south: number;

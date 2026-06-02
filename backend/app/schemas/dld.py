@@ -934,3 +934,64 @@ class DashboardDataResponse(Attribution):
     broker_stats: BrokerStats
     intelligence: DataIntelligenceFooter
     cached: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Building rent history (5y)
+# ---------------------------------------------------------------------------
+
+class BuildingRentHistoryPoint(BaseModel):
+    year: int
+    avg_annual_rent: Optional[float] = None
+    median_annual_rent: Optional[float] = None
+    avg_rent_per_sqft: Optional[float] = None
+    contract_count: int = 0
+    new_count: int = 0
+    renew_count: int = 0
+
+
+class DldBuildingRentHistoryResponse(Attribution):
+    building_id: UUID
+    project_name: Optional[str] = None
+    area_name: Optional[str] = None
+    points: List[BuildingRentHistoryPoint]
+    years_of_history: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Availability Tracker
+# ---------------------------------------------------------------------------
+
+class UpcomingAvailabilityItem(BaseModel):
+    property_sub_type: str  # Studio / 1BR / 2BR / 3BR / 4BR / 5BR+ / Other
+    contract_count: int
+    estimated_available: int
+    avg_last_rent: Optional[float] = None
+    renewal_probability_pct: Optional[float] = None
+
+
+class UpcomingAvailabilityResponse(Attribution):
+    area_name_norm: str
+    area_name_display: str
+    window_days: int  # 30 / 60 / 90
+    horizon_month_end: str  # 'YYYY-MM'
+    total_expiring: int
+    total_estimated_available: int
+    by_sub_type: List[UpcomingAvailabilityItem]
+
+
+class LeaseExpiryMonthBucket(BaseModel):
+    expiry_month: str  # 'YYYY-MM'
+    contract_count: int
+    estimated_available: int
+    avg_last_rent: Optional[float] = None
+    renewal_probability_pct: Optional[float] = None
+
+
+class BuildingLeaseExpiryResponse(Attribution):
+    building_id: UUID
+    project_name: Optional[str] = None
+    area_name: Optional[str] = None
+    months: List[LeaseExpiryMonthBucket]
+    total_expiring: int
+    total_estimated_available: int

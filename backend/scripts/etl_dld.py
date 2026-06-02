@@ -19,7 +19,6 @@ import argparse
 import collections
 import csv
 import datetime as dt
-import glob
 import os
 import re
 import statistics
@@ -27,6 +26,17 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Optional
+
+# Local shared module — same directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _dld_category import (  # noqa: E402
+    RESIDENTIAL_AMOUNT_MIN,
+    RESIDENTIAL_CATEGORIES,
+    classify_property,
+    is_bulk_contract,
+    is_residential,
+    residential_amount_cap,
+)
 
 DATA_DIR = Path(os.environ.get("DLD_DATA_DIR", str(Path.home() / "dld-data")))
 TODAY = dt.date(2026, 6, 1)
@@ -127,29 +137,124 @@ def load_csv(path: Path):
         yield from csv.DictReader(f)
 
 
-def load_rents_deduped() -> list[dict]:
-    rent_files = sorted(glob.glob(str(DATA_DIR / "rents-2026-06-01*.csv")))
-    seen: set[tuple] = set()
-    rows: list[dict] = []
-    for p in rent_files:
-        for row in load_csv(Path(p)):
-            key = tuple(row.values())
-            if key in seen:
+def load_rents_categorized(years: tuple[int, ...] = (2025, 2026)) -> dict[str, list[dict]]:
+    """Stream rents_2021_2026.csv (NEW 41-column schema), classify each row
+    by property_category, and split into per-category lists.
+
+    Each surviving row is annotated with:
+        row["_category"]       — apartment / villa / hotel_apt / labor_camp /
+                                 office / retail / warehouse / whole_building /
+                                 other
+        row["_is_person"]      — True when tenant_type_en == 'Person'
+        row["_is_bulk"]        — bulk-contract flag (see _dld_category)
+
+    Residential rows are additionally subject to the 10K-500K annual_amount
+    cap (except villas — they retain higher amounts and just get bulk-flagged
+    when no_of_prop > 1). This is the snapshot ETL; the historical ETL applies
+    the same taxonomy across 2021-2026.
+    """
+    path = DATA_DIR / "rents_2021_2026.csv"
+    if not path.exists():
+        raise SystemExit(f"NEW rents source not found: {path}")
+
+    years_set = {str(y) for y in years}
+    buckets: dict[str, list[dict]] = collections.defaultdict(list)
+    seen_total = 0
+    seen_authority = 0
+    seen_amount_out_of_band = 0
+
+    with open(path, encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            date = (row.get("contract_start_date") or "")[:4]
+            if date not in years_set:
                 continue
-            seen.add(key)
-            rows.append(row)
-    return rows
+            seen_total += 1
+
+            category = classify_property(
+                row.get("ejari_property_type_en"),
+                row.get("ejari_property_sub_type_en"),
+                row.get("ejari_bus_property_type_en"),
+            )
+
+            tenant = (row.get("tenant_type_en") or "").strip()
+            is_person = tenant == "Person"
+            if tenant == "Authority":
+                seen_authority += 1
+
+            amt = parse_float(row.get("annual_amount"))
+            nprop = parse_int(row.get("no_of_prop"))
+            bulk = is_bulk_contract(category, amt, nprop)
+
+            # Residential per-category caps. Apartment 10K-2M, Villa 10K-5M,
+            # Hotel Apt 10K-3M. Generous enough to keep Burj Khalifa-tier
+            # penthouses, Palm villas, and 5* serviced apartments in the
+            # residential pool.
+            if is_residential(category):
+                if amt is None:
+                    continue
+                if amt < RESIDENTIAL_AMOUNT_MIN:
+                    seen_amount_out_of_band += 1
+                    continue
+                cap = residential_amount_cap(category)
+                if cap is not None and amt > cap:
+                    seen_amount_out_of_band += 1
+                    continue
+
+            row["_category"] = category
+            row["_is_person"] = is_person
+            row["_is_bulk"] = bulk
+            buckets[category].append(row)
+
+    summary = ", ".join(
+        f"{k}={len(v):,}" for k, v in sorted(buckets.items()) if v
+    )
+    print(
+        f"[etl] rent classify: scanned {seen_total:,} in years {years_set} | "
+        f"by category: {summary} | "
+        f"dropped {seen_amount_out_of_band:,} residential amounts outside per-category caps "
+        f"(apt 10K-2M, villa 10K-5M, hotel_apt 10K-3M) | "
+        f"Authority tenants seen: {seen_authority:,} (kept tagged for audit)",
+        flush=True,
+    )
+    return buckets
+
+
+def residential_person_rents(
+    buckets: dict[str, list[dict]],
+    include_bulk: bool = False,
+) -> list[dict]:
+    """Subset = apartment+villa+hotel_apt where _is_person=True (and
+    optionally non-bulk). This is the canonical input for area_metrics,
+    buildings, and the residential benchmark cells we actually trust.
+    """
+    out: list[dict] = []
+    for cat in RESIDENTIAL_CATEGORIES:
+        for r in buckets.get(cat, []):
+            if not r.get("_is_person"):
+                continue
+            if not include_bulk and r.get("_is_bulk"):
+                continue
+            out.append(r)
+    return out
 
 
 # ---------------------------------------------------------------------------
 # Compute area display names — pick the best Title-Case form per norm key
 # ---------------------------------------------------------------------------
 
-def collect_areas(*sources: list[dict], col: str = "AREA_EN") -> dict[str, str]:
-    """Returns {name_norm: name_display} — display is best Title-Case observed."""
+def collect_areas(
+    *sources: tuple[list[dict], str],
+) -> dict[str, str]:
+    """Returns {name_norm: name_display} — display is best Title-Case observed.
+
+    Each source is a tuple of (rows, column_name) since the OLD-schema CSVs
+    (transactions, buildings, lands) use AREA_EN while the NEW-schema rents
+    file uses area_name_en.
+    """
     counts: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
-    for src in sources:
-        for row in src:
+    for rows, col in sources:
+        for row in rows:
             v = (row.get(col) or "").strip()
             if not v:
                 continue
@@ -197,17 +302,17 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
             continue
         sales_ppsf[area].append(ppsf)
 
-    # Rents 2026: annual rent + annual rent per sqft
+    # Rents 2026: annual rent + annual rent per sqft (NEW schema column names)
     rent_amounts: dict[str, list[float]] = collections.defaultdict(list)
     rent_ppsf: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2026: dict[str, int] = collections.Counter()
     for r in rents_2026:
-        area = norm(r.get("AREA_EN"))
+        area = norm(r.get("area_name_en"))
         if not area:
             continue
         rent_count_2026[area] += 1
-        amt = parse_float(r.get("ANNUAL_AMOUNT"))
-        a = parse_float(r.get("ACTUAL_AREA"))
+        amt = parse_float(r.get("annual_amount"))
+        a = parse_float(r.get("actual_area"))
         if amt is None or amt <= 0:
             continue
         rent_amounts[area].append(amt)
@@ -220,12 +325,12 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
     rent_ppsf_2025: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2025: dict[str, int] = collections.Counter()
     for r in rents_2025:
-        area = norm(r.get("AREA_EN"))
+        area = norm(r.get("area_name_en"))
         if not area:
             continue
         rent_count_2025[area] += 1
-        amt = parse_float(r.get("ANNUAL_AMOUNT"))
-        a = parse_float(r.get("ACTUAL_AREA"))
+        amt = parse_float(r.get("annual_amount"))
+        a = parse_float(r.get("actual_area"))
         if amt is None or a is None or amt <= 0 or a <= 0:
             continue
         ppsf = amt / a
@@ -272,15 +377,17 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
 # ---------------------------------------------------------------------------
 
 def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
-    # Index rents by (area_norm, project_en) to find per-building rents
+    # Index rents by (area_norm, project_name_en) to find per-building rents.
+    # buildings CSV (OLD schema) still uses PROJECT_EN/AREA_EN; rents (NEW
+    # schema) uses project_name_en/area_name_en — case-insensitive match.
     proj_rents: dict[tuple[str, str], list[tuple[float, float]]] = collections.defaultdict(list)
     for r in rents_2026:
-        proj = (r.get("PROJECT_EN") or "").strip()
-        area = norm(r.get("AREA_EN"))
+        proj = (r.get("project_name_en") or "").strip()
+        area = norm(r.get("area_name_en"))
         if not proj or not area:
             continue
-        amt = parse_float(r.get("ANNUAL_AMOUNT"))
-        a = parse_float(r.get("ACTUAL_AREA"))
+        amt = parse_float(r.get("annual_amount"))
+        a = parse_float(r.get("actual_area"))
         if amt is None or amt <= 0:
             continue
         proj_rents[(area, proj.strip().lower())].append((amt, a or 0))
@@ -332,33 +439,50 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
 # Rent benchmarks by (area, prop_sub_type, size_band)
 # ---------------------------------------------------------------------------
 
-def compute_benchmarks(rents_2026: list[dict]):
-    bucket: dict[tuple[str, str, str], list[tuple[float, float]]] = collections.defaultdict(list)
-    for r in rents_2026:
-        area = norm(r.get("AREA_EN"))
-        pst = (r.get("PROP_SUB_TYPE_EN") or "").strip()
-        if not area or not pst:
-            continue
-        amt = parse_float(r.get("ANNUAL_AMOUNT"))
-        sq = parse_float(r.get("ACTUAL_AREA"))
-        if amt is None or amt <= 0 or sq is None or sq <= 0:
-            continue
-        band = size_band_of(sq)
-        if not band:
-            continue
-        ppsf = amt / sq
-        if not (10 <= ppsf <= 5000):
-            continue
-        bucket[(area, pst, band)].append((amt, ppsf))
+def compute_benchmarks(buckets: dict[str, list[dict]]):
+    """Compute per-(area, sub_type, size_band, category, is_bulk) rent
+    benchmarks across the residential categories.
+
+    Bulk-flagged contracts get their own cells rather than being dropped —
+    consumer-facing UI should query is_bulk_contract=false; B2B can opt in.
+    """
+    bucket: dict[
+        tuple[str, str, str, str, bool],
+        list[tuple[float, float]],
+    ] = collections.defaultdict(list)
+
+    for category in RESIDENTIAL_CATEGORIES:
+        for r in buckets.get(category, []):
+            if not r.get("_is_person"):
+                continue
+            area = norm(r.get("area_name_en"))
+            pst = (r.get("ejari_property_sub_type_en") or "").strip()
+            if not area or not pst:
+                continue
+            amt = parse_float(r.get("annual_amount"))
+            sq = parse_float(r.get("actual_area"))
+            if amt is None or amt <= 0 or sq is None or sq <= 0:
+                continue
+            band = size_band_of(sq)
+            if not band:
+                continue
+            ppsf = amt / sq
+            if not (10 <= ppsf <= 5000):
+                continue
+            is_bulk = bool(r.get("_is_bulk"))
+            bucket[(area, pst, band, category, is_bulk)].append((amt, ppsf))
 
     out: list[dict] = []
-    for (area, pst, band), pairs in bucket.items():
+    for (area, pst, band, category, is_bulk), pairs in bucket.items():
         if len(pairs) < MIN_BENCHMARK_SAMPLES:
             continue
         amts = sorted(p[0] for p in pairs)
         ppsfs = sorted(p[1] for p in pairs)
         out.append(dict(
             area_norm=area, prop_sub_type=pst, size_band=band,
+            property_usage="Residential",
+            property_category=category,
+            is_bulk_contract=is_bulk,
             sample_count=len(pairs),
             p10_annual_rent=percentile(amts, 0.10),
             p25_annual_rent=percentile(amts, 0.25),
@@ -541,6 +665,9 @@ def write_to_db(
                 continue
             rows.append((
                 str(uuid.uuid4()), aid, bm["prop_sub_type"], bm["size_band"], "2026",
+                bm["property_usage"],
+                bm["property_category"],
+                bm["is_bulk_contract"],
                 bm["sample_count"],
                 bm["p10_annual_rent"], bm["p25_annual_rent"], bm["median_annual_rent"],
                 bm["p75_annual_rent"], bm["p90_annual_rent"],
@@ -550,7 +677,8 @@ def write_to_db(
             cur,
             """
             INSERT INTO dld_rent_benchmarks (id, dld_area_id,
-                prop_sub_type, size_band, period, sample_count,
+                prop_sub_type, size_band, period, property_usage,
+                property_category, is_bulk_contract, sample_count,
                 p10_annual_rent, p25_annual_rent, median_annual_rent,
                 p75_annual_rent, p90_annual_rent,
                 p25_rent_per_sqft, median_rent_per_sqft, p75_rent_per_sqft)
@@ -667,48 +795,81 @@ def main():
     # --- Load
     print("[etl] loading CSVs...", flush=True)
     txns = list(load_csv(DATA_DIR / "transactions-2026-06-01.csv"))
-    rents_all = load_rents_deduped()
-    rents_2026 = [r for r in rents_all if (r.get("START_DATE") or "")[:4] == "2026"]
-    rents_2025 = [r for r in rents_all if (r.get("START_DATE") or "")[:4] == "2025"]
+    # NEW: single canonical rent source, fully classified into property
+    # categories at stream time. Residential subset feeds area_metrics +
+    # buildings + benchmarks; commercial / labor_camp are written by the
+    # historical ETL.
+    rent_buckets_all = load_rents_categorized(years=(2025, 2026))
+
+    # Split by year for YoY math on the residential person + non-bulk subset.
+    def _yr(buckets: dict[str, list[dict]], y: str) -> list[dict]:
+        out: list[dict] = []
+        for rows in buckets.values():
+            out.extend(r for r in rows if (r.get("contract_start_date") or "")[:4] == y)
+        return out
+
+    rents_2026_all = _yr(rent_buckets_all, "2026")
+    rents_2025_all = _yr(rent_buckets_all, "2025")
+
+    # The 2026 residential snapshot used for area_metrics / buildings is
+    # Person + non-bulk only — the cleanest "what a private tenant paid" view.
+    buckets_2026 = {c: [r for r in rs if (r.get("contract_start_date") or "")[:4] == "2026"]
+                    for c, rs in rent_buckets_all.items()}
+    buckets_2025 = {c: [r for r in rs if (r.get("contract_start_date") or "")[:4] == "2025"]
+                    for c, rs in rent_buckets_all.items()}
+    rents_2026_resi = residential_person_rents(buckets_2026, include_bulk=False)
+    rents_2025_resi = residential_person_rents(buckets_2025, include_bulk=False)
+
     buildings = list(load_csv(DATA_DIR / "buildings-2026-06-01.csv"))
     lands = list(load_csv(DATA_DIR / "lands-2026-06-01.csv"))
     brokers_raw = list(load_csv(DATA_DIR / "brokers-2026-06-01.csv"))
 
     print(f"[etl]   transactions: {len(txns):,}", flush=True)
-    print(f"[etl]   rents (dedup): {len(rents_all):,} → 2026={len(rents_2026):,} 2025={len(rents_2025):,}", flush=True)
+    print(
+        f"[etl]   rents: 2026 all={len(rents_2026_all):,} residential-person-nonbulk={len(rents_2026_resi):,} | "
+        f"2025 all={len(rents_2025_all):,} residential-person-nonbulk={len(rents_2025_resi):,}",
+        flush=True,
+    )
     print(f"[etl]   buildings: {len(buildings):,}", flush=True)
     print(f"[etl]   lands: {len(lands):,}", flush=True)
     print(f"[etl]   brokers: {len(brokers_raw):,}", flush=True)
 
-    # --- Areas
-    areas = collect_areas(txns, rents_2026, rents_2025, buildings, lands)
+    # --- Areas (OLD-schema sources use AREA_EN; NEW-schema rents use area_name_en)
+    areas = collect_areas(
+        (txns, "AREA_EN"),
+        (rents_2026_all, "area_name_en"),
+        (rents_2025_all, "area_name_en"),
+        (buildings, "AREA_EN"),
+        (lands, "AREA_EN"),
+    )
     print(f"[etl] canonical DLD areas: {len(areas):,}", flush=True)
 
-    # --- Area counts
+    # --- Area counts. Residential-person-nonbulk counts feed dld_areas so
+    # the "how much real signal do we have here" stat is honest.
     area_counts = {
         "txn": collections.Counter(norm(r.get("AREA_EN")) for r in txns),
-        "rent_2026": collections.Counter(norm(r.get("AREA_EN")) for r in rents_2026),
-        "rent_2025": collections.Counter(norm(r.get("AREA_EN")) for r in rents_2025),
+        "rent_2026": collections.Counter(norm(r.get("area_name_en")) for r in rents_2026_resi),
+        "rent_2025": collections.Counter(norm(r.get("area_name_en")) for r in rents_2025_resi),
         "building": collections.Counter(norm(r.get("AREA_EN")) for r in buildings),
         "land": collections.Counter(norm(r.get("AREA_EN")) for r in lands),
     }
     for k in area_counts:
         area_counts[k].pop("", None)
 
-    # --- Metrics
-    metrics, _rc25 = compute_area_metrics(txns, rents_2026, rents_2025)
+    # --- Metrics (residential Person non-bulk only)
+    metrics, _rc25 = compute_area_metrics(txns, rents_2026_resi, rents_2025_resi)
     print(f"[etl] area metrics computed: {len(metrics):,}", flush=True)
 
-    # --- Buildings
-    bldg_rows = compute_buildings(buildings, rents_2026)
+    # --- Buildings (residential Person non-bulk only)
+    bldg_rows = compute_buildings(buildings, rents_2026_resi)
 
     # --- Brokers
     broker_rows = compute_brokers(brokers_raw)
     active = sum(1 for b in broker_rows if b["is_active"])
     print(f"[etl] brokers (deduped): {len(broker_rows):,} | active today: {active:,}", flush=True)
 
-    # --- Benchmarks
-    bench = compute_benchmarks(rents_2026)
+    # --- Benchmarks (all residential categories × Person × {bulk, non-bulk})
+    bench = compute_benchmarks(buckets_2026)
     print(f"[etl] rent benchmark cells (n>={MIN_BENCHMARK_SAMPLES}): {len(bench):,}", flush=True)
 
     # --- Summary preview

@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaYieldHistory } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
@@ -139,6 +139,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     ? await getDldAreaYieldHistory(area.dld.dld_name.toLowerCase()).catch(
         () => null
       )
+    : null;
+
+  // Upcoming availability over the next 90 days (Availability Tracker).
+  // Hidden when the area has no Person residential leases ending in the window.
+  const upcomingAvailability = area.dld?.dld_name
+    ? await getDldAreaUpcomingAvailability(
+        area.dld.dld_name.toLowerCase(),
+        90,
+      ).catch(() => null)
     : null;
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
@@ -708,6 +717,79 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             </section>
           );
         })()}
+
+        {/* Upcoming availability (next 90 days) — from Availability Tracker */}
+        {upcomingAvailability && upcomingAvailability.total_expiring > 0 && (
+          <section
+            id="upcoming-availability"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                Upcoming availability ·{' '}
+                {upcomingAvailability.window_days} days
+              </span>
+              <span className="text-[11px] text-fg-subtle">
+                horizon: {upcomingAvailability.horizon_month_end}
+              </span>
+            </div>
+            <div className="px-4 py-3 text-[11px] text-fg-muted border-b border-border">
+              {upcomingAvailability.total_expiring.toLocaleString()} Person
+              residential contracts expire by{' '}
+              {upcomingAvailability.horizon_month_end} — roughly{' '}
+              <span className="text-fg font-mono">
+                {upcomingAvailability.total_estimated_available.toLocaleString()}
+              </span>{' '}
+              units likely to come back on the market (39% non-renewal blend).
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-fg-subtle border-b border-border bg-bg-elev/40">
+                    <th className="py-2 px-3 font-medium">Type</th>
+                    <th className="py-2 px-3 font-medium">Expiring</th>
+                    <th className="py-2 px-3 font-medium">Est. available</th>
+                    <th className="py-2 px-3 font-medium">Avg last rent</th>
+                    <th className="py-2 px-3 font-medium">Renewal prob.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcomingAvailability.by_sub_type.map((it) => (
+                    <tr
+                      key={it.property_sub_type}
+                      className="border-b border-border/40"
+                    >
+                      <td className="py-2 px-3 font-medium text-fg">
+                        {it.property_sub_type}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-fg">
+                        {it.contract_count.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-accent">
+                        {it.estimated_available.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-fg-muted">
+                        {it.avg_last_rent != null
+                          ? `AED ${Math.round(it.avg_last_rent).toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-fg-muted">
+                        {it.renewal_probability_pct != null
+                          ? `${it.renewal_probability_pct.toFixed(0)}%`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
+              Source: DLD Ejari lease end dates. Estimated availability uses a
+              blended 39% non-renewal rate; per-row renewal probability blends
+              historical Person+Renew (61%) vs Person+New (45%).
+            </div>
+          </section>
+        )}
 
         {/* Top buildings in this area — Building X-Ray integration */}
         {topBuildings && topBuildings.items.length > 0 && (
