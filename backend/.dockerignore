@@ -1,15 +1,51 @@
-venv/
+# Python build artefacts
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
 *.so
+.Python
+*.egg-info/
+build/
+dist/
+
+# Local dev
+venv/
+.venv/
 .env
 .env.local
-.git
-.gitignore
+.env.*.local
+.env.backup
+
+# Tooling caches
 .pytest_cache/
-.coverage
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Version control + editor
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+
+# Docs / repo chrome
 README.md
+*.md
+LICENSE
+
+# Test/scripts not needed at runtime — the entrypoint only runs alembic
+# upgrade + uvicorn; ETL scripts are run from the host, not from the image.
+tests/
+scripts/
+
+# Data files
+dld-data/
+*.csv
+*.csv.gz
+*.parquet
+*.log
+
+# OS detritus
+.DS_Store
+Thumbs.db

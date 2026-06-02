@@ -4,18 +4,24 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+# Lockfile only — npm install only re-runs when these change
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # ---------- builder ----------
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# Source last — code edits don't invalidate node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_URL=https://api.floxcy.com
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# .next/cache mount lets webpack reuse module + babel transforms across
+# deploys; first deploy is unchanged, subsequent ones get the speedup.
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
 # ---------- runner ----------
 FROM node:20-alpine AS runner

@@ -1,0 +1,56 @@
+# Root-level dockerignore — applies when Coolify (or any tool) builds with
+# the repo root as the build context. Per-app Dockerfiles also have their
+# own .dockerignore for finer control.
+
+# Python
+__pycache__/
+*.py[cod]
+backend/venv/
+backend/.venv/
+backend/.env
+backend/.env.backup
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.coverage
+
+# Node
+node_modules/
+**/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+
+# Stray root-level node files (from a prior session)
+package.json
+package-lock.json
+
+# Git + editor
+.git/
+.gitignore
+.gitattributes
+.github/
+.idea/
+.vscode/
+.claude/
+
+# Local data sources — never want these in the build context
+dld-data/
+*.csv
+*.csv.gz
+*.parquet
+*.log
+
+# Docs/chrome that don't belong in any image
+README.md
+CLAUDE.md
+docs/
+memory/
+
+# Test directories
+backend/tests/
+frontend/tests/
+
+# OS detritus
+.DS_Store
+Thumbs.db

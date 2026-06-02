@@ -1,28 +1,27 @@
+# syntax=docker/dockerfile:1.6
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# System deps — own layer so apt cache survives code-only changes
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for caching)
+# Requirements first, isolated layer — only re-runs when requirements.txt
+# changes. BuildKit pip cache mount makes rebuilds even faster.
 COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy application + alembic (migrations are bundled so the entrypoint
-# can run `alembic upgrade head` before starting uvicorn).
+# App + migrations + entrypoint last — every code change invalidates only
+# from here down. Everything above is cached across commits.
 COPY ./app ./app
 COPY ./alembic ./alembic
 COPY ./alembic.ini ./alembic.ini
-
-# Entrypoint script: run migrations, then start uvicorn
 COPY ./entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
