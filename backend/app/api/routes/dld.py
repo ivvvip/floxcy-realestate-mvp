@@ -190,18 +190,52 @@ async def list_canonical_areas(
         description="Filter to areas seen in this dataset: "
                     "'transactions' | 'rents' | 'lands'.",
     ),
+    only_with_coords: bool = Query(
+        False,
+        description="Drop areas without geocoded coordinates. Use for the "
+                    "map UI, which can't render markers without lat/lng.",
+    ),
+    only_with_polygon: bool = Query(
+        False,
+        description="Drop areas without a GeoJSON polygon shape. Use for "
+                    "choropleth / heatmap views that need real boundaries.",
+    ),
 ):
-    """The single source of truth for area names. Sorted A→Z."""
+    """The single source of truth for area names. Sorted A→Z.
+
+    Coords + polygon are populated by `scripts/overpass_geocoding.py` and
+    `scripts/improve_geocoding.py` from OSM. Coverage as of the last run
+    is reported in the response (`coords_coverage`, `polygon_coverage`).
+    """
     stmt = select(DldCanonicalArea).where(
         DldCanonicalArea.occurrence_count >= min_occurrences
     )
     if source:
         # JSONB contains check — Postgres-native
         stmt = stmt.where(DldCanonicalArea.source_datasets.contains([source]))
+    if only_with_coords:
+        stmt = stmt.where(
+            DldCanonicalArea.latitude.is_not(None),
+            DldCanonicalArea.longitude.is_not(None),
+        )
+    if only_with_polygon:
+        stmt = stmt.where(DldCanonicalArea.polygon.is_not(None))
     stmt = stmt.order_by(DldCanonicalArea.area_name)
     rows = (await db.execute(stmt)).scalars().all()
-    items = [
-        CanonicalAreaItem(
+
+    items: list[CanonicalAreaItem] = []
+    coords_n = poly_n = 0
+    for r in rows:
+        bbox = None
+        if (r.bbox_north is not None and r.bbox_south is not None
+                and r.bbox_east is not None and r.bbox_west is not None):
+            bbox = {"north": r.bbox_north, "south": r.bbox_south,
+                    "east": r.bbox_east, "west": r.bbox_west}
+        if r.latitude is not None and r.longitude is not None:
+            coords_n += 1
+        if r.polygon is not None:
+            poly_n += 1
+        items.append(CanonicalAreaItem(
             id=r.id,
             area_name=r.area_name,
             area_name_upper=r.area_name_upper,
@@ -210,12 +244,18 @@ async def list_canonical_areas(
             source_datasets=list(r.source_datasets) if r.source_datasets else [],
             first_seen_year=r.first_seen_year,
             occurrence_count=int(r.occurrence_count or 0),
-        )
-        for r in rows
-    ]
+            latitude=r.latitude,
+            longitude=r.longitude,
+            bbox=bbox,
+            polygon=r.polygon,
+            coords_source=r.coords_source,
+            coords_confidence=r.coords_confidence,
+        ))
     return CanonicalAreasResponse(
         count=len(items),
         min_occurrences=min_occurrences,
+        coords_coverage=coords_n,
+        polygon_coverage=poly_n,
         items=items,
     )
 

@@ -147,6 +147,15 @@ class TopAppreciationResponse(Attribution):
 # Market overview — homepage KPI tiles
 # ---------------------------------------------------------------------------
 
+class CanonicalAreaBbox(BaseModel):
+    """Geographic bounding box. All four required when present so the client
+    doesn't need to defend against half-populated boxes."""
+    north: float
+    south: float
+    east: float
+    west: float
+
+
 class CanonicalAreaItem(BaseModel):
     id: UUID
     area_name: str
@@ -156,11 +165,24 @@ class CanonicalAreaItem(BaseModel):
     source_datasets: List[str]
     first_seen_year: Optional[int] = None
     occurrence_count: int
+    # Geocoding payload — populated by scripts/overpass_geocoding.py +
+    # scripts/improve_geocoding.py. ~86% of canonical areas have coords;
+    # the rest are niche DLD admin sectors with no OSM presence.
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    bbox: Optional[CanonicalAreaBbox] = None
+    # GeoJSON Polygon / MultiPolygon for map rendering. Coverage ~49% —
+    # only areas matched against OSM admin boundaries have a polygon.
+    polygon: Optional[dict] = None
+    coords_source: Optional[str] = None
+    coords_confidence: Optional[str] = None
 
 
 class CanonicalAreasResponse(Attribution):
     count: int
     min_occurrences: int
+    coords_coverage: int  # how many items in this response have lat/lng
+    polygon_coverage: int  # how many items have a polygon shape
     items: List[CanonicalAreaItem]
 
 

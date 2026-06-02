@@ -282,6 +282,8 @@ class DldCanonicalArea(Base):
     bbox_west: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     coords_source: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     coords_confidence: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    # GeoJSON polygon shape from OSM Overpass (Polygon or MultiPolygon)
+    polygon: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
