@@ -197,13 +197,23 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
     { label: 'Type', render: (a) => <span className="pill">{a.area_type}</span> },
     {
       label: 'AED / sqft',
-      render: (a) => formatNumber(a.latest_price_per_sqft, 0),
+      render: (a) =>
+        a.latest_price_per_sqft != null
+          ? formatNumber(a.latest_price_per_sqft, 0)
+          : '—',
     },
     {
       label: 'Avg sale price',
-      render: (a) => formatAED(a.latest_sale_price, { compact: true }),
+      render: (a) =>
+        a.latest_sale_price != null
+          ? formatAED(a.latest_sale_price, { compact: true })
+          : '—',
     },
-    { label: 'Yield', render: (a) => formatPercent(a.latest_yield, 2) },
+    {
+      label: 'Yield',
+      render: (a) =>
+        a.latest_yield != null ? formatPercent(a.latest_yield, 2) : '—',
+    },
     {
       label: '1Y appreciation',
       render: (a) => <DataBadge value={a.appreciation_1y} format="percent" />,
@@ -325,7 +335,7 @@ function PriceOverlay({ areas }: { areas: CompareAreaData[] }) {
           {areas.map((a) => {
             const first = a.history[0]?.avg_price_per_sqft;
             const last = a.history[a.history.length - 1]?.avg_price_per_sqft;
-            const delta = first ? ((last - first) / first) * 100 : null;
+            const delta = first && last ? ((last - first) / first) * 100 : null;
             return (
               <div
                 key={a.id}
@@ -334,7 +344,9 @@ function PriceOverlay({ areas }: { areas: CompareAreaData[] }) {
                 <div className="min-w-0">
                   <div className="text-fg truncate">{a.name}</div>
                   <div className="tabular text-fg-subtle">
-                    {formatNumber(a.latest_price_per_sqft, 0)} AED/sqft
+                    {a.latest_price_per_sqft != null
+                      ? `${formatNumber(a.latest_price_per_sqft, 0)} AED/sqft`
+                      : 'Limited data'}
                   </div>
                 </div>
                 <DataBadge value={delta} format="percent" precision={1} />

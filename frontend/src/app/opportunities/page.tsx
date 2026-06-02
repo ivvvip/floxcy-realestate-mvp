@@ -41,8 +41,8 @@ export default async function OpportunitiesPage() {
                   </h1>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted max-w-2xl">
-                  AI-derived market signals across 70 Dubai areas, alongside
-                  curated deals from verified investment specialists. Every
+                  AI-derived market signals across 70 curated Dubai areas,
+                  alongside deals from verified investment specialists. Every
                   signal is reproducible — see{' '}
                   <Link href="/methodology" className="text-accent hover:underline">
                     methodology
@@ -50,6 +50,22 @@ export default async function OpportunitiesPage() {
                   .
                 </p>
               </div>
+              <Link
+                href="/areas"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3.5 text-xs font-medium text-accent hover:bg-accent/20"
+              >
+                Explore all 362 DLD areas →
+              </Link>
+            </div>
+            <div className="mt-3 rounded border border-border bg-bg-card/50 px-3 py-2 text-[11px] text-fg-subtle">
+              <span className="font-medium text-fg">Note on coverage:</span>{' '}
+              opportunity scoring runs on the 70 curated areas with full
+              MarketSnapshot history. To browse the other 292 DLD-tracked
+              areas (which have rent/sales data but no Floxcy scoring yet),{' '}
+              <Link href="/areas" className="text-accent hover:underline">
+                use the Areas screener
+              </Link>
+              . We don&apos;t fabricate scores where we lack the history.
             </div>
           </div>
         </Container>

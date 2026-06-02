@@ -30,17 +30,19 @@ class CompareAreaData(BaseModel):
     name: str
     name_arabic: Optional[str] = None
     area_type: str
-    latest_price_per_sqft: float
-    latest_yield: float
-    latest_sale_price: float
+    # All curated metrics now optional — DLD-only areas have none of these
+    latest_price_per_sqft: Optional[float] = None
+    latest_yield: Optional[float] = None
+    latest_sale_price: Optional[float] = None
     appreciation_1y: Optional[float] = None
     appreciation_3y: Optional[float] = None
     occupancy_rate: Optional[float] = None
     demand_score: Optional[float] = None
     risk_score: Optional[float] = None
     investment_score: Optional[float] = None
-    history: List[CompareSnapshotPoint]
+    history: List[CompareSnapshotPoint] = []
     dld: Optional[CompareDldBlock] = None
+    coverage_tier: str = "full"  # full | partial | limited
 
 
 class CompareResponse(BaseModel):

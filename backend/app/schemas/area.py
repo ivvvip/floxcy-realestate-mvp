@@ -106,6 +106,80 @@ class AreaDldBlock(BaseModel):
     confidence: str = "low"
 
 
+# -----------------------------------------------------------------------------
+# Universal area coverage — for the 362-area screener
+# -----------------------------------------------------------------------------
+
+class AreaCoverageItem(BaseModel):
+    """One row of the universal area list.
+
+    Curated areas keep their UUID and area_type. DLD-only areas use the
+    DldArea UUID and a default type. `slug` is always the URL-safe lookup
+    token (UUID for curated; name_norm for DLD-only so URLs read naturally
+    like /areas/business-bay).
+    """
+    id: UUID  # Area.id when curated, DldArea.id when DLD-only
+    slug: str
+    name: str
+    name_arabic: Optional[str] = None
+    area_type: str = "residential"
+    city: str = "Dubai"
+    emirate: str = "Dubai"
+    # Coverage tier: full → has MarketSnapshot AND solid DLD overlay
+    #                partial → has DLD metrics meeting confidence threshold
+    #                limited → has DLD metrics but thin samples
+    #                none    → DLD area exists but no metrics yet
+    coverage_tier: str = "none"
+    is_curated: bool = False
+    # Headline metrics so the screener can sort/filter without an N+1
+    median_price_per_sqft: Optional[float] = None
+    rental_yield_pct: Optional[float] = None
+    rent_growth_yoy_pct: Optional[float] = None
+    sales_count: int = 0
+    rent_count_2026: int = 0
+    investment_score: Optional[float] = None
+    appreciation_1y: Optional[float] = None
+
+
+class AreaCoverageResponse(BaseModel):
+    total: int
+    counts: Dict[str, int]  # by coverage_tier
+    items: List[AreaCoverageItem]
+    data_source: str = "Dubai Land Department Open Data + Floxcy curated set"
+    last_updated: str = "2026-06-01"
+
+
+# -----------------------------------------------------------------------------
+# Limited-data detail (for DLD-only areas in /areas/[slug])
+# -----------------------------------------------------------------------------
+
+class AreaLimitedDetail(BaseModel):
+    """Detail payload for a DLD-only area — no MarketSnapshot history."""
+    id: UUID
+    slug: str
+    name: str
+    coverage_tier: str = "limited"
+    dld: AreaDldBlock
+    data_source: str = "Dubai Land Department Open Data"
+    last_updated: str = "2026-06-01"
+
+
+# -----------------------------------------------------------------------------
+# Admin coverage stats
+# -----------------------------------------------------------------------------
+
+class AreaCoverageStats(BaseModel):
+    total_areas: int
+    curated_count: int
+    dld_only_count: int
+    by_tier: Dict[str, int]
+    samples_total_sales: int
+    samples_total_rents: int
+    area_gaps: List[str]  # DLD areas with zero metrics — sorted by name
+    data_source: str = "Dubai Land Department Open Data"
+    last_updated: str = "2026-06-01"
+
+
 class AreaDetailResponse(AreaResponse):
     """Area detail: base info + latest snapshot + 12-month history + DLD overlay."""
     latest: Optional[AreaLatestSnapshot] = None

@@ -43,6 +43,57 @@ export interface AreaStats {
   area_names: string[];
 }
 
+export type CoverageTier = 'full' | 'partial' | 'limited' | 'none';
+
+export interface AreaCoverageItem {
+  id: string;
+  slug: string;
+  name: string;
+  name_arabic: string | null;
+  area_type: string;
+  city: string;
+  emirate: string;
+  coverage_tier: CoverageTier;
+  is_curated: boolean;
+  median_price_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  sales_count: number;
+  rent_count_2026: number;
+  investment_score: number | null;
+  appreciation_1y: number | null;
+}
+
+export interface AreaCoverageResponse {
+  total: number;
+  counts: Record<CoverageTier, number>;
+  items: AreaCoverageItem[];
+  data_source: string;
+  last_updated: string;
+}
+
+export interface AreaCoverageStats {
+  total_areas: number;
+  curated_count: number;
+  dld_only_count: number;
+  by_tier: Record<CoverageTier, number>;
+  samples_total_sales: number;
+  samples_total_rents: number;
+  area_gaps: string[];
+  data_source: string;
+  last_updated: string;
+}
+
+export interface AreaLimitedDetail {
+  id: string;
+  slug: string;
+  name: string;
+  coverage_tier: CoverageTier;
+  dld: AreaDldBlock;
+  data_source: string;
+  last_updated: string;
+}
+
 export interface AreaSnapshotPoint {
   snapshot_date: string;
   avg_price_per_sqft: number;
@@ -142,9 +193,10 @@ export interface CompareAreaData {
   name: string;
   name_arabic: string | null;
   area_type: string;
-  latest_price_per_sqft: number;
-  latest_yield: number;
-  latest_sale_price: number;
+  // All curated metrics now nullable — DLD-only areas have none of these
+  latest_price_per_sqft: number | null;
+  latest_yield: number | null;
+  latest_sale_price: number | null;
   appreciation_1y: number | null;
   appreciation_3y: number | null;
   occupancy_rate: number | null;
@@ -153,6 +205,7 @@ export interface CompareAreaData {
   investment_score: number | null;
   history: CompareSnapshotPoint[];
   dld?: CompareDldBlock | null;
+  coverage_tier?: CoverageTier;
 }
 
 export interface CompareResponse {

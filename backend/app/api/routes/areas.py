@@ -1,8 +1,8 @@
 """Areas API endpoints."""
 from uuid import UUID
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from typing import List, Optional, Union
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit_dependency
@@ -12,6 +12,10 @@ from app.models.dld import DldArea, DldAreaMetrics
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.area import (
     AreaResponse,
+    AreaCoverageItem,
+    AreaCoverageResponse,
+    AreaCoverageStats,
+    AreaLimitedDetail,
     AreaStatsResponse,
     AreaDetailResponse,
     AreaDldBlock,
@@ -21,6 +25,30 @@ from app.schemas.area import (
 )
 from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield, confidence_for
 from app.services.confidence import build_confidence_report, confidence_to_dict
+
+
+def _coverage_tier(
+    is_curated: bool,
+    has_snapshot: bool,
+    sales: int,
+    rents: int,
+) -> str:
+    """Classify each area for the coverage screener and limited-data badges."""
+    if is_curated and has_snapshot:
+        return "full"
+    total = sales + rents
+    if total >= 100:
+        return "partial"
+    if total > 0:
+        return "limited"
+    return "none"
+
+
+def _parse_uuid(s: str) -> Optional[UUID]:
+    try:
+        return UUID(s)
+    except (ValueError, AttributeError):
+        return None
 
 router = APIRouter(
     prefix="/api/v1/areas",
@@ -106,6 +134,205 @@ async def list_areas(db: AsyncSession = Depends(get_db)):
     return items
 
 
+@router.get("/all", response_model=AreaCoverageResponse)
+async def list_all_areas(
+    db: AsyncSession = Depends(get_db),
+    area_type: Optional[str] = Query(None, description="residential | commercial | mixed"),
+    sort_by: str = Query(
+        "rent_count",
+        description="rent_count | investment_score | yield | name",
+    ),
+    min_samples: int = Query(0, ge=0, description="Filter areas with sales+rents below this"),
+    coverage_tier: Optional[str] = Query(None, description="full | partial | limited | none"),
+):
+    """Universal 362-area screener — every DLD area plus curated extras.
+
+    Returns rows tagged with `coverage_tier` so the frontend can render
+    'Limited data' / 'Data coming soon' badges without faking metrics.
+    Sort + filter happen in Python because the dataset is small (≤500 rows)
+    and the curated-vs-DLD merge would otherwise need a UNION ALL.
+    """
+    # 1. Pull all DLD areas + their 2026-ytd metrics + their curated link
+    dld_rows = (
+        await db.execute(
+            select(DldArea, DldAreaMetrics, Area)
+            .outerjoin(
+                DldAreaMetrics,
+                and_(
+                    DldAreaMetrics.dld_area_id == DldArea.id,
+                    DldAreaMetrics.period == "2026-ytd",
+                ),
+            )
+            .outerjoin(Area, Area.id == DldArea.curated_area_id)
+        )
+    ).all()
+
+    # 2. Pull the latest MarketSnapshot per curated area (so we know which
+    #    curated areas have snapshot history — drives the 'full' tier)
+    latest_date_subq = (
+        select(
+            MarketSnapshot.area_id,
+            func.max(MarketSnapshot.snapshot_date).label("latest_date"),
+        )
+        .group_by(MarketSnapshot.area_id)
+        .subquery()
+    )
+    snap_rows = (
+        await db.execute(
+            select(Area, MarketSnapshot)
+            .join(MarketSnapshot, MarketSnapshot.area_id == Area.id)
+            .join(
+                latest_date_subq,
+                (latest_date_subq.c.area_id == MarketSnapshot.area_id)
+                & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
+            )
+        )
+    ).all()
+    snaps_by_area = {a.id: s for a, s in snap_rows}
+    seen_curated_ids: set[UUID] = set()
+
+    items: List[AreaCoverageItem] = []
+
+    # 3. Build a row per DLD area (one row per area; merge curated when linked)
+    for dld, metrics, area in dld_rows:
+        sales = int(metrics.sales_count or 0) if metrics else 0
+        rents = int(metrics.rent_count_2026 or 0) if metrics else 0
+        snap = snaps_by_area.get(area.id) if area else None
+        if area:
+            seen_curated_ids.add(area.id)
+        tier = _coverage_tier(
+            is_curated=area is not None,
+            has_snapshot=snap is not None,
+            sales=sales,
+            rents=rents,
+        )
+        median_ppsf = (
+            float(metrics.median_price_per_sqft)
+            if metrics and metrics.median_price_per_sqft is not None
+            else (float(snap.avg_price_per_sqft) if snap else None)
+        )
+        show_yield = None
+        if (metrics and metrics.rental_yield_pct is not None
+                and sales >= MIN_RELIABLE_SAMPLES
+                and rents >= MIN_RELIABLE_SAMPLES):
+            show_yield = cap_yield(float(metrics.rental_yield_pct))
+        elif snap and snap.rental_yield is not None:
+            show_yield = float(snap.rental_yield)
+        items.append(AreaCoverageItem(
+            id=area.id if area else dld.id,
+            slug=str(area.id) if area else dld.name_norm,
+            name=area.name if area else dld.name_display,
+            name_arabic=area.name_arabic if area else None,
+            area_type=area.area_type if area else "residential",
+            coverage_tier=tier,
+            is_curated=area is not None,
+            median_price_per_sqft=median_ppsf,
+            rental_yield_pct=show_yield,
+            rent_growth_yoy_pct=(
+                float(metrics.rent_growth_yoy_pct)
+                if metrics and metrics.rent_growth_yoy_pct is not None
+                else None
+            ),
+            sales_count=sales,
+            rent_count_2026=rents,
+            investment_score=float(snap.investment_score) if snap and snap.investment_score else None,
+            appreciation_1y=float(snap.appreciation_1y) if snap and snap.appreciation_1y else None,
+        ))
+
+    # 4. Catch any curated areas that have no DLD link (rare but possible)
+    curated_orphans = (
+        await db.execute(
+            select(Area).where(~Area.id.in_(seen_curated_ids))
+        )
+    ).scalars().all() if seen_curated_ids else (
+        await db.execute(select(Area))
+    ).scalars().all()
+    for area in curated_orphans:
+        snap = snaps_by_area.get(area.id)
+        tier = _coverage_tier(
+            is_curated=True, has_snapshot=snap is not None, sales=0, rents=0
+        )
+        items.append(AreaCoverageItem(
+            id=area.id,
+            slug=str(area.id),
+            name=area.name,
+            name_arabic=area.name_arabic,
+            area_type=area.area_type,
+            coverage_tier=tier,
+            is_curated=True,
+            median_price_per_sqft=float(snap.avg_price_per_sqft) if snap else None,
+            rental_yield_pct=float(snap.rental_yield) if snap and snap.rental_yield is not None else None,
+            investment_score=float(snap.investment_score) if snap and snap.investment_score else None,
+            appreciation_1y=float(snap.appreciation_1y) if snap and snap.appreciation_1y else None,
+        ))
+
+    # 5. Filter + sort in Python
+    if area_type:
+        items = [i for i in items if i.area_type == area_type]
+    if coverage_tier:
+        items = [i for i in items if i.coverage_tier == coverage_tier]
+    if min_samples > 0:
+        items = [i for i in items if (i.sales_count + i.rent_count_2026) >= min_samples]
+
+    def _sort_key(it: AreaCoverageItem):
+        # Always push 'none' tier to the bottom; sort within by the chosen key
+        tier_rank = {"full": 0, "partial": 1, "limited": 2, "none": 3}.get(it.coverage_tier, 4)
+        if sort_by == "investment_score":
+            return (tier_rank, -(it.investment_score or 0))
+        if sort_by == "yield":
+            return (tier_rank, -(it.rental_yield_pct or 0))
+        if sort_by == "name":
+            return (tier_rank, it.name.lower())
+        # default: rent_count desc (proxy for volume)
+        return (tier_rank, -(it.rent_count_2026 + it.sales_count))
+
+    items.sort(key=_sort_key)
+
+    counts: dict[str, int] = {}
+    for it in items:
+        counts[it.coverage_tier] = counts.get(it.coverage_tier, 0) + 1
+
+    return AreaCoverageResponse(total=len(items), counts=counts, items=items)
+
+
+@router.get("/coverage-stats", response_model=AreaCoverageStats)
+async def coverage_stats(db: AsyncSession = Depends(get_db)):
+    """Aggregate coverage health — used by the admin coverage panel."""
+    # Quick counts that don't need to load every row
+    total_curated = await db.scalar(select(func.count()).select_from(Area)) or 0
+    total_dld = await db.scalar(select(func.count()).select_from(DldArea)) or 0
+    samples = await db.execute(
+        select(
+            func.coalesce(func.sum(DldAreaMetrics.sales_count), 0),
+            func.coalesce(func.sum(DldAreaMetrics.rent_count_2026), 0),
+        ).where(DldAreaMetrics.period == "2026-ytd")
+    )
+    total_sales, total_rents = samples.one()
+
+    # Reuse the universal lister so the tier counts can't drift
+    coverage = await list_all_areas(
+        db=db, area_type=None, sort_by="rent_count", min_samples=0, coverage_tier=None
+    )
+
+    gaps = [
+        it.name for it in coverage.items
+        if it.coverage_tier == "none" and not it.is_curated
+    ]
+    gaps.sort()
+    # Distinct DLD-only areas
+    dld_only = sum(1 for it in coverage.items if not it.is_curated)
+
+    return AreaCoverageStats(
+        total_areas=coverage.total,
+        curated_count=int(total_curated),
+        dld_only_count=dld_only,
+        by_tier=coverage.counts,
+        samples_total_sales=int(total_sales),
+        samples_total_rents=int(total_rents),
+        area_gaps=gaps[:200],  # cap at 200 — admin panel doesn't need a full dump
+    )
+
+
 @router.get("/stats", response_model=AreaStatsResponse)
 async def get_areas_stats(db: AsyncSession = Depends(get_db)):
     """Aggregate stats — total reflects full DLD coverage, not just curated."""
@@ -174,17 +401,87 @@ async def area_confidence(area_id: UUID, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/{area_id}", response_model=AreaDetailResponse)
-async def get_area(area_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Get area detail including latest snapshot, 12-month history, and DLD overlay."""
-    result = await db.execute(select(Area).where(Area.id == area_id))
-    area = result.scalar_one_or_none()
+@router.get("/{slug}", response_model=Union[AreaDetailResponse, AreaLimitedDetail])
+async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
+    """Get area detail, accepting either a curated UUID or a DLD name_norm.
+
+    Resolution order:
+      1. Slug parses as UUID and matches `areas.id` → full detail with
+         MarketSnapshot history + DLD overlay (unchanged behaviour).
+      2. Slug parses as UUID and matches `dld_areas.id` → limited detail
+         from DLD only.
+      3. Slug is a string → look up DLD by name_norm → limited detail.
+      4. None of the above → 404.
+    """
+    maybe_uuid = _parse_uuid(slug)
+    area: Optional[Area] = None
+    if maybe_uuid:
+        area = (await db.execute(select(Area).where(Area.id == maybe_uuid))).scalar_one_or_none()
 
     if not area:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Area with id {area_id} not found"
-        )
+        # Try DLD area lookup (by UUID first, then by name_norm)
+        dld_area = None
+        if maybe_uuid:
+            dld_area = (await db.execute(
+                select(DldArea).where(DldArea.id == maybe_uuid)
+            )).scalar_one_or_none()
+        if not dld_area:
+            dld_area = (await db.execute(
+                select(DldArea).where(DldArea.name_norm == slug.strip().lower())
+            )).scalar_one_or_none()
+        if not dld_area:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Area '{slug}' not found",
+            )
+
+        # If this DLD area IS linked to a curated area, recurse into the curated branch
+        if dld_area.curated_area_id:
+            area = (await db.execute(
+                select(Area).where(Area.id == dld_area.curated_area_id)
+            )).scalar_one_or_none()
+
+        if not area:
+            # Return the limited-data payload — DLD metrics only
+            metrics = (await db.execute(
+                select(DldAreaMetrics).where(
+                    DldAreaMetrics.dld_area_id == dld_area.id,
+                    DldAreaMetrics.period == "2026-ytd",
+                )
+            )).scalar_one_or_none()
+            sales = int(metrics.sales_count or 0) if metrics else 0
+            rents = int(metrics.rent_count_2026 or 0) if metrics else 0
+            show_yield = None
+            if (metrics and metrics.rental_yield_pct is not None
+                    and sales >= MIN_RELIABLE_SAMPLES
+                    and rents >= MIN_RELIABLE_SAMPLES):
+                show_yield = cap_yield(float(metrics.rental_yield_pct))
+            dld_block = AreaDldBlock(
+                dld_area_id=dld_area.id,
+                dld_name=dld_area.name_display,
+                median_price_per_sqft=float(metrics.median_price_per_sqft) if metrics and metrics.median_price_per_sqft is not None else None,
+                median_annual_rent=float(metrics.median_annual_rent) if metrics and metrics.median_annual_rent is not None else None,
+                median_rent_per_sqft=float(metrics.median_rent_per_sqft) if metrics and metrics.median_rent_per_sqft is not None else None,
+                avg_price_per_sqft=float(metrics.avg_price_per_sqft) if metrics and metrics.avg_price_per_sqft is not None else None,
+                avg_annual_rent=float(metrics.avg_annual_rent) if metrics and metrics.avg_annual_rent is not None else None,
+                avg_rent_per_sqft=float(metrics.avg_rent_per_sqft) if metrics and metrics.avg_rent_per_sqft is not None else None,
+                rental_yield_pct=show_yield,
+                rent_growth_yoy_pct=float(metrics.rent_growth_yoy_pct) if metrics and metrics.rent_growth_yoy_pct is not None else None,
+                sales_count=sales,
+                rent_count_2026=rents,
+                building_count=dld_area.building_count,
+                confidence=confidence_for(max(sales, rents)),
+            )
+            tier = _coverage_tier(False, False, sales, rents)
+            return AreaLimitedDetail(
+                id=dld_area.id,
+                slug=dld_area.name_norm,
+                name=dld_area.name_display,
+                coverage_tier=tier,
+                dld=dld_block,
+            )
+
+    area_id = area.id
 
     snaps_q = (
         select(MarketSnapshot)

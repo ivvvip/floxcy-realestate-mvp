@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock, Sparkles, Activity } from 'lucide-react';
+import { Copy, LogOut, RefreshCw, ShieldOff, KeyRound, Users, FileClock, Sparkles, Activity, Database } from 'lucide-react';
 import {
   ApiError,
   adminAiAnalytics,
@@ -15,11 +15,13 @@ import {
   authLogout,
   authMe,
   recomputeOpportunities,
+  getAreaCoverageStats,
 } from '@/lib/api';
 import type {
   AIAnalyticsResponse,
   ApiKeyCreateResponse,
   ApiKeyPublic,
+  AreaCoverageStats,
   AuditLogEntry,
   MeResponse,
 } from '@/lib/types';
@@ -33,6 +35,7 @@ export function AdminDashboard() {
   const [keys, setKeys] = useState<ApiKeyPublic[]>([]);
   const [audit, setAudit] = useState<AuditLogEntry[]>([]);
   const [aiStats, setAiStats] = useState<AIAnalyticsResponse | null>(null);
+  const [coverage, setCoverage] = useState<AreaCoverageStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
@@ -62,16 +65,18 @@ export function AdminDashboard() {
   async function refresh() {
     setError(null);
     try {
-      const [u, k, a, ai] = await Promise.all([
+      const [u, k, a, ai, cov] = await Promise.all([
         adminListUsers().catch(() => []),
         adminListApiKeys().catch(() => []),
         adminListAuditLog({ limit: 50 }).catch(() => []),
         adminAiAnalytics().catch(() => null),
+        getAreaCoverageStats().catch(() => null),
       ]);
       setUsers(u);
       setKeys(k);
       setAudit(a);
       setAiStats(ai);
+      setCoverage(cov);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed');
     }
@@ -209,6 +214,93 @@ export function AdminDashboard() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Area Coverage */}
+      <div className="border border-border rounded-lg bg-bg-card">
+        <div className="chart-header">
+          <span className="chart-header-label inline-flex items-center gap-1.5">
+            <Database className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+            Area Coverage · DLD
+          </span>
+          {coverage && (
+            <span className="text-[11px] text-fg-subtle">
+              {coverage.total_areas.toLocaleString()} areas total · Updated {coverage.last_updated}
+            </span>
+          )}
+        </div>
+        {!coverage ? (
+          <div className="p-4 text-xs text-fg-subtle">
+            Loading coverage stats…
+          </div>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border border-border rounded overflow-hidden">
+              <CovTile
+                label="Full data"
+                value={coverage.by_tier.full ?? 0}
+                tone="positive"
+                hint="curated + history"
+              />
+              <CovTile
+                label="Partial"
+                value={coverage.by_tier.partial ?? 0}
+                tone="accent"
+                hint="≥100 samples"
+              />
+              <CovTile
+                label="Limited"
+                value={coverage.by_tier.limited ?? 0}
+                tone="warning"
+                hint="<100 samples"
+              />
+              <CovTile
+                label="No data"
+                value={coverage.by_tier.none ?? 0}
+                tone="muted"
+                hint="DLD listed only"
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[11px]">
+              <div className="rounded border border-border bg-bg-elev px-3 py-2">
+                <div className="text-fg-subtle">Curated areas</div>
+                <div className="mt-0.5 text-fg font-mono">
+                  {coverage.curated_count.toLocaleString()}
+                </div>
+              </div>
+              <div className="rounded border border-border bg-bg-elev px-3 py-2">
+                <div className="text-fg-subtle">DLD-only areas</div>
+                <div className="mt-0.5 text-fg font-mono">
+                  {coverage.dld_only_count.toLocaleString()}
+                </div>
+              </div>
+              <div className="rounded border border-border bg-bg-elev px-3 py-2">
+                <div className="text-fg-subtle">Total samples</div>
+                <div className="mt-0.5 text-fg font-mono">
+                  {coverage.samples_total_sales.toLocaleString()} sales ·{' '}
+                  {coverage.samples_total_rents.toLocaleString()} rents
+                </div>
+              </div>
+            </div>
+            {coverage.area_gaps.length > 0 && (
+              <details className="rounded border border-border bg-bg-elev px-3 py-2 text-[11px]">
+                <summary className="cursor-pointer text-fg-muted hover:text-fg">
+                  Data gaps — {coverage.area_gaps.length} DLD areas with no
+                  2026 metrics (click to expand)
+                </summary>
+                <div className="mt-2 max-h-[240px] overflow-y-auto">
+                  <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 text-fg-subtle">
+                    {coverage.area_gaps.map((name) => (
+                      <li key={name} className="truncate" title={name}>
+                        · {name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Opportunity Engine */}
@@ -589,6 +681,40 @@ export function AdminDashboard() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CovTile({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: number;
+  tone: 'positive' | 'accent' | 'warning' | 'muted';
+  hint?: string;
+}) {
+  return (
+    <div className="bg-bg-card px-3 py-3">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-1 text-2xl leading-tight tabular font-mono',
+          tone === 'positive' && 'text-positive',
+          tone === 'accent' && 'text-accent',
+          tone === 'warning' && 'text-warning',
+          tone === 'muted' && 'text-fg-subtle'
+        )}
+      >
+        {value.toLocaleString()}
+      </div>
+      {hint && (
+        <div className="mt-0.5 text-[10px] text-fg-subtle">{hint}</div>
+      )}
     </div>
   );
 }

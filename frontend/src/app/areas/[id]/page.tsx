@@ -16,6 +16,8 @@ import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
 import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings } from '@/lib/api';
+import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
+import { LimitedAreaPage } from './LimitedAreaPage';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -54,25 +56,46 @@ export async function generateMetadata({
 }: AreaDetailProps): Promise<Metadata> {
   try {
     const area = await getArea(params.id);
+    if ('latest' in area) {
+      return {
+        title: area.name,
+        description:
+          area.description ??
+          `${area.name} — a curated investment area in ${area.city}, ${area.emirate}.`,
+      };
+    }
     return {
-      title: area.name,
-      description:
-        area.description ??
-        `${area.name} — a curated investment area in ${area.city}, ${area.emirate}.`,
+      title: `${area.name} — DLD area`,
+      description: `${area.name} · Dubai Land Department area. Median PPSF, yield, YoY rent growth, and confidence — never fabricated.`,
     };
   } catch {
     return { title: 'Area' };
   }
 }
 
+function isLimitedArea(
+  a: AreaDetail | AreaLimitedDetail
+): a is AreaLimitedDetail {
+  // AreaLimitedDetail has dld and coverage_tier but NO `latest`/`history`.
+  return !('latest' in a);
+}
+
 export default async function AreaDetailPage({ params }: AreaDetailProps) {
-  let area;
+  let raw;
   try {
-    area = await getArea(params.id);
+    raw = await getArea(params.id);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   }
+
+  // Universal slug resolver: when /areas/[slug] resolves to a DLD-only area
+  // we render the LimitedAreaPage with whatever DLD data we have, instead of
+  // the full curated layout (which assumes MarketSnapshot history).
+  if (isLimitedArea(raw)) {
+    return <LimitedAreaPage area={raw} />;
+  }
+  const area = raw;
 
   let confidence: ConfidenceReport | null = null;
   let undervaluation: OpportunityResult | null = null;

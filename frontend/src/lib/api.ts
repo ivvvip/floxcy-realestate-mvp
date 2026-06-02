@@ -2,6 +2,9 @@ import type {
   Area,
   AreaDetail,
   AreaStats,
+  AreaCoverageResponse,
+  AreaCoverageStats,
+  AreaLimitedDetail,
   ROICalculateRequest,
   ROICalculateResponse,
   DashboardSummary,
@@ -127,8 +130,40 @@ export async function getAreaStats(): Promise<AreaStats> {
   return request<AreaStats>('/api/v1/areas/stats', { revalidate: 300 });
 }
 
-export async function getArea(id: string): Promise<AreaDetail> {
-  return request<AreaDetail>(`/api/v1/areas/${id}`, { revalidate: 60 });
+export async function getAllAreas(opts?: {
+  area_type?: string;
+  sort_by?: 'rent_count' | 'investment_score' | 'yield' | 'name';
+  min_samples?: number;
+  coverage_tier?: 'full' | 'partial' | 'limited' | 'none';
+}): Promise<AreaCoverageResponse> {
+  const params = new URLSearchParams();
+  if (opts?.area_type) params.set('area_type', opts.area_type);
+  if (opts?.sort_by) params.set('sort_by', opts.sort_by);
+  if (opts?.min_samples != null) params.set('min_samples', String(opts.min_samples));
+  if (opts?.coverage_tier) params.set('coverage_tier', opts.coverage_tier);
+  const q = params.toString();
+  return request<AreaCoverageResponse>(
+    `/api/v1/areas/all${q ? `?${q}` : ''}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getAreaCoverageStats(): Promise<AreaCoverageStats> {
+  return request<AreaCoverageStats>('/api/v1/areas/coverage-stats', {
+    revalidate: 600,
+  });
+}
+
+/**
+ * Area detail. Accepts a curated UUID OR a DLD name_norm slug.
+ * Returns either AreaDetail (full) or AreaLimitedDetail (DLD-only).
+ * Use the presence of `latest` to discriminate.
+ */
+export async function getArea(slug: string): Promise<AreaDetail | AreaLimitedDetail> {
+  return request<AreaDetail | AreaLimitedDetail>(
+    `/api/v1/areas/${encodeURIComponent(slug)}`,
+    { revalidate: 60 }
+  );
 }
 
 export async function getAreaConfidence(id: string): Promise<ConfidenceReport & { area_id: string; area_name: string }> {
