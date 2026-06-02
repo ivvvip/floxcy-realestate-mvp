@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,9 +33,22 @@ from app.models.dld import (
 from app.models.investor_lead import InvestorLead
 from app.models.rent_alert import RentAlert
 from app.schemas.dld import (
+    ActivityPoint,
+    BrokerFirmItem,
+    BrokerLicensePoint,
+    BrokerStats,
     DISPLAY_YIELD_CAP_PCT,
+    DashboardDataResponse,
+    DashboardKpi,
+    DashboardPriceHistoryPoint,
+    DashboardTicker,
+    DataIntelligenceFooter,
     MIN_RELIABLE_SAMPLES,
     SIZE_CATEGORY_BANDS,
+    SalesCompositionSlice,
+    SupplyPipelineItem,
+    TopAreaItem,
+    YieldTrendPoint,
     BrokerConsultationRequest,
     BrokerConsultationResponse,
     BrokerMatchItem,
@@ -391,6 +404,435 @@ async def dld_market_overview(db: AsyncSession = Depends(get_db)):
         pass  # cache failure is non-fatal
 
     return MarketOverviewResponse(**payload, cached=False)
+
+
+# ---------------------------------------------------------------------------
+# Bloomberg-style dashboard aggregator — single payload feeding every
+# section of /dashboard. Cached 1h in Redis. Every number traces back to
+# a DLD ETL table; sections we don't have honest data for are omitted.
+# ---------------------------------------------------------------------------
+
+DASHBOARD_DATA_CACHE_KEY = "dld:dashboard-data:v1"
+DASHBOARD_DATA_TTL_S = 3600
+
+
+async def _resolve_area_display(db: AsyncSession, area_name_norm: str) -> str:
+    """Map area_name_norm → human-readable display name; fall back to title-case."""
+    disp = (await db.execute(
+        select(DldArea.name_display).where(DldArea.name_norm == area_name_norm)
+    )).scalar_one_or_none()
+    return disp or area_name_norm.title()
+
+
+@router.get("/dashboard-data", response_model=DashboardDataResponse)
+async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
+    """One-call snapshot for the Bloomberg-style dashboard. Cached 1h."""
+    import json
+    from datetime import datetime as _dt
+    from app.redis_client import redis_client
+
+    cached_blob = None
+    try:
+        cached_blob = await redis_client.get(DASHBOARD_DATA_CACHE_KEY)
+    except Exception:
+        cached_blob = None
+    if cached_blob:
+        try:
+            payload = json.loads(cached_blob if isinstance(cached_blob, str) else cached_blob.decode())
+            payload["cached"] = True
+            return DashboardDataResponse(**payload)
+        except Exception:
+            pass
+
+    # ---- Latest year across our DLD tables ----
+    latest_year = await db.scalar(select(func.max(DldPriceHistory.year))) or 2026
+
+    # ---- Headline totals ----
+    total_sales = int(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.transaction_count), 0))
+    ) or 0)
+    total_volume = float(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.total_value_aed), 0))
+    ) or 0)
+    sales_latest = int(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.transaction_count), 0))
+        .where(DldPriceHistory.year == latest_year)
+    ) or 0)
+    volume_latest = float(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.total_value_aed), 0))
+        .where(DldPriceHistory.year == latest_year)
+    ) or 0)
+    sales_prev = int(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.transaction_count), 0))
+        .where(DldPriceHistory.year == latest_year - 1)
+    ) or 0)
+    rent_contracts = int(await db.scalar(
+        select(func.coalesce(func.sum(DldRentHistory.contract_count), 0))
+        .where(DldRentHistory.year.in_([latest_year, latest_year - 1]))
+    ) or 0)
+    active_brokers = int(await db.scalar(
+        select(func.count()).select_from(DldReraBroker).where(DldReraBroker.is_active.is_(True))
+    ) or 0)
+    areas_tracked = int(await db.scalar(
+        select(func.count()).select_from(DldCanonicalArea)
+    ) or 0)
+
+    # Market-wide latest-year avg yield (sample-floor enforced)
+    avg_yield_pct = await db.scalar(
+        select(func.avg(DldYieldHistory.gross_yield_pct))
+        .where(
+            DldYieldHistory.year == latest_year,
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+    )
+    avg_yield_pct_f = float(avg_yield_pct) if avg_yield_pct is not None else None
+    # Prior-year for the delta tile
+    avg_yield_prev = await db.scalar(
+        select(func.avg(DldYieldHistory.gross_yield_pct))
+        .where(
+            DldYieldHistory.year == latest_year - 1,
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+    )
+
+    # ---- Off-plan share for latest year ----
+    op_row = await db.execute(
+        select(
+            func.sum(DldPriceHistory.transaction_count_offplan),
+            func.sum(DldPriceHistory.transaction_count_ready),
+            func.sum(DldPriceHistory.transaction_count),
+            func.sum(DldPriceHistory.total_value_aed),
+        ).where(DldPriceHistory.year == latest_year)
+    )
+    op_count, ready_count, all_count, latest_volume = op_row.one()
+    op_count = int(op_count or 0)
+    ready_count = int(ready_count or 0)
+    all_count = int(all_count or 0)
+    latest_volume_f = float(latest_volume or 0)
+    offplan_share_pct = (op_count / all_count * 100) if all_count else 0.0
+    # Volume by composition — split by transaction-share since DLD doesn't
+    # store per-row volume_offplan vs volume_ready. This is the standard
+    # industry approximation when only counts × avg_price are available.
+    offplan_volume = (latest_volume_f * op_count / all_count) if all_count else 0.0
+    ready_volume = latest_volume_f - offplan_volume
+
+    # ---- Top yield areas (top 10) ----
+    top_yield_rows = (await db.execute(
+        select(DldYieldHistory)
+        .where(
+            DldYieldHistory.year == latest_year,
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+        .order_by(DldYieldHistory.gross_yield_pct.desc())
+        .limit(10)
+    )).scalars().all()
+    top_yield_areas: list[TopAreaItem] = []
+    for i, r in enumerate(top_yield_rows):
+        disp = await _resolve_area_display(db, r.area_name_norm)
+        top_yield_areas.append(TopAreaItem(
+            rank=i + 1, area_name=disp, value=float(r.gross_yield_pct),
+            sample_count=int(r.sample_score or 0),
+        ))
+
+    # ---- Top 5y appreciation (top 10) ----
+    top_app_rows = (await db.execute(
+        select(DldAreaAppreciation)
+        .where(
+            DldAreaAppreciation.appreciation_5y_pct.isnot(None),
+            DldAreaAppreciation.years_of_data >= 5,
+        )
+        .order_by(DldAreaAppreciation.appreciation_5y_pct.desc())
+        .limit(10)
+    )).scalars().all()
+    top_appreciation_areas: list[TopAreaItem] = []
+    for i, r in enumerate(top_app_rows):
+        disp = await _resolve_area_display(db, r.area_name_norm)
+        top_appreciation_areas.append(TopAreaItem(
+            rank=i + 1, area_name=disp,
+            value=float(r.appreciation_5y_pct),
+            secondary=float(r.cagr_5y_pct) if r.cagr_5y_pct is not None else None,
+        ))
+
+    # ---- Rent growth leaders (top 10) ----
+    rent_growth_rows = (await db.execute(
+        select(DldAreaMetrics, DldArea)
+        .join(DldArea, DldArea.id == DldAreaMetrics.dld_area_id)
+        .where(
+            DldAreaMetrics.rent_growth_yoy_pct.isnot(None),
+            DldAreaMetrics.rent_count_2026 >= MIN_RELIABLE_SAMPLES,
+            DldAreaMetrics.period == "2026-ytd",
+        )
+        .order_by(DldAreaMetrics.rent_growth_yoy_pct.desc())
+        .limit(10)
+    )).all()
+    rent_growth_leaders: list[TopAreaItem] = [
+        TopAreaItem(
+            rank=i + 1,
+            area_name=area.name_display or area.name_norm.title(),
+            value=float(m.rent_growth_yoy_pct),
+            sample_count=int(m.rent_count_2026 or 0),
+        )
+        for i, (m, area) in enumerate(rent_growth_rows)
+    ]
+
+    # ---- Price history line (yearly, market-wide weighted avg) ----
+    price_hist_rows = (await db.execute(
+        select(
+            DldPriceHistory.year,
+            func.sum(DldPriceHistory.avg_ppsf_ready * DldPriceHistory.transaction_count_ready) / func.nullif(func.sum(DldPriceHistory.transaction_count_ready), 0),
+            func.sum(DldPriceHistory.avg_ppsf_offplan * DldPriceHistory.transaction_count_offplan) / func.nullif(func.sum(DldPriceHistory.transaction_count_offplan), 0),
+            func.sum(DldPriceHistory.avg_ppsf_all * DldPriceHistory.transaction_count) / func.nullif(func.sum(DldPriceHistory.transaction_count), 0),
+            func.sum(DldPriceHistory.transaction_count),
+        )
+        .group_by(DldPriceHistory.year)
+        .order_by(DldPriceHistory.year)
+    )).all()
+    price_history = [
+        DashboardPriceHistoryPoint(
+            year=int(yr),
+            avg_ppsf_ready=float(pr_ready) if pr_ready is not None else None,
+            avg_ppsf_offplan=float(pr_op) if pr_op is not None else None,
+            avg_ppsf_all=float(pr_all) if pr_all is not None else None,
+            transaction_count=int(tx or 0),
+        )
+        for yr, pr_ready, pr_op, pr_all, tx in price_hist_rows
+    ]
+
+    # ---- Yearly activity (transaction volume per year, split by off-plan) ----
+    activity_rows = (await db.execute(
+        select(
+            DldPriceHistory.year,
+            func.sum(DldPriceHistory.transaction_count),
+            func.sum(DldPriceHistory.total_value_aed),
+            func.sum(DldPriceHistory.transaction_count_offplan),
+            func.sum(DldPriceHistory.transaction_count_ready),
+        )
+        .group_by(DldPriceHistory.year)
+        .order_by(DldPriceHistory.year)
+    )).all()
+    activity = [
+        ActivityPoint(
+            year=int(yr),
+            transaction_count=int(tx or 0),
+            volume_aed=float(vol or 0),
+            offplan_count=int(op or 0),
+            ready_count=int(rd or 0),
+        )
+        for yr, tx, vol, op, rd in activity_rows
+    ]
+
+    # ---- Yield trend (market-wide avg per year) ----
+    yt_rows = (await db.execute(
+        select(
+            DldYieldHistory.year,
+            func.avg(DldYieldHistory.gross_yield_pct),
+            func.count(DldYieldHistory.id),
+        )
+        .where(
+            DldYieldHistory.gross_yield_pct.isnot(None),
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+        )
+        .group_by(DldYieldHistory.year)
+        .order_by(DldYieldHistory.year)
+    )).all()
+    yield_trend = [
+        YieldTrendPoint(
+            year=int(yr),
+            avg_gross_yield_pct=round(float(yld), 2),
+            area_count=int(cnt or 0),
+        )
+        for yr, yld, cnt in yt_rows if yld is not None
+    ]
+    direction: Optional[str] = None
+    if len(yield_trend) >= 2:
+        first, last = yield_trend[0].avg_gross_yield_pct, yield_trend[-1].avg_gross_yield_pct
+        delta = last - first
+        direction = "rising" if delta > 0.2 else "falling" if delta < -0.2 else "flat"
+
+    # ---- Supply pipeline (top 10 areas by project count, off-plan share) ----
+    supply_rows = (await db.execute(
+        select(
+            DldArea.name_display,
+            DldArea.name_norm,
+            func.count(DldBuilding.id),
+            func.sum(DldBuilding.flats),
+            func.sum(case((DldBuilding.is_offplan.is_(True), 1), else_=0)),
+        )
+        .select_from(DldBuilding)
+        .join(DldArea, DldArea.id == DldBuilding.dld_area_id)
+        .group_by(DldArea.id, DldArea.name_display, DldArea.name_norm)
+        .order_by(func.count(DldBuilding.id).desc())
+        .limit(10)
+    )).all()
+    supply_pipeline: list[SupplyPipelineItem] = []
+    for i, (disp, norm, pcount, fl, op) in enumerate(supply_rows):
+        op_pct = (float(op) / float(pcount) * 100) if (pcount and op is not None) else None
+        supply_pipeline.append(SupplyPipelineItem(
+            rank=i + 1,
+            area_name=disp or (norm or "").title(),
+            project_count=int(pcount or 0),
+            total_units=int(fl) if fl is not None else None,
+            offplan_pct=round(op_pct, 1) if op_pct is not None else None,
+        ))
+
+    # ---- Broker license growth by year + top firms ----
+    lic_rows = (await db.execute(
+        select(
+            func.extract("year", DldReraBroker.license_start_date),
+            func.count(),
+        )
+        .where(DldReraBroker.license_start_date.isnot(None))
+        .group_by(func.extract("year", DldReraBroker.license_start_date))
+        .order_by(func.extract("year", DldReraBroker.license_start_date))
+    )).all()
+    licenses_per_year = [
+        BrokerLicensePoint(year=int(yr), new_licenses=int(cnt))
+        for yr, cnt in lic_rows if yr is not None and int(yr) >= 2015
+    ]
+    firm_rows = (await db.execute(
+        select(
+            DldReraBroker.real_estate_name,
+            func.count(),
+        )
+        .where(
+            DldReraBroker.real_estate_name.isnot(None),
+            DldReraBroker.real_estate_name != "",
+            DldReraBroker.is_active.is_(True),
+        )
+        .group_by(DldReraBroker.real_estate_name)
+        .order_by(func.count().desc())
+        .limit(10)
+    )).all()
+    top_firms = [
+        BrokerFirmItem(rank=i + 1, firm_name=name, broker_count=int(cnt))
+        for i, (name, cnt) in enumerate(firm_rows)
+    ]
+
+    # ---- Sales composition (latest year, off-plan vs ready) ----
+    sales_composition = []
+    if all_count:
+        sales_composition.append(SalesCompositionSlice(
+            label="Off-Plan",
+            pct=round(op_count / all_count * 100, 1),
+            volume_aed=round(offplan_volume, 2),
+            transaction_count=op_count,
+        ))
+        sales_composition.append(SalesCompositionSlice(
+            label="Ready",
+            pct=round(ready_count / all_count * 100, 1),
+            volume_aed=round(ready_volume, 2),
+            transaction_count=ready_count,
+        ))
+
+    # ---- KPI tiles ----
+    kpis: list[DashboardKpi] = []
+    kpis.append(DashboardKpi(
+        label=f"Sales {latest_year} YTD",
+        value=float(sales_latest),
+        unit="count",
+        delta_pct=((sales_latest - sales_prev) / sales_prev * 100) if sales_prev else None,
+        delta_label=f"vs {latest_year - 1}" if sales_prev else None,
+    ))
+    kpis.append(DashboardKpi(
+        label=f"Sales volume {latest_year} YTD",
+        value=volume_latest,
+        unit="aed",
+    ))
+    kpis.append(DashboardKpi(
+        label=f"Avg yield {latest_year}",
+        value=round(avg_yield_pct_f or 0, 2),
+        unit="pct",
+        sublabel="Dubai market average",
+        delta_pct=(
+            (avg_yield_pct_f - float(avg_yield_prev)) if (avg_yield_pct_f is not None and avg_yield_prev is not None)
+            else None
+        ),
+        delta_label=f"vs {latest_year - 1}" if avg_yield_prev is not None else None,
+    ))
+    kpis.append(DashboardKpi(
+        label=f"Rent contracts {latest_year - 1}-{latest_year}",
+        value=float(rent_contracts),
+        unit="count",
+        sublabel="Ejari registrations",
+    ))
+    kpis.append(DashboardKpi(
+        label="Active RERA brokers",
+        value=float(active_brokers),
+        unit="count",
+        sublabel="Currently licensed",
+    ))
+    kpis.append(DashboardKpi(
+        label=f"Off-plan share {latest_year}",
+        value=round(offplan_share_pct, 1),
+        unit="pct",
+        sublabel="Of all sales",
+    ))
+
+    # ---- Ticker ----
+    top_yield_pct = top_yield_areas[0].value if top_yield_areas else None
+    top_5y_pct = top_appreciation_areas[0].value if top_appreciation_areas else None
+    ticker = DashboardTicker(
+        sales_2026_ytd=sales_latest,
+        volume_2026_aed=volume_latest,
+        top_yield_pct=round(top_yield_pct, 2) if top_yield_pct is not None else None,
+        top_5y_growth_pct=round(top_5y_pct, 1) if top_5y_pct is not None else None,
+        active_brokers=active_brokers,
+        areas_tracked=areas_tracked,
+    )
+
+    # ---- Data intelligence footer ----
+    records_analyzed = total_sales + rent_contracts + active_brokers
+    intelligence = DataIntelligenceFooter(
+        last_updated=_dt.utcnow().date().isoformat(),
+        records_analyzed=records_analyzed,
+        data_sources=[
+            "DLD Transactions (Sales of Units)",
+            "DLD Ejari Rent Contracts",
+            "DLD Land Registry",
+            "DLD RERA Broker Registry",
+            "DLD Buildings / Projects",
+            "DLD Price History (derived)",
+            "DLD Rent History (derived)",
+            "DLD Yield History (derived)",
+            "DLD Area Appreciation (derived)",
+            "OSM Admin Boundaries (geocoding)",
+        ],
+        next_update=None,
+        confidence="high",
+    )
+
+    payload = {
+        "ticker": ticker.model_dump(),
+        "kpis": [k.model_dump() for k in kpis],
+        "sales_composition": [s.model_dump() for s in sales_composition],
+        "sales_composition_total_aed": round(latest_volume_f, 2),
+        "price_history": [p.model_dump() for p in price_history],
+        "top_yield_areas": [t.model_dump() for t in top_yield_areas],
+        "top_appreciation_areas": [t.model_dump() for t in top_appreciation_areas],
+        "activity": [a.model_dump() for a in activity],
+        "rent_growth_leaders": [r.model_dump() for r in rent_growth_leaders],
+        "yield_trend": [y.model_dump() for y in yield_trend],
+        "yield_trend_direction": direction,
+        "supply_pipeline": [s.model_dump() for s in supply_pipeline],
+        "broker_stats": BrokerStats(
+            licenses_per_year=licenses_per_year,
+            top_firms=top_firms,
+            total_active=active_brokers,
+        ).model_dump(),
+        "intelligence": intelligence.model_dump(),
+    }
+
+    try:
+        await redis_client.setex(
+            DASHBOARD_DATA_CACHE_KEY, DASHBOARD_DATA_TTL_S, json.dumps(payload, default=str),
+        )
+    except Exception:
+        pass
+
+    return DashboardDataResponse(**payload, cached=False)
 
 
 @router.get("/areas/top-appreciation", response_model=TopAppreciationResponse)

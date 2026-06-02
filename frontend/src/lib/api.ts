@@ -48,6 +48,7 @@ import type {
   DldRentHistoryResponse,
   DldYieldHistoryResponse,
   CanonicalAreasResponse,
+  DashboardDataResponse,
   MarketOverviewResponse,
   DldStatsResponse,
   DldBuildingsResponse,
@@ -728,6 +729,15 @@ export async function getTopAppreciation(
 ): Promise<TopAppreciationResponse> {
   return request<TopAppreciationResponse>(
     `/api/v1/dld/areas/top-appreciation?limit=${limit}&min_years=${minYears}`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDashboardData(): Promise<DashboardDataResponse> {
+  // Aggregator endpoint — backend caches 1h in Redis. Client revalidates
+  // the same TTL so SSR doesn't shoulder the full query on every request.
+  return request<DashboardDataResponse>(
+    '/api/v1/dld/dashboard-data',
     { revalidate: 3600 }
   );
 }

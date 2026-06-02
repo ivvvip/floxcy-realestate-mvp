@@ -363,6 +363,116 @@ export interface CanonicalAreasResponse extends DldAttribution {
   items: CanonicalAreaItem[];
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard data — Bloomberg-style infographic payload from one call
+// ---------------------------------------------------------------------------
+
+export interface DashboardTicker {
+  sales_2026_ytd: number;
+  volume_2026_aed: number;
+  top_yield_pct: number | null;
+  top_5y_growth_pct: number | null;
+  active_brokers: number;
+  areas_tracked: number;
+}
+
+export interface DashboardKpi {
+  label: string;
+  value: number;
+  unit: 'count' | 'aed' | 'pct';
+  sublabel?: string | null;
+  delta_pct?: number | null;
+  delta_label?: string | null;
+}
+
+export interface SalesCompositionSlice {
+  label: string;
+  pct: number;
+  volume_aed: number;
+  transaction_count: number;
+}
+
+export interface DashboardPriceHistoryPoint {
+  year: number;
+  avg_ppsf_ready: number | null;
+  avg_ppsf_offplan: number | null;
+  avg_ppsf_all: number | null;
+  transaction_count: number;
+}
+
+export interface TopAreaItem {
+  rank: number;
+  area_name: string;
+  value: number;
+  secondary?: number | null;
+  sample_count?: number | null;
+}
+
+export interface ActivityPoint {
+  year: number;
+  transaction_count: number;
+  volume_aed: number;
+  offplan_count: number;
+  ready_count: number;
+}
+
+export interface YieldTrendPoint {
+  year: number;
+  avg_gross_yield_pct: number;
+  area_count: number;
+}
+
+export interface SupplyPipelineItem {
+  rank: number;
+  area_name: string;
+  project_count: number;
+  total_units: number | null;
+  offplan_pct: number | null;
+}
+
+export interface BrokerLicensePoint {
+  year: number;
+  new_licenses: number;
+}
+
+export interface BrokerFirmItem {
+  rank: number;
+  firm_name: string;
+  broker_count: number;
+}
+
+export interface BrokerStats {
+  licenses_per_year: BrokerLicensePoint[];
+  top_firms: BrokerFirmItem[];
+  total_active: number;
+}
+
+export interface DataIntelligenceFooter {
+  last_updated: string;
+  records_analyzed: number;
+  data_sources: string[];
+  next_update: string | null;
+  confidence: string;
+}
+
+export interface DashboardDataResponse extends DldAttribution {
+  ticker: DashboardTicker;
+  kpis: DashboardKpi[];
+  sales_composition: SalesCompositionSlice[];
+  sales_composition_total_aed: number;
+  price_history: DashboardPriceHistoryPoint[];
+  top_yield_areas: TopAreaItem[];
+  top_appreciation_areas: TopAreaItem[];
+  activity: ActivityPoint[];
+  rent_growth_leaders: TopAreaItem[];
+  yield_trend: YieldTrendPoint[];
+  yield_trend_direction: 'rising' | 'falling' | 'flat' | null;
+  supply_pipeline: SupplyPipelineItem[];
+  broker_stats: BrokerStats;
+  intelligence: DataIntelligenceFooter;
+  cached?: boolean;
+}
+
 export interface MarketOverviewResponse extends DldAttribution {
   total_sales: number;
   total_volume_aed: number;

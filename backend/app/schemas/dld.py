@@ -503,3 +503,126 @@ class DldBrokersResponse(Attribution):
     count: int
     total_available: int
     items: List[DldBrokerItem]
+
+
+# ---------------------------------------------------------------------------
+# Dashboard data — single-call aggregator for the Bloomberg-style dashboard
+# ---------------------------------------------------------------------------
+# All sections sourced from real DLD tables. Anything we don't have honest
+# DLD data for (e.g. bedroom-type breakdown) is intentionally omitted
+# rather than fabricated.
+
+class DashboardTicker(BaseModel):
+    """One-line auto-scroll ticker stats — short labels for the strip."""
+    sales_2026_ytd: int
+    volume_2026_aed: float
+    top_yield_pct: Optional[float] = None
+    top_5y_growth_pct: Optional[float] = None
+    active_brokers: int
+    areas_tracked: int
+
+
+class DashboardKpi(BaseModel):
+    label: str
+    value: float
+    unit: str  # 'count', 'aed', 'pct'
+    sublabel: Optional[str] = None
+    delta_pct: Optional[float] = None  # vs prior year, when computable
+    delta_label: Optional[str] = None  # human-readable like "vs 2025"
+
+
+class SalesCompositionSlice(BaseModel):
+    label: str  # 'Off-Plan' | 'Ready'
+    pct: float
+    volume_aed: float
+    transaction_count: int
+
+
+class DashboardPriceHistoryPoint(BaseModel):
+    year: int
+    avg_ppsf_ready: Optional[float] = None
+    avg_ppsf_offplan: Optional[float] = None
+    avg_ppsf_all: Optional[float] = None
+    transaction_count: int
+
+
+class TopAreaItem(BaseModel):
+    rank: int
+    area_name: str
+    value: float  # primary metric (yield %, appreciation %, rent growth %, etc)
+    secondary: Optional[float] = None  # e.g. cagr alongside cumulative
+    sample_count: Optional[int] = None
+
+
+class ActivityPoint(BaseModel):
+    """Yearly transaction activity. DLD aggregates are yearly, not monthly —
+    a true monthly heatmap would require the raw transactions table."""
+    year: int
+    transaction_count: int
+    volume_aed: float
+    offplan_count: int
+    ready_count: int
+
+
+class YieldTrendPoint(BaseModel):
+    year: int
+    avg_gross_yield_pct: float
+    area_count: int  # how many areas contributed to this average
+
+
+class SupplyPipelineItem(BaseModel):
+    rank: int
+    area_name: str
+    project_count: int
+    total_units: Optional[int] = None  # sum of flats across projects
+    offplan_pct: Optional[float] = None  # % of projects flagged off-plan
+
+
+class BrokerLicensePoint(BaseModel):
+    year: int
+    new_licenses: int
+
+
+class BrokerFirmItem(BaseModel):
+    rank: int
+    firm_name: str
+    broker_count: int
+
+
+class BrokerStats(BaseModel):
+    licenses_per_year: List[BrokerLicensePoint]
+    top_firms: List[BrokerFirmItem]
+    total_active: int
+
+
+class DataIntelligenceFooter(BaseModel):
+    last_updated: str  # ISO date
+    records_analyzed: int
+    data_sources: List[str]
+    next_update: Optional[str] = None
+    confidence: str  # 'high'
+
+
+class DashboardDataResponse(Attribution):
+    """Single Redis-cached payload (1h) feeding the entire dashboard.
+
+    Sections are deliberately conservative: every number traces back to a
+    DLD ETL table. Sections without honest underlying data (e.g. a true
+    monthly transactions heatmap, bedroom-type split) are absent rather
+    than mocked.
+    """
+    ticker: DashboardTicker
+    kpis: List[DashboardKpi]
+    sales_composition: List[SalesCompositionSlice]
+    sales_composition_total_aed: float
+    price_history: List[DashboardPriceHistoryPoint]
+    top_yield_areas: List[TopAreaItem]
+    top_appreciation_areas: List[TopAreaItem]
+    activity: List[ActivityPoint]
+    rent_growth_leaders: List[TopAreaItem]
+    yield_trend: List[YieldTrendPoint]
+    yield_trend_direction: Optional[str] = None  # 'rising' | 'falling' | 'flat'
+    supply_pipeline: List[SupplyPipelineItem]
+    broker_stats: BrokerStats
+    intelligence: DataIntelligenceFooter
+    cached: bool = False
