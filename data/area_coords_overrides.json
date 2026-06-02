@@ -1,0 +1,44 @@
+[
+  {
+    "area_name_upper": "AL MAMZER",
+    "latitude": 25.2697,
+    "longitude": 55.3321,
+    "notes": "Coastal residential/recreational district, NE Dubai"
+  },
+  {
+    "area_name_upper": "AL SAFOUH FIRST",
+    "latitude": 25.0922,
+    "longitude": 55.1542,
+    "notes": "Knowledge Village area, between Marina and Internet City"
+  },
+  {
+    "area_name_upper": "AL SAFOUH SECOND",
+    "latitude": 25.0980,
+    "longitude": 55.1612,
+    "notes": "Adjacent to Al Safouh First, includes Madinat Jumeirah"
+  },
+  {
+    "area_name_upper": "AL MURQABAT",
+    "latitude": 25.2631,
+    "longitude": 55.3178,
+    "notes": "Deira, near Al Nahda border"
+  },
+  {
+    "area_name_upper": "AL JAFLIYA",
+    "latitude": 25.2285,
+    "longitude": 55.2908,
+    "notes": "Bur Dubai, between Trade Centre and Karama"
+  },
+  {
+    "area_name_upper": "AL SAFA FIRST",
+    "latitude": 25.2006,
+    "longitude": 55.2368,
+    "notes": "Jumeirah side, between Al Wasl and Sheikh Zayed Road"
+  },
+  {
+    "area_name_upper": "AL SAFA SECOND",
+    "latitude": 25.1934,
+    "longitude": 55.2298,
+    "notes": "Adjacent to Al Safa First, towards Umm Suqeim"
+  }
+]

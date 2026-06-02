@@ -192,16 +192,16 @@
     "area_name": "Al Barsha South Fourth",
     "area_name_upper": "AL BARSHA SOUTH FOURTH",
     "area_name_slug": "al-barsha-south-fourth",
-    "latitude": 25.0565882,
-    "longitude": 55.2079869,
+    "latitude": 25.0612,
+    "longitude": 55.2087,
     "bbox": [
       25.0765882,
       25.0365882,
       55.2279869,
       55.1879869
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "9bef410a-69ee-4709-87ab-ce091c7a6cc4",
@@ -246,16 +246,16 @@
     "area_name": "Al Barshaa South Third",
     "area_name_upper": "AL BARSHAA SOUTH THIRD",
     "area_name_slug": "al-barshaa-south-third",
-    "latitude": 25.0498433,
-    "longitude": 55.1907008,
+    "latitude": 25.0571,
+    "longitude": 55.2087,
     "bbox": [
       25.0598433,
       25.0398433,
       55.2007008,
       55.1807008
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "9ef17b33-7276-4858-9d87-48acb7f3f9cd",
@@ -294,11 +294,11 @@
     "area_name": "Al Eyas",
     "area_name_upper": "AL EYAS",
     "area_name_slug": "al-eyas",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.3526383,
+    "longitude": 55.4021839,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "f1e80b49-caa6-406d-b0cd-c55b8e30d535",
@@ -488,16 +488,16 @@
     "area_name": "Al Hebiah Fifth",
     "area_name_upper": "AL HEBIAH FIFTH",
     "area_name_slug": "al-hebiah-fifth",
-    "latitude": 24.9875615,
-    "longitude": 55.3867909,
+    "latitude": 24.9742,
+    "longitude": 55.2987,
     "bbox": [
       24.9996174,
       24.9755476,
       55.400534,
       55.3690433
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "5086620f-191a-47af-b36b-e030cd5ef892",
@@ -520,16 +520,16 @@
     "area_name": "Al Hebiah Fourth",
     "area_name_upper": "AL HEBIAH FOURTH",
     "area_name_slug": "al-hebiah-fourth",
-    "latitude": 25.0264384,
-    "longitude": 55.251228,
+    "latitude": 25.0288,
+    "longitude": 55.258,
     "bbox": [
       25.0364384,
       25.0164384,
       55.261228,
       55.241228
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "4ec2eaba-1895-40bc-99dd-23b11cbb1241",
@@ -616,11 +616,11 @@
     "area_name": "Al Jafliya",
     "area_name_upper": "AL JAFLIYA",
     "area_name_slug": "al-jafliya",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2285,
+    "longitude": 55.2908,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "e1e55fc6-a510-447e-9457-2cd8934af634",
@@ -820,11 +820,11 @@
     "area_name": "Al Mamzer",
     "area_name_upper": "AL MAMZER",
     "area_name_slug": "al-mamzer",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2697,
+    "longitude": 55.3321,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "41d384af-2822-4b2b-8ded-e3459d57a092",
@@ -981,11 +981,11 @@
     "area_name": "Al Murqabat",
     "area_name_upper": "AL MURQABAT",
     "area_name_slug": "al-murqabat",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2631,
+    "longitude": 55.3178,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "9235128b-83e8-4f91-a615-125a840ce7a1",
@@ -1056,11 +1056,11 @@
     "area_name": "Al Oshoosh",
     "area_name_upper": "AL OSHOOSH",
     "area_name_slug": "al-oshoosh",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 24.655096,
+    "longitude": 55.3461446,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "0622b62e-edc3-46a1-8cf6-9384f6e2e943",
@@ -1324,55 +1324,55 @@
     "area_name": "Al Safaa",
     "area_name_upper": "AL SAFAA",
     "area_name_slug": "al-safaa",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2688347,
+    "longitude": 55.3774755,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "5a6d7b43-ae9b-465f-b672-2f1336a96ddc",
     "area_name": "Al Saffa First",
     "area_name_upper": "AL SAFFA FIRST",
     "area_name_slug": "al-saffa-first",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2006,
+    "longitude": 55.2368,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "c7488c38-3d37-454f-b30a-6115347ae2e7",
     "area_name": "Al Saffa Second",
     "area_name_upper": "AL SAFFA SECOND",
     "area_name_slug": "al-saffa-second",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.1934,
+    "longitude": 55.2298,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "3e1c1b2f-8a08-4834-9dcb-7e48a69621b1",
     "area_name": "Al Safouh First",
     "area_name_upper": "AL SAFOUH FIRST",
     "area_name_slug": "al-safouh-first",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.0922,
+    "longitude": 55.1542,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "b2c6ffec-a042-49d5-b490-24a23890e3d9",
     "area_name": "Al Safouh Second",
     "area_name_upper": "AL SAFOUH SECOND",
     "area_name_slug": "al-safouh-second",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.098,
+    "longitude": 55.1612,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "manual_override",
+    "coords_confidence": "high"
   },
   {
     "id": "ff6acf50-099d-4a7f-a74d-81f565c2ccad",
@@ -1759,32 +1759,32 @@
     "area_name": "Al Yelayiss 1",
     "area_name_upper": "AL YELAYISS 1",
     "area_name_slug": "al-yelayiss-1",
-    "latitude": 25.0076387,
-    "longitude": 55.2878122,
+    "latitude": 25.0103,
+    "longitude": 55.2772,
     "bbox": [
       25.0219497,
       24.9913768,
       55.3052806,
       55.2723628
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "351e774c-60b1-46d9-b70a-567215f2794d",
     "area_name": "Al Yelayiss 2",
     "area_name_upper": "AL YELAYISS 2",
     "area_name_slug": "al-yelayiss-2",
-    "latitude": 25.0076387,
-    "longitude": 55.2878122,
+    "latitude": 25.0103,
+    "longitude": 55.2772,
     "bbox": [
       25.0219497,
       24.9913768,
       55.3052806,
       55.2723628
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "64c5d9ad-9de3-4e77-884f-fb5943552c0a",
@@ -1813,16 +1813,16 @@
     "area_name": "Al Yelayiss 5",
     "area_name_upper": "AL YELAYISS 5",
     "area_name_slug": "al-yelayiss-5",
-    "latitude": 25.0242942,
-    "longitude": 55.2238436,
+    "latitude": 25.0269,
+    "longitude": 55.254,
     "bbox": [
       25.0348651,
       25.0129777,
       55.2384052,
       55.2106187
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "a06a142a-da47-4116-9ed1-fbe1ae7a6875",
@@ -1893,11 +1893,11 @@
     "area_name": "Al Zaroob",
     "area_name_upper": "AL ZAROOB",
     "area_name_slug": "al-zaroob",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2135082,
+    "longitude": 55.277677,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "565cf377-ff74-4b30-9034-58c5208eec04",
@@ -1975,11 +1975,11 @@
     "area_name": "Al-Murar Jadeed",
     "area_name_upper": "AL-MURAR JADEED",
     "area_name_slug": "al-murar-jadeed",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2786941,
+    "longitude": 55.3123909,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "6e01996d-84c3-4090-a7c9-52a507701601",
@@ -2390,16 +2390,16 @@
     "area_name": "Hadaeq Sheikh Mohammed Bin Rashid",
     "area_name_upper": "HADAEQ SHEIKH MOHAMMED BIN RASHID",
     "area_name_slug": "hadaeq-sheikh-mohammed-bin-rashid",
-    "latitude": 25.1220614,
-    "longitude": 55.3421249,
+    "latitude": 25.0288,
+    "longitude": 55.258,
     "bbox": [
       25.1222186,
       25.1219042,
       55.3422895,
       55.3419602
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "ae4267d4-9209-4e26-9d2f-f23230f9e758",
@@ -2759,16 +2759,16 @@
     "area_name": "Madinat Al Mataar",
     "area_name_upper": "MADINAT AL MATAAR",
     "area_name_slug": "madinat-al-mataar",
-    "latitude": 24.9144391,
-    "longitude": 55.1615128,
+    "latitude": 24.8895,
+    "longitude": 55.1466,
     "bbox": [
       24.9344391,
       24.8944391,
       55.1815128,
       55.1415128
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "ed0e55c3-6ed0-49ae-a585-79ddb478298f",
@@ -2914,32 +2914,32 @@
     "area_name": "Me'Aisem First",
     "area_name_upper": "ME'AISEM FIRST",
     "area_name_slug": "me-aisem-first",
-    "latitude": 25.0315993,
-    "longitude": 55.2756891,
+    "latitude": 25.049,
+    "longitude": 55.266,
     "bbox": [
       25.0335047,
       25.0296916,
       55.2777403,
       55.2736419
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "bc4b26b1-2c42-4717-a2bc-a751c1d4f397",
     "area_name": "Me'Aisem Second",
     "area_name_upper": "ME'AISEM SECOND",
     "area_name_slug": "me-aisem-second",
-    "latitude": 25.0315993,
-    "longitude": 55.2756891,
+    "latitude": 25.049,
+    "longitude": 55.266,
     "bbox": [
       25.0335047,
       25.0296916,
       55.2777403,
       55.2736419
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "3889f76b-431f-4854-b280-a56c82f2db78",
@@ -3166,15 +3166,15 @@
     "area_name": "Nad Al Shiba First",
     "area_name_upper": "NAD AL SHIBA FIRST",
     "area_name_slug": "nad-al-shiba-first",
-    "latitude": 25.1456302,
-    "longitude": 55.364275,
+    "latitude": 25.1672,
+    "longitude": 55.3155,
     "bbox": [
       25.1708198,
       25.119936,
       55.3911268,
       55.284237
     ],
-    "coords_source": "nominatim",
+    "coords_source": "curated_alias",
     "coords_confidence": "high"
   },
   {
@@ -3305,11 +3305,11 @@
     "area_name": "Naif South",
     "area_name_upper": "NAIF SOUTH",
     "area_name_slug": "naif-south",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.2724896,
+    "longitude": 55.3094134,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "bdf4cc6a-af79-469e-9aa8-2d5d34013964",
@@ -3558,32 +3558,32 @@
     "area_name": "Saih Shuaib 1",
     "area_name_upper": "SAIH SHUAIB 1",
     "area_name_slug": "saih-shuaib-1",
-    "latitude": 24.9144391,
-    "longitude": 55.1615128,
+    "latitude": 24.8895,
+    "longitude": 55.1466,
     "bbox": [
       24.9344391,
       24.8944391,
       55.1815128,
       55.1415128
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "674d2460-d7e0-4eef-9448-a288a1ea4633",
     "area_name": "Saih Shuaib 2",
     "area_name_upper": "SAIH SHUAIB 2",
     "area_name_slug": "saih-shuaib-2",
-    "latitude": 24.9144391,
-    "longitude": 55.1615128,
+    "latitude": 24.8895,
+    "longitude": 55.1466,
     "bbox": [
       24.9344391,
       24.8944391,
       55.1815128,
       55.1415128
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "b626542d-9234-47a8-b48a-0fdc5421e983",
@@ -3606,16 +3606,16 @@
     "area_name": "Saih Shuaib 4",
     "area_name_upper": "SAIH SHUAIB 4",
     "area_name_slug": "saih-shuaib-4",
-    "latitude": 24.9144391,
-    "longitude": 55.1615128,
+    "latitude": 24.8895,
+    "longitude": 55.1466,
     "bbox": [
       24.9344391,
       24.8944391,
       55.1815128,
       55.1415128
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "2f18bb5a-ff0b-4eaf-98f0-dd038a4b58c4",
@@ -3758,11 +3758,11 @@
     "area_name": "Um Al Sheif",
     "area_name_upper": "UM AL SHEIF",
     "area_name_slug": "um-al-sheif",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.1697885,
+    "longitude": 55.2272991,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "cda66b36-5bb7-4b2d-abb3-021d99e947c3",
@@ -3823,11 +3823,11 @@
     "area_name": "Um Ramool",
     "area_name_upper": "UM RAMOOL",
     "area_name_slug": "um-ramool",
-    "latitude": null,
-    "longitude": null,
+    "latitude": 25.4716459,
+    "longitude": 55.6022488,
     "bbox": null,
-    "coords_source": null,
-    "coords_confidence": null
+    "coords_source": "nominatim_retry",
+    "coords_confidence": "medium"
   },
   {
     "id": "355da036-ddfc-4e36-96bf-7b0f9ac0b903",
@@ -3916,32 +3916,32 @@
     "area_name": "Wadi Al Safa 2",
     "area_name_upper": "WADI AL SAFA 2",
     "area_name_slug": "wadi-al-safa-2",
-    "latitude": 25.0535681,
-    "longitude": 55.2754782,
+    "latitude": 25.0567,
+    "longitude": 55.2716,
     "bbox": [
       25.0635681,
       25.0435681,
       55.2854782,
       55.2654782
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "medium"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "440ebaf2-8b2b-445b-8168-2411607724ba",
     "area_name": "Wadi Al Safa 3",
     "area_name_upper": "WADI AL SAFA 3",
     "area_name_slug": "wadi-al-safa-3",
-    "latitude": 25.0535681,
-    "longitude": 55.2754782,
+    "latitude": 25.0567,
+    "longitude": 55.2716,
     "bbox": [
       25.0635681,
       25.0435681,
       55.2854782,
       55.2654782
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "medium"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "b6fdf3d6-6d82-466d-970d-ac7711e77f55",
@@ -3964,16 +3964,16 @@
     "area_name": "Wadi Al Safa 5",
     "area_name_upper": "WADI AL SAFA 5",
     "area_name_slug": "wadi-al-safa-5",
-    "latitude": 25.0535681,
-    "longitude": 55.2754782,
+    "latitude": 25.0567,
+    "longitude": 55.2716,
     "bbox": [
       25.0635681,
       25.0435681,
       55.2854782,
       55.2654782
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "medium"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "6a127afc-2c9f-48e8-a7c0-2cd040a56bdf",
@@ -3996,32 +3996,32 @@
     "area_name": "Wadi Al Safa 7",
     "area_name_upper": "WADI AL SAFA 7",
     "area_name_slug": "wadi-al-safa-7",
-    "latitude": 25.0535681,
-    "longitude": 55.2754782,
+    "latitude": 25.0567,
+    "longitude": 55.2716,
     "bbox": [
       25.0635681,
       25.0435681,
       55.2854782,
       55.2654782
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "medium"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "89cc586c-bc40-40cc-8534-e7e7bfe94db2",
     "area_name": "Warsan Fourth",
     "area_name_upper": "WARSAN FOURTH",
     "area_name_slug": "warsan-fourth",
-    "latitude": 25.1322737,
-    "longitude": 55.3981414,
+    "latitude": 25.1632,
+    "longitude": 55.408,
     "bbox": [
       25.1606092,
       25.1037774,
       55.4269558,
       55.3648828
     ],
-    "coords_source": "nominatim",
-    "coords_confidence": "low"
+    "coords_source": "curated_alias",
+    "coords_confidence": "high"
   },
   {
     "id": "f923d61c-54c4-4ea6-9091-3bd1303fc771",
