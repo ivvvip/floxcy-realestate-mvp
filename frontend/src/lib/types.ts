@@ -455,6 +455,226 @@ export interface DataIntelligenceFooter {
   confidence: string;
 }
 
+// ---------------------------------------------------------------------------
+// Opportunities-filtered, similar areas, market timing, rent rankings
+// ---------------------------------------------------------------------------
+
+export type SupplyRiskTier = 'low' | 'medium' | 'high';
+export type OpportunityConfidence = 'low' | 'medium' | 'high';
+
+export interface OpportunityFilteredItem {
+  area_id: string;
+  area_name: string;
+  area_name_norm: string;
+  rank: number;
+  score: number;
+  gross_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  appreciation_5y_pct: number | null;
+  cagr_5y_pct: number | null;
+  median_price_per_sqft: number | null;
+  transaction_count: number;
+  supply_risk: SupplyRiskTier | null;
+  offplan_pct: number | null;
+  freehold_pct: number | null;
+  investor_visa_eligible: boolean;
+  sales_sample_count: number;
+  rent_sample_count: number;
+  confidence: OpportunityConfidence;
+  reasoning: string[];
+}
+
+export interface OpportunityScoreFormula {
+  yield_weight: number;
+  rent_growth_weight: number;
+  appreciation_weight: number;
+  demand_weight: number;
+  low_supply_risk_weight: number;
+}
+
+export interface OpportunitiesFilteredResponse extends DldAttribution {
+  goal: string;
+  risk: string;
+  budget_aed_max: number | null;
+  property_type: string | null;
+  count: number;
+  formula: OpportunityScoreFormula;
+  items: OpportunityFilteredItem[];
+}
+
+export interface SimilarAreaItem {
+  rank: number;
+  area_id: string;
+  area_name: string;
+  area_name_norm: string;
+  median_price_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  similarity_score: number;
+  reason: string;
+}
+
+export interface SimilarAreasResponse extends DldAttribution {
+  source_area_name: string;
+  source_yield_pct: number | null;
+  source_price_per_sqft: number | null;
+  count: number;
+  items: SimilarAreaItem[];
+}
+
+export interface MarketTimingSignal {
+  label: string;
+  value: string;
+  tone: 'positive' | 'neutral' | 'negative';
+  detail: string;
+}
+
+export interface MarketTimingResponse extends DldAttribution {
+  area_name: string;
+  area_name_norm: string;
+  verdict: 'good_time' | 'neutral' | 'caution';
+  confidence: 'low' | 'medium' | 'high';
+  headline: string;
+  signals: MarketTimingSignal[];
+  reasoning: string[];
+  current_yield_pct: number | null;
+  yield_5y_avg_pct: number | null;
+  current_ppsf: number | null;
+  ppsf_5y_peak: number | null;
+  latest_offplan_pct: number | null;
+}
+
+export interface RentRankingItem {
+  area_name: string;
+  area_name_norm: string;
+  prop_sub_type: string;
+  size_band: string;
+  median_annual_rent: number;
+  median_rent_per_sqft: number;
+  p25_annual_rent: number | null;
+  p75_annual_rent: number | null;
+  sample_count: number;
+}
+
+export interface RentRankingResponse extends DldAttribution {
+  direction: 'cheapest' | 'expensive';
+  size_category: string;
+  prop_sub_type: string;
+  count: number;
+  items: RentRankingItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Comprehensive DLD-grounded ROI calculator
+// ---------------------------------------------------------------------------
+
+export type RoiPaymentType = 'cash' | 'mortgage';
+
+export interface RoiCalcMortgage {
+  down_payment_pct: number;
+  interest_rate_pct: number;
+  term_years: number;
+}
+
+export interface RoiCalcRequest {
+  area_name: string;
+  property_type: 'studio' | '1br' | '2br' | '3br' | '4br';
+  size_sqm: number;
+  purchase_price_aed: number;
+  payment: RoiPaymentType;
+  mortgage?: RoiCalcMortgage;
+  expected_annual_rent_aed?: number;
+  service_charge_aed_per_sqft?: number;
+  maintenance_pct?: number;
+  property_management_pct?: number;
+  vacancy_rate_pct?: number;
+}
+
+export interface RoiCalcCostBreakdown {
+  dld_transfer_aed: number;
+  agency_aed: number;
+  agency_vat_aed: number;
+  trustee_aed: number;
+  mortgage_registration_aed: number;
+  total_buying_cost_aed: number;
+  notes: string[];
+}
+
+export interface RoiCalcRentalReturns {
+  gross_rent_aed: number;
+  operating_expenses_aed: number;
+  net_rent_aed: number;
+  gross_yield_pct: number;
+  net_yield_pct: number;
+  monthly_cash_flow_aed: number | null;
+  annual_cash_flow_aed: number | null;
+}
+
+export interface RoiCalcCapitalGrowth {
+  current_value_aed: number;
+  projected_value_5y_aed: number;
+  cagr_pct_used: number;
+  cagr_source: string;
+  total_5y_return_aed: number;
+  total_5y_return_pct: number;
+  irr_estimate_pct: number | null;
+}
+
+export interface RoiCalcScenario {
+  label: string;
+  annual_rent_aed: number;
+  net_yield_pct: number;
+  annual_cash_flow_aed: number | null;
+}
+
+export interface RoiCalcSensitivityItem {
+  scenario: string;
+  delta_annual_cash_flow_aed: number | null;
+  delta_net_yield_pp: number | null;
+  note: string;
+}
+
+export interface RoiCalcBenchmark {
+  your_value: number;
+  area_median: number | null;
+  percentile_rank: number | null;
+  verdict: string;
+}
+
+export interface RoiCalcCurrency {
+  code: string;
+  symbol: string;
+  price_local: number;
+}
+
+export interface RoiCalcInsight {
+  summary: string;
+  bullets: string[];
+}
+
+export interface RoiCalcResponse extends DldAttribution {
+  area_name: string;
+  property_type: string;
+  size_sqm: number;
+  purchase_price_aed: number;
+  payment: RoiPaymentType;
+  total_cash_needed_aed: number;
+  total_investment_inc_costs_aed: number;
+  rental_returns: RoiCalcRentalReturns;
+  capital_growth: RoiCalcCapitalGrowth;
+  payback_years: number | null;
+  yield_vs_market: RoiCalcBenchmark;
+  price_vs_market: RoiCalcBenchmark;
+  scenarios: RoiCalcScenario[];
+  sensitivity: RoiCalcSensitivityItem[];
+  tax_advantages: string[];
+  effective_net_yield_after_tax_pct: number;
+  fx_rates_disclaimer: string;
+  currencies: RoiCalcCurrency[];
+  insight: RoiCalcInsight;
+  cost_breakdown: RoiCalcCostBreakdown;
+  defaults_used: Record<string, number | string>;
+}
+
 export interface DashboardDataResponse extends DldAttribution {
   ticker: DashboardTicker;
   kpis: DashboardKpi[];

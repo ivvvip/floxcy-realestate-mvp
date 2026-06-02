@@ -50,6 +50,12 @@ import type {
   CanonicalAreasResponse,
   DashboardDataResponse,
   MarketOverviewResponse,
+  MarketTimingResponse,
+  OpportunitiesFilteredResponse,
+  RentRankingResponse,
+  RoiCalcRequest,
+  RoiCalcResponse,
+  SimilarAreasResponse,
   DldStatsResponse,
   DldBuildingsResponse,
   TopAppreciationResponse,
@@ -729,6 +735,65 @@ export async function getTopAppreciation(
 ): Promise<TopAppreciationResponse> {
   return request<TopAppreciationResponse>(
     `/api/v1/dld/areas/top-appreciation?limit=${limit}&min_years=${minYears}`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function calculateDldRoi(body: RoiCalcRequest): Promise<RoiCalcResponse> {
+  return request<RoiCalcResponse>('/api/v1/dld/roi/calculate', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getOpportunitiesFiltered(opts: {
+  goal?: 'income' | 'growth' | 'balanced' | 'offplan';
+  risk?: 'low' | 'medium' | 'high';
+  budget_aed_max?: number;
+  property_type?: 'apartment' | 'villa' | 'offplan';
+  limit?: number;
+}): Promise<OpportunitiesFilteredResponse> {
+  const p = new URLSearchParams();
+  if (opts.goal) p.set('goal', opts.goal);
+  if (opts.risk) p.set('risk', opts.risk);
+  if (opts.budget_aed_max) p.set('budget_aed_max', String(opts.budget_aed_max));
+  if (opts.property_type) p.set('property_type', opts.property_type);
+  if (opts.limit) p.set('limit', String(opts.limit));
+  return request<OpportunitiesFilteredResponse>(
+    `/api/v1/dld/opportunities-filtered?${p.toString()}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getSimilarAreas(
+  areaName: string,
+  limit = 3,
+): Promise<SimilarAreasResponse> {
+  return request<SimilarAreasResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(areaName)}/similar?limit=${limit}`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getMarketTiming(areaName: string): Promise<MarketTimingResponse> {
+  return request<MarketTimingResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(areaName)}/market-timing`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getRentsByArea(opts: {
+  direction: 'cheapest' | 'expensive';
+  size?: 'studio' | '1br' | '2br' | '3br' | '4br';
+  prop_sub_type?: string;
+  limit?: number;
+}): Promise<RentRankingResponse> {
+  const p = new URLSearchParams({ direction: opts.direction });
+  if (opts.size) p.set('size', opts.size);
+  if (opts.prop_sub_type) p.set('prop_sub_type', opts.prop_sub_type);
+  if (opts.limit) p.set('limit', String(opts.limit));
+  return request<RentRankingResponse>(
+    `/api/v1/dld/rents/by-area?${p.toString()}`,
     { revalidate: 3600 }
   );
 }
