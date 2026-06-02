@@ -4,6 +4,9 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { getDldStats, getDldAreas, getCanonicalAreas } from '@/lib/api';
 import { RentCheckClient } from './RentCheckClient';
+import { RentMarketTable } from './RentMarketTable';
+import { CheckCircle2, ExternalLink, FileText, Building2 } from 'lucide-react';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Is Your Rent Fair? — DLD Benchmark',
@@ -24,24 +27,26 @@ export default async function RentCheckPage() {
     getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
   ]);
 
-  const canonUpperSet = new Set(
-    (canon?.items ?? []).map((c) => c.area_name_upper)
+  // Canonical is the spine: ALL 284 areas in the dropdown, even ones with
+  // no rent data yet (they'll just show 0 contracts). We then overlay
+  // dld_areas data (rent_count + median_annual_rent) where available so
+  // the dropdown can hint at coverage strength per area.
+  const dldByUpper = new Map(
+    (areas?.items ?? []).map((a) => [
+      a.name.toUpperCase(),
+      { name_norm: a.name_norm, rent_count: a.rent_count_2026, median_annual_rent: a.median_annual_rent },
+    ])
   );
-  const canonByUpper = new Map(
-    (canon?.items ?? []).map((c) => [c.area_name_upper, c.area_name])
-  );
-
-  // Intersect dld_areas with canonical: hides noise areas, uses canonical
-  // display name where it differs. Sort by sample size descending so
-  // high-data areas float to the top.
-  const areaOptions = (areas?.items ?? [])
-    .filter((a) => canonUpperSet.size === 0 || canonUpperSet.has(a.name.toUpperCase()))
-    .map((a) => ({
-      name: canonByUpper.get(a.name.toUpperCase()) ?? a.name,
-      name_norm: a.name_norm,
-      rent_count: a.rent_count_2026,
-      median_annual_rent: a.median_annual_rent,
-    }))
+  const areaOptions = (canon?.items ?? [])
+    .map((c) => {
+      const overlay = dldByUpper.get(c.area_name_upper);
+      return {
+        name: c.area_name,
+        name_norm: overlay?.name_norm ?? c.area_name_upper.toLowerCase(),
+        rent_count: overlay?.rent_count ?? 0,
+        median_annual_rent: overlay?.median_annual_rent ?? 0,
+      };
+    })
     .sort((a, b) => b.rent_count - a.rent_count);
 
   return (
@@ -84,10 +89,75 @@ export default async function RentCheckPage() {
       </div>
 
       <Container>
-        <div className="py-4 sm:py-6">
+        <div className="py-4 sm:py-6 space-y-6">
           <RentCheckClient areaOptions={areaOptions} />
+          {/* Dubai Rent Market — cheapest / most expensive by size */}
+          <RentMarketTable />
+          {/* Ejari + tenant-rights notice */}
+          <TenantRightsNotice />
         </div>
       </Container>
+    </div>
+  );
+}
+
+function TenantRightsNotice() {
+  return (
+    <section className="border border-border rounded-lg bg-bg-card/60 p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-fg inline-flex items-center gap-1.5">
+        <FileText className="h-3.5 w-3.5 text-accent" strokeWidth={2.5} />
+        Your rights as a Dubai tenant
+      </h2>
+      <div className="grid md:grid-cols-2 gap-3 text-xs text-fg-muted">
+        <div className="space-y-1.5">
+          <Right>90-day written notice required before any rent change</Right>
+          <Right>Max increase capped by RERA Decree 43 (calculator above)</Right>
+          <Right>Landlord cannot evict for sale during fixed-term contract</Right>
+        </div>
+        <div className="space-y-1.5">
+          <Right>Ejari registration is mandatory — without it you have no legal recourse</Right>
+          <Right>File a dispute at the Rental Disputes Settlement Centre (RDSC)</Right>
+          <Right>5% RERA admin fee for any rental dispute filing</Right>
+        </div>
+      </div>
+      <div className="border-t border-border pt-3 grid sm:grid-cols-2 gap-2">
+        <a
+          href="https://www.dubailand.gov.ae/en/eservices/ejari/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent hover:bg-accent/20"
+        >
+          Register on Ejari
+          <ExternalLink className="h-3 w-3" strokeWidth={2} />
+        </a>
+        <a
+          href="https://www.dc.gov.ae/PublicServices/RentalDisputesIntroduction.aspx"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-accent/40"
+        >
+          File a dispute (RDSC)
+          <ExternalLink className="h-3 w-3" strokeWidth={2} />
+        </a>
+      </div>
+      <div className="border-t border-border pt-3 text-[11px] text-fg-muted">
+        <Link
+          href="/buildings"
+          className="inline-flex items-center gap-1 text-accent hover:underline"
+        >
+          <Building2 className="h-3 w-3" strokeWidth={2.5} />
+          Check your specific building&apos;s rent benchmark →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function Right({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2">
+      <CheckCircle2 className="h-3 w-3 text-positive shrink-0 mt-0.5" strokeWidth={2.5} />
+      <span>{children}</span>
     </div>
   );
 }
