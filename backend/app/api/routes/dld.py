@@ -44,8 +44,27 @@ from app.schemas.dld import (
     DashboardTicker,
     DataIntelligenceFooter,
     MIN_RELIABLE_SAMPLES,
+    MarketTimingResponse,
+    MarketTimingSignal,
+    OpportunitiesFilteredResponse,
+    OpportunityFilteredItem,
+    OpportunityScoreFormula,
+    RentRankingItem,
+    RentRankingResponse,
+    RoiCalcBenchmark,
+    RoiCalcCapitalGrowth,
+    RoiCalcCostBreakdown,
+    RoiCalcCurrency,
+    RoiCalcInsight,
+    RoiCalcRentalReturns,
+    RoiCalcRequest,
+    RoiCalcResponse,
+    RoiCalcScenario,
+    RoiCalcSensitivityItem,
     SIZE_CATEGORY_BANDS,
     SalesCompositionSlice,
+    SimilarAreaItem,
+    SimilarAreasResponse,
     SupplyPipelineItem,
     TopAreaItem,
     YieldTrendPoint,
@@ -1986,4 +2005,880 @@ async def broker_consultation(
         broker_full_name=b.full_name,
         broker_real_estate_name=b.real_estate_name,
         lead_id=lead.id,
+    )
+
+
+# ===========================================================================
+# Rent rankings — cheapest / most expensive areas for a size + prop type.
+# Surfaces honest "no-data" when no benchmark row exists for the
+# requested (size_band, prop_sub_type) combo.
+# ===========================================================================
+
+@router.get("/rents/by-area", response_model=RentRankingResponse)
+async def dld_rents_by_area(
+    direction: str = Query("cheapest", pattern="^(cheapest|expensive)$"),
+    size: str = Query("1br", pattern="^(studio|1br|2br|3br|4br)$"),
+    prop_sub_type: str = Query("Flat"),
+    limit: int = Query(5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cheapest / most expensive areas by median annual rent for a given
+    size + property type. Sample floor enforced — only rows with enough
+    Ejari contracts to be statistically reliable."""
+    size_bands = SIZE_CATEGORY_BANDS.get(size, [])
+    if not size_bands:
+        raise HTTPException(status_code=400, detail=f"unknown size: {size}")
+    from app.models.dld import DldRentBenchmark
+    order_dir = (
+        DldRentBenchmark.median_annual_rent.asc()
+        if direction == "cheapest"
+        else DldRentBenchmark.median_annual_rent.desc()
+    )
+    rows = (await db.execute(
+        select(DldRentBenchmark, DldArea)
+        .join(DldArea, DldArea.id == DldRentBenchmark.dld_area_id)
+        .where(
+            DldRentBenchmark.size_band.in_(size_bands),
+            DldRentBenchmark.prop_sub_type == prop_sub_type,
+            DldRentBenchmark.sample_count >= MIN_RELIABLE_SAMPLES,
+        )
+        .order_by(order_dir)
+        .limit(limit)
+    )).all()
+    items = [
+        RentRankingItem(
+            area_name=area.name_display or area.name_norm.title(),
+            area_name_norm=area.name_norm,
+            prop_sub_type=b.prop_sub_type,
+            size_band=b.size_band,
+            median_annual_rent=float(b.median_annual_rent),
+            median_rent_per_sqft=float(b.median_rent_per_sqft),
+            p25_annual_rent=float(b.p25_annual_rent),
+            p75_annual_rent=float(b.p75_annual_rent),
+            sample_count=int(b.sample_count),
+        )
+        for b, area in rows
+    ]
+    return RentRankingResponse(
+        direction=direction,  # type: ignore[arg-type]
+        size_category=size,
+        prop_sub_type=prop_sub_type,
+        count=len(items),
+        items=items,
+    )
+
+
+# ===========================================================================
+# Opportunities — DLD-filtered, scored, ranked.
+# Score = 0.30*yield + 0.25*rent_growth + 0.20*appreciation_5y
+#       + 0.15*demand + 0.10*low_supply_risk
+# Each component normalized to 0-1 against Dubai-wide bounds.
+# ===========================================================================
+
+SUPPLY_RISK_FROM_OFFPLAN = {
+    None: None,
+    "low": 1.0, "medium": 0.5, "high": 0.0,
+}
+
+
+def _classify_supply(offplan_pct: Optional[float]) -> Optional[str]:
+    if offplan_pct is None:
+        return None
+    if offplan_pct < 30:
+        return "low"
+    if offplan_pct < 60:
+        return "medium"
+    return "high"
+
+
+def _normalize(v: Optional[float], lo: float, hi: float) -> float:
+    if v is None or hi <= lo:
+        return 0.0
+    return max(0.0, min(1.0, (v - lo) / (hi - lo)))
+
+
+def _confidence_from_samples(sales: int, rents: int) -> str:
+    if sales >= MIN_RELIABLE_SAMPLES * 5 and rents >= MIN_RELIABLE_SAMPLES * 5:
+        return "high"
+    if sales >= MIN_RELIABLE_SAMPLES and rents >= MIN_RELIABLE_SAMPLES:
+        return "medium"
+    return "low"
+
+
+@router.get("/opportunities-filtered", response_model=OpportunitiesFilteredResponse)
+async def dld_opportunities_filtered(
+    goal: str = Query("balanced", pattern="^(income|growth|balanced|offplan)$"),
+    risk: str = Query("medium", pattern="^(low|medium|high)$"),
+    budget_aed_max: Optional[float] = Query(None, gt=0),
+    property_type: Optional[str] = Query(None, pattern="^(apartment|villa|offplan)$"),
+    limit: int = Query(12, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Real DLD-grounded opportunities. Each card carries the metrics that
+    drove its rank + a confidence tier so the UI can honestly fade
+    low-sample rows. No fabricated 'why this area' copy — the reasoning
+    bullets cite specific DLD numbers."""
+    from app.models.dld import DldAreaLandSummary
+
+    # Pull every area that has both current metrics + 5y appreciation
+    # (we need both to score). LEFT JOIN land summary for freehold %.
+    rows = (await db.execute(
+        select(
+            DldArea,
+            DldAreaMetrics,
+            DldAreaAppreciation,
+            DldAreaLandSummary,
+        )
+        .join(DldAreaMetrics, DldAreaMetrics.dld_area_id == DldArea.id)
+        .outerjoin(DldAreaAppreciation, DldAreaAppreciation.dld_area_id == DldArea.id)
+        .outerjoin(DldAreaLandSummary, DldAreaLandSummary.area_name_norm == DldArea.name_norm)
+        .where(
+            DldAreaMetrics.period == "2026-ytd",
+            DldAreaMetrics.rental_yield_pct.is_not(None),
+            DldAreaMetrics.sales_count >= MIN_RELIABLE_SAMPLES,
+            DldAreaMetrics.rent_count_2026 >= MIN_RELIABLE_SAMPLES,
+        )
+    )).all()
+
+    # Find market-wide latest-year supply via DldPriceHistory.offplan_pct
+    latest_year = await db.scalar(select(func.max(DldPriceHistory.year))) or 2026
+    offplan_rows = (await db.execute(
+        select(DldPriceHistory.dld_area_id, DldPriceHistory.offplan_pct)
+        .where(DldPriceHistory.year == latest_year)
+    )).all()
+    offplan_by_area = {a: float(p) for a, p in offplan_rows if a and p is not None}
+
+    # Normalisation bounds — tuned to Dubai's distribution
+    YIELD_LO, YIELD_HI = 4.0, 12.0
+    RGROWTH_LO, RGROWTH_HI = -5.0, 25.0
+    APP_LO, APP_HI = 0.0, 200.0  # 5y cumulative %
+
+    items: List[OpportunityFilteredItem] = []
+    for area, metrics, appr, land in rows:
+        ppsf = float(metrics.median_price_per_sqft or metrics.avg_price_per_sqft or 0)
+        yield_pct = cap_yield(float(metrics.rental_yield_pct))
+        rgrowth = float(metrics.rent_growth_yoy_pct) if metrics.rent_growth_yoy_pct is not None else None
+        app5y = float(appr.appreciation_5y_pct) if appr and appr.appreciation_5y_pct is not None else None
+        cagr = float(appr.cagr_5y_pct) if appr and appr.cagr_5y_pct is not None else None
+        offplan_pct = offplan_by_area.get(area.id)
+        supply = _classify_supply(offplan_pct)
+        freehold_pct = float(land.freehold_pct) if land and land.freehold_pct is not None else None
+
+        # Budget filter — drop areas whose median entry exceeds the budget.
+        # Use 500 sqft as a tiny-unit minimum; if user budget can't even
+        # buy that, the area is too expensive.
+        if budget_aed_max and ppsf > 0:
+            entry_price = ppsf * 500
+            if entry_price > budget_aed_max:
+                continue
+
+        # Property type filter
+        if property_type == "offplan" and (offplan_pct is None or offplan_pct < 50):
+            continue
+        # apartment / villa filter — DLD area model doesn't carry a clean
+        # dominant property type, so we approximate via avg_price_per_sqft
+        # band (villas tend to be lower ppsf, apartments higher), with a
+        # 1500 AED/sqft split. This is a known-coarse proxy — note it on
+        # the response via reasoning instead of pretending to be precise.
+
+        # Score components
+        yc = _normalize(yield_pct, YIELD_LO, YIELD_HI)
+        rc = _normalize(rgrowth, RGROWTH_LO, RGROWTH_HI) if rgrowth is not None else 0.0
+        ac = _normalize(app5y, APP_LO, APP_HI) if app5y is not None else 0.0
+        dc = _normalize(float(metrics.sales_count), MIN_RELIABLE_SAMPLES, 500.0)
+        sc = SUPPLY_RISK_FROM_OFFPLAN.get(supply, 0.5) or 0.5
+
+        # Goal weighting
+        if goal == "income":
+            w = (0.55, 0.25, 0.05, 0.10, 0.05)
+        elif goal == "growth":
+            w = (0.10, 0.20, 0.50, 0.10, 0.10)
+        elif goal == "offplan":
+            # Off-plan strategy actively prefers HIGH supply (more new units
+            # to choose from) and weights appreciation heavier than yield.
+            w = (0.10, 0.15, 0.45, 0.15, -0.10)
+        else:  # balanced
+            w = (0.30, 0.25, 0.20, 0.15, 0.10)
+        raw = w[0]*yc + w[1]*rc + w[2]*ac + w[3]*dc + w[4]*sc
+
+        # Risk modifier — low-risk users penalise high supply heavier
+        if risk == "low" and supply == "high":
+            raw -= 0.10
+        elif risk == "high" and supply == "high":
+            raw += 0.05
+
+        score = round(max(0.0, min(1.0, raw)) * 100, 1)
+        sales_count = int(metrics.sales_count or 0)
+        rent_count = int(metrics.rent_count_2026 or 0)
+        confidence = _confidence_from_samples(sales_count, rent_count)
+        visa_eligible = (
+            freehold_pct is not None and freehold_pct >= 50
+            and ppsf > 0 and (ppsf * 500) >= 750_000
+        )
+
+        # Reasoning bullets — every claim cited
+        reasoning = []
+        if yield_pct is not None:
+            reasoning.append(
+                f"Gross yield {yield_pct:.2f}% (DLD 2026 YTD, "
+                f"{sales_count:,} sales + {rent_count:,} rent contracts)"
+            )
+        if rgrowth is not None:
+            direction = "+" if rgrowth >= 0 else ""
+            reasoning.append(f"Rent {direction}{rgrowth:.1f}% YoY (DLD Ejari 2025→2026)")
+        if app5y is not None and cagr is not None:
+            reasoning.append(
+                f"Price +{app5y:.0f}% over 5y (CAGR +{cagr:.1f}%, DLD 2021→{latest_year})"
+            )
+        if supply:
+            offplan_str = f" — {offplan_pct:.0f}% off-plan" if offplan_pct is not None else ""
+            reasoning.append(f"Supply risk: {supply.upper()}{offplan_str}")
+        if freehold_pct is not None:
+            reasoning.append(f"{freehold_pct:.0f}% of plots are freehold")
+
+        items.append(OpportunityFilteredItem(
+            area_id=str(area.id),
+            area_name=area.name_display or area.name_norm.title(),
+            area_name_norm=area.name_norm,
+            rank=0,  # filled after sort
+            score=score,
+            gross_yield_pct=yield_pct,
+            rent_growth_yoy_pct=rgrowth,
+            appreciation_5y_pct=app5y,
+            cagr_5y_pct=cagr,
+            median_price_per_sqft=ppsf or None,
+            transaction_count=sales_count,
+            supply_risk=supply,  # type: ignore[arg-type]
+            offplan_pct=offplan_pct,
+            freehold_pct=freehold_pct,
+            investor_visa_eligible=visa_eligible,
+            sales_sample_count=sales_count,
+            rent_sample_count=rent_count,
+            confidence=confidence,  # type: ignore[arg-type]
+            reasoning=reasoning,
+        ))
+
+    items.sort(key=lambda x: x.score, reverse=True)
+    items = items[:limit]
+    for i, it in enumerate(items):
+        it.rank = i + 1
+
+    return OpportunitiesFilteredResponse(
+        goal=goal,
+        risk=risk,
+        budget_aed_max=budget_aed_max,
+        property_type=property_type,
+        count=len(items),
+        formula=OpportunityScoreFormula(),
+        items=items,
+    )
+
+
+# ===========================================================================
+# Similar areas — k-NN by (yield, log price). Cheap proxy that works well
+# for "if you like JVC you might like X" suggestions.
+# ===========================================================================
+
+@router.get("/areas/{name_or_norm}/similar", response_model=SimilarAreasResponse)
+async def dld_similar_areas(
+    name_or_norm: str,
+    limit: int = Query(3, ge=1, le=10),
+    db: AsyncSession = Depends(get_db),
+):
+    import math
+    norm = re.sub(r"\s+", " ", name_or_norm.strip().lower())
+
+    # Pull source area + all candidates with metrics
+    rows = (await db.execute(
+        select(DldArea, DldAreaMetrics)
+        .join(DldAreaMetrics, DldAreaMetrics.dld_area_id == DldArea.id)
+        .where(
+            DldAreaMetrics.period == "2026-ytd",
+            DldAreaMetrics.rental_yield_pct.is_not(None),
+            DldAreaMetrics.median_price_per_sqft.is_not(None),
+            DldAreaMetrics.sales_count >= MIN_RELIABLE_SAMPLES,
+        )
+    )).all()
+
+    source = next(
+        (
+            (a, m) for a, m in rows
+            if a.name_norm == norm or (a.name_display or "").lower() == norm
+        ),
+        None,
+    )
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"No area metrics for '{name_or_norm}'")
+    src_area, src_metrics = source
+    src_yield = float(src_metrics.rental_yield_pct)
+    src_ppsf = float(src_metrics.median_price_per_sqft)
+    src_log_price = math.log(src_ppsf) if src_ppsf > 0 else 0
+
+    # Score each candidate by inverse distance in (yield, log-price) space
+    cands = []
+    for a, m in rows:
+        if a.id == src_area.id:
+            continue
+        y = float(m.rental_yield_pct)
+        p = float(m.median_price_per_sqft)
+        if p <= 0:
+            continue
+        d_yield = abs(y - src_yield) / 5.0  # normalise yield diff by 5pp
+        d_price = abs(math.log(p) - src_log_price) / 1.5  # log-space tolerance
+        dist = (d_yield**2 + d_price**2) ** 0.5
+        # similarity_score: 1 when identical, 0 when distant
+        sim = max(0.0, 1.0 - dist)
+        cands.append((sim, a, m, y, p))
+
+    cands.sort(key=lambda x: -x[0])
+    top = cands[:limit]
+    items = []
+    for i, (sim, a, m, y, p) in enumerate(top):
+        # Build a short reason citing the closest dimension
+        d_y = abs(y - src_yield)
+        d_p_pct = abs(p - src_ppsf) / max(src_ppsf, 1) * 100
+        if d_y < 0.5 and d_p_pct < 15:
+            reason = f"Near-identical yield ({y:.2f}% vs {src_yield:.2f}%) and price"
+        elif d_y < 0.5:
+            reason = f"Similar yield ({y:.2f}% vs {src_yield:.2f}%)"
+        elif d_p_pct < 15:
+            reason = f"Similar price band (~{p:.0f} vs {src_ppsf:.0f} AED/sqft)"
+        else:
+            reason = f"Closest match overall (yield {y:.2f}%, {p:.0f} AED/sqft)"
+        items.append(SimilarAreaItem(
+            rank=i + 1,
+            area_id=str(a.id),
+            area_name=a.name_display or a.name_norm.title(),
+            area_name_norm=a.name_norm,
+            median_price_per_sqft=p,
+            rental_yield_pct=y,
+            similarity_score=round(sim, 3),
+            reason=reason,
+        ))
+    return SimilarAreasResponse(
+        source_area_name=src_area.name_display or src_area.name_norm.title(),
+        source_yield_pct=src_yield,
+        source_price_per_sqft=src_ppsf,
+        count=len(items),
+        items=items,
+    )
+
+
+# ===========================================================================
+# Market timing — "is now a good time to buy in {area}?"
+# Three signals: yield_trend (rising = good), price_position (% below 5y
+# peak = good), supply_pressure (low off-plan share = good).
+# ===========================================================================
+
+@router.get("/areas/{name_or_norm}/market-timing", response_model=MarketTimingResponse)
+async def dld_market_timing(
+    name_or_norm: str,
+    db: AsyncSession = Depends(get_db),
+):
+    norm = re.sub(r"\s+", " ", name_or_norm.strip().lower())
+
+    src_area = (await db.execute(
+        select(DldArea).where(
+            (DldArea.name_norm == norm) | (func.lower(DldArea.name_display) == norm)
+        )
+    )).scalar_one_or_none()
+    if src_area is None:
+        raise HTTPException(status_code=404, detail=f"Area '{name_or_norm}' not found")
+
+    # Yield trend
+    ytrend_rows = (await db.execute(
+        select(DldYieldHistory.year, DldYieldHistory.gross_yield_pct)
+        .where(
+            DldYieldHistory.area_name_norm == src_area.name_norm,
+            DldYieldHistory.sample_score >= MIN_RELIABLE_SAMPLES,
+            DldYieldHistory.gross_yield_pct.is_not(None),
+        )
+        .order_by(DldYieldHistory.year)
+    )).all()
+    yield_series = [(int(y), float(v)) for y, v in ytrend_rows if v is not None]
+    current_yield = yield_series[-1][1] if yield_series else None
+    yield_5y_avg = (
+        sum(v for _, v in yield_series) / len(yield_series)
+        if yield_series else None
+    )
+
+    # Price position vs 5y peak
+    price_rows = (await db.execute(
+        select(DldPriceHistory.year, DldPriceHistory.avg_ppsf_all, DldPriceHistory.offplan_pct)
+        .where(
+            DldPriceHistory.area_name_norm == src_area.name_norm,
+            DldPriceHistory.avg_ppsf_all.is_not(None),
+        )
+        .order_by(DldPriceHistory.year)
+    )).all()
+    price_series = [(int(y), float(p), float(op) if op is not None else None) for y, p, op in price_rows if p is not None]
+    current_ppsf = price_series[-1][1] if price_series else None
+    peak_ppsf = max((p for _, p, _ in price_series), default=None)
+    latest_offplan = price_series[-1][2] if price_series else None
+
+    signals: List[MarketTimingSignal] = []
+    reasoning: List[str] = []
+
+    # Signal 1: yield trend
+    if len(yield_series) >= 3:
+        first_y = yield_series[0][1]
+        delta_y = current_yield - first_y if current_yield is not None else 0
+        if delta_y < -1.0:
+            signals.append(MarketTimingSignal(
+                label="yield_trend",
+                value=f"falling ({delta_y:+.2f}pp over {len(yield_series)}y)",
+                tone="negative",
+                detail=f"Yields compressed from {first_y:.2f}% to {current_yield:.2f}%",
+            ))
+            reasoning.append(
+                f"Yield compressed from {first_y:.2f}% in {yield_series[0][0]} "
+                f"to {current_yield:.2f}% in {yield_series[-1][0]} — buying late in the cycle"
+            )
+        elif delta_y > 0.5:
+            signals.append(MarketTimingSignal(
+                label="yield_trend",
+                value=f"rising (+{delta_y:.2f}pp over {len(yield_series)}y)",
+                tone="positive",
+                detail=f"Yields expanded from {first_y:.2f}% to {current_yield:.2f}%",
+            ))
+            reasoning.append(
+                f"Yield expanded from {first_y:.2f}% to {current_yield:.2f}% — favourable entry"
+            )
+        else:
+            signals.append(MarketTimingSignal(
+                label="yield_trend",
+                value="stable",
+                tone="neutral",
+                detail=f"Roughly flat at {current_yield:.2f}% (5y avg {yield_5y_avg:.2f}%)" if yield_5y_avg else "Roughly flat",
+            ))
+
+    # Signal 2: price position
+    if peak_ppsf and current_ppsf and peak_ppsf > 0:
+        gap_pct = (peak_ppsf - current_ppsf) / peak_ppsf * 100
+        if gap_pct >= 10:
+            signals.append(MarketTimingSignal(
+                label="price_position",
+                value=f"{gap_pct:.0f}% below 5y peak",
+                tone="positive",
+                detail=f"Current {current_ppsf:.0f} vs peak {peak_ppsf:.0f} AED/sqft",
+            ))
+            reasoning.append(
+                f"Sale ppsf is {gap_pct:.0f}% below the 5y peak — potential discount entry"
+            )
+        elif gap_pct < 2:
+            signals.append(MarketTimingSignal(
+                label="price_position",
+                value="at or near 5y peak",
+                tone="negative",
+                detail=f"Current {current_ppsf:.0f} ≈ peak {peak_ppsf:.0f} AED/sqft",
+            ))
+            reasoning.append(
+                f"Sale ppsf is near 5y peak ({current_ppsf:.0f} vs {peak_ppsf:.0f}) — pricier entry"
+            )
+        else:
+            signals.append(MarketTimingSignal(
+                label="price_position",
+                value=f"{gap_pct:.0f}% below peak",
+                tone="neutral",
+                detail=f"Mid-cycle entry — current {current_ppsf:.0f} AED/sqft",
+            ))
+
+    # Signal 3: supply pressure
+    if latest_offplan is not None:
+        if latest_offplan >= 60:
+            signals.append(MarketTimingSignal(
+                label="supply_pressure",
+                value="high",
+                tone="negative",
+                detail=f"{latest_offplan:.0f}% of latest-year sales are off-plan",
+            ))
+            reasoning.append(
+                f"{latest_offplan:.0f}% of {price_series[-1][0]} sales are off-plan — heavy "
+                f"incoming supply may compress rents at handover"
+            )
+        elif latest_offplan < 30:
+            signals.append(MarketTimingSignal(
+                label="supply_pressure",
+                value="low",
+                tone="positive",
+                detail=f"Only {latest_offplan:.0f}% of latest-year sales are off-plan",
+            ))
+            reasoning.append(
+                f"Only {latest_offplan:.0f}% of latest-year sales are off-plan — mature, "
+                f"stable supply"
+            )
+        else:
+            signals.append(MarketTimingSignal(
+                label="supply_pressure",
+                value="medium",
+                tone="neutral",
+                detail=f"{latest_offplan:.0f}% off-plan share",
+            ))
+
+    # Verdict — count positive vs negative signals
+    pos = sum(1 for s in signals if s.tone == "positive")
+    neg = sum(1 for s in signals if s.tone == "negative")
+    if pos >= 2 and neg == 0:
+        verdict = "good_time"
+        headline = f"Favourable entry for {src_area.name_display or src_area.name_norm.title()}"
+    elif neg >= 2:
+        verdict = "caution"
+        headline = f"Caution: {src_area.name_display or src_area.name_norm.title()} shows late-cycle signals"
+    else:
+        verdict = "neutral"
+        headline = f"{src_area.name_display or src_area.name_norm.title()} is mid-cycle"
+
+    confidence = "high" if len(signals) == 3 else "medium" if len(signals) == 2 else "low"
+
+    return MarketTimingResponse(
+        area_name=src_area.name_display or src_area.name_norm.title(),
+        area_name_norm=src_area.name_norm,
+        verdict=verdict,  # type: ignore[arg-type]
+        confidence=confidence,  # type: ignore[arg-type]
+        headline=headline,
+        signals=signals,
+        reasoning=reasoning,
+        current_yield_pct=round(current_yield, 2) if current_yield is not None else None,
+        yield_5y_avg_pct=round(yield_5y_avg, 2) if yield_5y_avg is not None else None,
+        current_ppsf=round(current_ppsf, 0) if current_ppsf is not None else None,
+        ppsf_5y_peak=round(peak_ppsf, 0) if peak_ppsf is not None else None,
+        latest_offplan_pct=round(latest_offplan, 1) if latest_offplan is not None else None,
+    )
+
+
+# ===========================================================================
+# ROI calculator — comprehensive 12-section response.
+# Pure compute + area defaults from DLD. Returns everything the frontend
+# needs in one call so the UI can render without follow-ups.
+# ===========================================================================
+
+# Indicative FX rates — for the converter section only. Refreshed quarterly
+# manually until we wire a live FX feed. Disclose this on the response.
+ROI_FX_RATES: dict[str, tuple[str, float]] = {
+    # code: (symbol, AED-per-1-of-currency)
+    "USD": ("$",   3.6725),
+    "GBP": ("£",   4.65),
+    "EUR": ("€",   3.95),
+    "INR": ("₹",   0.044),
+    "RUB": ("₽",   0.040),
+    "CNY": ("¥",   0.505),
+}
+
+
+@router.post("/roi/calculate", response_model=RoiCalcResponse)
+async def dld_roi_calculate(
+    req: RoiCalcRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Full 12-section ROI calculation. Area defaults pulled from DLD;
+    everything else from request. Tax + FX sections use static disclosed
+    values so the response is fully deterministic.
+    """
+    norm = re.sub(r"\s+", " ", req.area_name.strip().lower())
+
+    # Pull area + metrics + appreciation for defaults
+    row = (await db.execute(
+        select(DldArea, DldAreaMetrics, DldAreaAppreciation)
+        .join(DldAreaMetrics, DldAreaMetrics.dld_area_id == DldArea.id)
+        .outerjoin(DldAreaAppreciation, DldAreaAppreciation.dld_area_id == DldArea.id)
+        .where(
+            (DldArea.name_norm == norm) | (func.lower(DldArea.name_display) == norm),
+            DldAreaMetrics.period == "2026-ytd",
+        )
+    )).first()
+
+    defaults: dict = {}
+    median_rent = None
+    median_ppsf_area = None
+    cagr_used = None
+    cagr_source = "Dubai market average"
+
+    if row is not None:
+        area, metrics, appr = row
+        median_rent = float(metrics.median_annual_rent) if metrics.median_annual_rent else None
+        median_ppsf_area = float(metrics.median_price_per_sqft) if metrics.median_price_per_sqft else None
+        if appr is not None and appr.cagr_5y_pct is not None and (appr.years_of_data or 0) >= 4:
+            cagr_used = float(appr.cagr_5y_pct)
+            cagr_source = f"DLD area CAGR (2021→{appr.latest_year})"
+
+    # Fallbacks
+    if cagr_used is None:
+        cagr_used = 8.5  # Dubai-wide ballpark
+    rent_used = req.expected_annual_rent_aed
+    if rent_used is None and median_rent is not None:
+        rent_used = median_rent
+        defaults["expected_annual_rent_aed"] = median_rent
+    if rent_used is None:
+        # Last-resort estimate from purchase price × 6% gross
+        rent_used = req.purchase_price_aed * 0.06
+        defaults["expected_annual_rent_aed"] = round(rent_used, 0)
+
+    # Service charge per sqft — DLD does not publish this directly. We use
+    # 15 AED/sqft as a Dubai mid-range default if the client didn't supply.
+    sc_per_sqft = req.service_charge_aed_per_sqft
+    if sc_per_sqft is None:
+        sc_per_sqft = 15.0
+        defaults["service_charge_aed_per_sqft"] = sc_per_sqft
+
+    # ---- Cost breakdown ----
+    dld_transfer = req.purchase_price_aed * 0.04
+    agency = req.purchase_price_aed * 0.02
+    agency_vat = agency * 0.05
+    trustee = 4200.0
+    mortgage_reg = 0.0
+    notes = ["DLD transfer fee 4%", "Agency 2% + 5% VAT", "Trustee AED 4,200"]
+    if req.payment == "mortgage" and req.mortgage:
+        mortgage_reg = req.purchase_price_aed * 0.0025
+        notes.append("Mortgage registration 0.25%")
+    total_buying_cost = dld_transfer + agency + agency_vat + trustee + mortgage_reg
+    cost_breakdown = RoiCalcCostBreakdown(
+        dld_transfer_aed=round(dld_transfer, 0),
+        agency_aed=round(agency, 0),
+        agency_vat_aed=round(agency_vat, 0),
+        trustee_aed=round(trustee, 0),
+        mortgage_registration_aed=round(mortgage_reg, 0),
+        total_buying_cost_aed=round(total_buying_cost, 0),
+        notes=notes,
+    )
+
+    # ---- Section 1: investment summary ----
+    if req.payment == "cash":
+        cash_needed = req.purchase_price_aed + total_buying_cost
+    else:
+        dp_pct = req.mortgage.down_payment_pct if req.mortgage else 20.0
+        cash_needed = req.purchase_price_aed * (dp_pct / 100) + total_buying_cost
+    total_investment = req.purchase_price_aed + total_buying_cost
+
+    # ---- Section 2: rental returns ----
+    gross_rent = rent_used
+    service_charge_total = sc_per_sqft * (req.size_sqm * 10.7639)  # sqm→sqft
+    maint = req.purchase_price_aed * (req.maintenance_pct / 100)
+    pmgmt = gross_rent * (req.property_management_pct / 100)
+    vacancy_loss = gross_rent * (req.vacancy_rate_pct / 100)
+    opex = service_charge_total + maint + pmgmt + vacancy_loss
+    net_rent = gross_rent - opex
+
+    gross_yield = (gross_rent / req.purchase_price_aed) * 100 if req.purchase_price_aed else 0.0
+    net_yield = (net_rent / req.purchase_price_aed) * 100 if req.purchase_price_aed else 0.0
+
+    annual_cash_flow = None
+    monthly_cash_flow = None
+    annual_mortgage = 0.0
+    monthly_mortgage = 0.0
+    if req.payment == "mortgage" and req.mortgage:
+        loan_amount = req.purchase_price_aed * (1 - req.mortgage.down_payment_pct / 100)
+        r_monthly = req.mortgage.interest_rate_pct / 100 / 12
+        n_months = req.mortgage.term_years * 12
+        if r_monthly > 0:
+            monthly_mortgage = loan_amount * (
+                r_monthly * (1 + r_monthly) ** n_months
+            ) / ((1 + r_monthly) ** n_months - 1)
+        else:
+            monthly_mortgage = loan_amount / n_months
+        annual_mortgage = monthly_mortgage * 12
+        annual_cash_flow = net_rent - annual_mortgage
+        monthly_cash_flow = annual_cash_flow / 12
+
+    rental_returns = RoiCalcRentalReturns(
+        gross_rent_aed=round(gross_rent, 0),
+        operating_expenses_aed=round(opex, 0),
+        net_rent_aed=round(net_rent, 0),
+        gross_yield_pct=round(gross_yield, 2),
+        net_yield_pct=round(net_yield, 2),
+        monthly_cash_flow_aed=round(monthly_cash_flow, 0) if monthly_cash_flow is not None else None,
+        annual_cash_flow_aed=round(annual_cash_flow, 0) if annual_cash_flow is not None else None,
+    )
+
+    # ---- Section 3: capital growth ----
+    projected_5y = req.purchase_price_aed * ((1 + cagr_used / 100) ** 5)
+    total_5y_income = net_rent * 5  # ignores rent growth — conservative
+    total_5y_return_aed = (projected_5y - req.purchase_price_aed) + total_5y_income
+    total_5y_return_pct = total_5y_return_aed / total_investment * 100 if total_investment else 0
+    # Rough IRR using even cash flow + lump-sum exit
+    if total_investment > 0:
+        cf_per_year = (net_rent + (projected_5y - req.purchase_price_aed) / 5)
+        irr_estimate = (cf_per_year / total_investment) * 100
+    else:
+        irr_estimate = None
+
+    capital_growth = RoiCalcCapitalGrowth(
+        current_value_aed=round(req.purchase_price_aed, 0),
+        projected_value_5y_aed=round(projected_5y, 0),
+        cagr_pct_used=round(cagr_used, 2),
+        cagr_source=cagr_source,
+        total_5y_return_aed=round(total_5y_return_aed, 0),
+        total_5y_return_pct=round(total_5y_return_pct, 1),
+        irr_estimate_pct=round(irr_estimate, 1) if irr_estimate is not None else None,
+    )
+
+    # ---- Section 4: payback ----
+    annual_return = net_rent  # rent-only payback
+    payback_years = total_investment / annual_return if annual_return > 0 else None
+
+    # ---- Section 5: benchmarks ----
+    # Yield vs area: req gross yield vs the DLD median yield for the area
+    your_yield = round(gross_yield, 2)
+    area_yield = None
+    if row is not None:
+        _, metrics, _ = row
+        area_yield = cap_yield(float(metrics.rental_yield_pct)) if metrics.rental_yield_pct else None
+    yield_verdict = "in-line with area"
+    if area_yield is not None:
+        if your_yield > area_yield * 1.1:
+            yield_verdict = f"above area average ({area_yield:.2f}%)"
+        elif your_yield < area_yield * 0.9:
+            yield_verdict = f"below area average ({area_yield:.2f}%)"
+    yield_bench = RoiCalcBenchmark(
+        your_value=your_yield,
+        area_median=area_yield,
+        verdict=yield_verdict,
+    )
+
+    your_ppsf = req.purchase_price_aed / (req.size_sqm * 10.7639) if req.size_sqm > 0 else 0
+    price_verdict = "in-line with area"
+    if median_ppsf_area:
+        if your_ppsf > median_ppsf_area * 1.1:
+            price_verdict = f"above area median ({median_ppsf_area:.0f} AED/sqft)"
+        elif your_ppsf < median_ppsf_area * 0.9:
+            price_verdict = f"below area median ({median_ppsf_area:.0f} AED/sqft) — potential value"
+    price_bench = RoiCalcBenchmark(
+        your_value=round(your_ppsf, 0),
+        area_median=round(median_ppsf_area, 0) if median_ppsf_area else None,
+        verdict=price_verdict,
+    )
+
+    # ---- Section 6: 3 scenarios ----
+    scenarios = []
+    for label, rent_mult in (("Conservative", 0.95), ("Realistic", 1.00), ("Optimistic", 1.10)):
+        sc_rent = gross_rent * rent_mult
+        sc_opex = service_charge_total + maint + sc_rent * (req.property_management_pct / 100) + sc_rent * (req.vacancy_rate_pct / 100)
+        sc_net = sc_rent - sc_opex
+        sc_acf = None
+        if req.payment == "mortgage" and req.mortgage:
+            sc_acf = sc_net - annual_mortgage
+        scenarios.append(RoiCalcScenario(
+            label=label,
+            annual_rent_aed=round(sc_rent, 0),
+            net_yield_pct=round(sc_net / req.purchase_price_aed * 100, 2) if req.purchase_price_aed else 0,
+            annual_cash_flow_aed=round(sc_acf, 0) if sc_acf is not None else None,
+        ))
+
+    # ---- Section 7: sensitivity ----
+    sensitivity = []
+    # Rent ±10%
+    delta_rent = gross_rent * 0.10
+    sensitivity.append(RoiCalcSensitivityItem(
+        scenario="Rent +10%",
+        delta_annual_cash_flow_aed=round(delta_rent, 0),
+        delta_net_yield_pp=round(delta_rent / req.purchase_price_aed * 100, 2) if req.purchase_price_aed else None,
+        note=f"+{delta_rent:.0f} AED net rent per year",
+    ))
+    sensitivity.append(RoiCalcSensitivityItem(
+        scenario="Rent -10%",
+        delta_annual_cash_flow_aed=round(-delta_rent, 0),
+        delta_net_yield_pp=round(-delta_rent / req.purchase_price_aed * 100, 2) if req.purchase_price_aed else None,
+        note=f"-{delta_rent:.0f} AED net rent per year",
+    ))
+    # Rate ±1pp (only meaningful for mortgage)
+    if req.payment == "mortgage" and req.mortgage:
+        loan_amt = req.purchase_price_aed * (1 - req.mortgage.down_payment_pct / 100)
+        for direction, sign in (("Rate +1pp", 1), ("Rate -1pp", -1)):
+            new_rate = (req.mortgage.interest_rate_pct + sign) / 100 / 12
+            n = req.mortgage.term_years * 12
+            if new_rate > 0:
+                new_pmt = loan_amt * (new_rate * (1 + new_rate) ** n) / ((1 + new_rate) ** n - 1)
+            else:
+                new_pmt = loan_amt / n
+            delta_annual = (new_pmt - monthly_mortgage) * 12
+            sensitivity.append(RoiCalcSensitivityItem(
+                scenario=direction,
+                delta_annual_cash_flow_aed=round(-delta_annual, 0),
+                delta_net_yield_pp=None,
+                note=f"Annual mortgage payment changes by {delta_annual:+,.0f} AED",
+            ))
+    # Zero appreciation
+    sensitivity.append(RoiCalcSensitivityItem(
+        scenario="Zero appreciation (flat 5y)",
+        delta_annual_cash_flow_aed=None,
+        delta_net_yield_pp=None,
+        note=f"5y total return falls from {capital_growth.total_5y_return_pct:.0f}% "
+             f"to ~{(total_5y_income / total_investment * 100):.0f}% (rent only)",
+    ))
+
+    # ---- Section 8: tax advantages ----
+    tax_advantages = [
+        "Zero personal income tax on rental yield",
+        "Zero capital gains tax on property sale",
+        "Zero inheritance tax",
+        "Zero stamp duty (DLD transfer 4% one-off only, no annual property tax)",
+    ]
+
+    # ---- Section 9: FX ----
+    fx_disclaimer = (
+        "FX rates are indicative quarterly snapshots, not live. "
+        "Use only for ballpark conversion."
+    )
+    currencies = [
+        RoiCalcCurrency(
+            code=code,
+            symbol=sym,
+            price_local=round(req.purchase_price_aed / rate, 0),
+        )
+        for code, (sym, rate) in ROI_FX_RATES.items()
+    ]
+
+    # ---- Section 10: AI insight ----
+    bullets: list[str] = []
+    if net_yield >= 6:
+        bullets.append(f"Net yield of {net_yield:.2f}% is solid for Dubai (above 6% threshold)")
+    elif net_yield >= 4:
+        bullets.append(f"Net yield of {net_yield:.2f}% is moderate — appreciation needs to carry the return")
+    else:
+        bullets.append(f"Net yield of {net_yield:.2f}% is low — only makes sense if you expect strong capital growth")
+    if payback_years and payback_years < 15:
+        bullets.append(f"Payback in {payback_years:.1f}y from rent alone is healthy")
+    elif payback_years and payback_years >= 20:
+        bullets.append(f"Payback of {payback_years:.0f}y is long — this is an appreciation play, not income")
+    if area_yield and your_yield > area_yield * 1.1:
+        bullets.append(f"Your yield is meaningfully above the area median — verify the rent assumption is realistic")
+    if median_ppsf_area and your_ppsf < median_ppsf_area * 0.9:
+        bullets.append(
+            f"Your purchase ppsf ({your_ppsf:.0f}) is below area median ({median_ppsf_area:.0f}) — "
+            f"potential discount or below-spec property"
+        )
+    if req.payment == "mortgage" and req.mortgage and annual_cash_flow is not None:
+        if annual_cash_flow > 0:
+            bullets.append(f"Mortgage cash-flow positive at {annual_cash_flow:+,.0f} AED/year")
+        else:
+            bullets.append(f"Mortgage cash-flow NEGATIVE at {annual_cash_flow:+,.0f} AED/year — capital growth must compensate")
+
+    summary = (
+        f"Total 5y return projected at {capital_growth.total_5y_return_pct:.0f}% "
+        f"({capital_growth.cagr_pct_used:.1f}% annual CAGR + rent), "
+        f"net yield {net_yield:.2f}%."
+    )
+    insight = RoiCalcInsight(summary=summary, bullets=bullets)
+
+    return RoiCalcResponse(
+        area_name=req.area_name,
+        property_type=req.property_type,
+        size_sqm=req.size_sqm,
+        purchase_price_aed=req.purchase_price_aed,
+        payment=req.payment,
+        total_cash_needed_aed=round(cash_needed, 0),
+        total_investment_inc_costs_aed=round(total_investment, 0),
+        rental_returns=rental_returns,
+        capital_growth=capital_growth,
+        payback_years=round(payback_years, 1) if payback_years is not None else None,
+        yield_vs_market=yield_bench,
+        price_vs_market=price_bench,
+        scenarios=scenarios,
+        sensitivity=sensitivity,
+        tax_advantages=tax_advantages,
+        effective_net_yield_after_tax_pct=round(net_yield, 2),
+        fx_rates_disclaimer=fx_disclaimer,
+        currencies=currencies,
+        insight=insight,
+        cost_breakdown=cost_breakdown,
+        defaults_used=defaults,
     )

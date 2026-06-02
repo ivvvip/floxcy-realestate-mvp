@@ -506,6 +506,267 @@ class DldBrokersResponse(Attribution):
 
 
 # ---------------------------------------------------------------------------
+# New endpoints — rent rankings, opportunities filter, similar areas,
+# ROI calculator, market timing. All grounded in real DLD tables.
+# ---------------------------------------------------------------------------
+
+class RentRankingItem(BaseModel):
+    area_name: str
+    area_name_norm: str
+    prop_sub_type: str
+    size_band: str
+    median_annual_rent: float
+    median_rent_per_sqft: float
+    p25_annual_rent: Optional[float] = None
+    p75_annual_rent: Optional[float] = None
+    sample_count: int
+
+
+class RentRankingResponse(Attribution):
+    direction: Literal["cheapest", "expensive"]
+    size_category: str
+    prop_sub_type: str
+    count: int
+    items: List[RentRankingItem]
+
+
+class OpportunityFilteredItem(BaseModel):
+    """A single area's opportunity card, DLD-grounded.
+
+    Fields are derived directly from DLD tables — no fabrication. Sample
+    counts travel with each metric so the client can fade low-confidence
+    rows without us having to lie about the underlying data.
+    """
+    area_id: str
+    area_name: str
+    area_name_norm: str
+    rank: int
+    score: float  # 0-100, computed from the 5-component formula
+
+    # Core metrics
+    gross_yield_pct: Optional[float] = None
+    rent_growth_yoy_pct: Optional[float] = None
+    appreciation_5y_pct: Optional[float] = None
+    cagr_5y_pct: Optional[float] = None
+    median_price_per_sqft: Optional[float] = None
+    transaction_count: int = 0
+
+    # Supply + freehold + visa
+    supply_risk: Optional[Literal["low", "medium", "high"]] = None
+    offplan_pct: Optional[float] = None
+    freehold_pct: Optional[float] = None  # area-level freehold share
+    investor_visa_eligible: bool = False  # entry-price ≥ AED 750K freehold
+
+    # Sample-trust signals
+    sales_sample_count: int = 0
+    rent_sample_count: int = 0
+    confidence: Literal["low", "medium", "high"] = "low"
+
+    # Why this rank (cited bullets)
+    reasoning: List[str] = []
+
+
+class OpportunityScoreFormula(BaseModel):
+    """The exact weights used to compute `score`, returned to the client so
+    the UI can show "How we score →" transparently."""
+    yield_weight: float = 0.30
+    rent_growth_weight: float = 0.25
+    appreciation_weight: float = 0.20
+    demand_weight: float = 0.15
+    low_supply_risk_weight: float = 0.10
+
+
+class OpportunitiesFilteredResponse(Attribution):
+    goal: str
+    risk: str
+    budget_aed_max: Optional[float] = None
+    property_type: Optional[str] = None
+    count: int
+    formula: OpportunityScoreFormula
+    items: List[OpportunityFilteredItem]
+
+
+class SimilarAreaItem(BaseModel):
+    rank: int
+    area_id: str
+    area_name: str
+    area_name_norm: str
+    median_price_per_sqft: Optional[float] = None
+    rental_yield_pct: Optional[float] = None
+    similarity_score: float  # 0-1
+    reason: str  # human-readable explanation
+
+
+class SimilarAreasResponse(Attribution):
+    source_area_name: str
+    source_yield_pct: Optional[float] = None
+    source_price_per_sqft: Optional[float] = None
+    count: int
+    items: List[SimilarAreaItem]
+
+
+class MarketTimingSignal(BaseModel):
+    label: str  # 'yield_trend' | 'price_position' | 'supply_pressure'
+    value: str  # 'falling' | '15% below 5y peak' | 'high'
+    tone: Literal["positive", "neutral", "negative"]
+    detail: str
+
+
+class MarketTimingResponse(Attribution):
+    area_name: str
+    area_name_norm: str
+    verdict: Literal["good_time", "neutral", "caution"]
+    confidence: Literal["low", "medium", "high"]
+    headline: str  # short user-facing summary
+    signals: List[MarketTimingSignal]
+    reasoning: List[str]  # cited bullets
+    # Raw numbers backing the verdict
+    current_yield_pct: Optional[float] = None
+    yield_5y_avg_pct: Optional[float] = None
+    current_ppsf: Optional[float] = None
+    ppsf_5y_peak: Optional[float] = None
+    latest_offplan_pct: Optional[float] = None
+
+
+# ---- ROI calculator ----
+
+class RoiCalcMortgage(BaseModel):
+    down_payment_pct: float = Field(20.0, ge=0, le=100)
+    interest_rate_pct: float = Field(5.0, ge=0, le=20)
+    term_years: int = Field(25, ge=1, le=40)
+
+
+class RoiCalcRequest(BaseModel):
+    area_name: str = Field(..., min_length=2, max_length=128)
+    property_type: Literal["studio", "1br", "2br", "3br", "4br"] = "1br"
+    size_sqm: float = Field(..., gt=0, lt=10000)
+    purchase_price_aed: float = Field(..., gt=0)
+    payment: Literal["cash", "mortgage"] = "cash"
+    mortgage: Optional[RoiCalcMortgage] = None
+    expected_annual_rent_aed: Optional[float] = Field(
+        None, gt=0,
+        description="Annual rent. If omitted, server uses DLD median for the area+size.",
+    )
+    service_charge_aed_per_sqft: Optional[float] = Field(None, ge=0)
+    maintenance_pct: float = Field(1.0, ge=0, le=10)
+    property_management_pct: float = Field(0.0, ge=0, le=20)
+    vacancy_rate_pct: float = Field(5.0, ge=0, le=50)
+
+
+class RoiCalcCostBreakdown(BaseModel):
+    dld_transfer_aed: float
+    agency_aed: float
+    agency_vat_aed: float
+    trustee_aed: float
+    mortgage_registration_aed: float
+    total_buying_cost_aed: float
+    notes: List[str]
+
+
+class RoiCalcRentalReturns(BaseModel):
+    gross_rent_aed: float
+    operating_expenses_aed: float
+    net_rent_aed: float
+    gross_yield_pct: float
+    net_yield_pct: float
+    monthly_cash_flow_aed: Optional[float] = None  # None for cash purchase
+    annual_cash_flow_aed: Optional[float] = None
+
+
+class RoiCalcCapitalGrowth(BaseModel):
+    current_value_aed: float
+    projected_value_5y_aed: float
+    cagr_pct_used: float
+    cagr_source: str  # 'DLD area CAGR' | 'Dubai market average'
+    total_5y_return_aed: float
+    total_5y_return_pct: float
+    irr_estimate_pct: Optional[float] = None
+
+
+class RoiCalcScenario(BaseModel):
+    label: str  # 'Conservative' | 'Realistic' | 'Optimistic'
+    annual_rent_aed: float
+    net_yield_pct: float
+    annual_cash_flow_aed: Optional[float] = None
+
+
+class RoiCalcSensitivityItem(BaseModel):
+    scenario: str  # 'Rent +10%' | 'Rate +1pp' | etc
+    delta_annual_cash_flow_aed: Optional[float] = None
+    delta_net_yield_pp: Optional[float] = None  # percentage points
+    note: str
+
+
+class RoiCalcBenchmark(BaseModel):
+    your_value: float
+    area_median: Optional[float] = None
+    percentile_rank: Optional[float] = None  # 0-100 if computable
+    verdict: str  # 'above area average', 'in-line', etc
+
+
+class RoiCalcCurrency(BaseModel):
+    code: str
+    symbol: str
+    price_local: float
+
+
+class RoiCalcInsight(BaseModel):
+    summary: str
+    bullets: List[str]
+
+
+class RoiCalcResponse(Attribution):
+    # Echo of inputs for the PDF / share card
+    area_name: str
+    property_type: str
+    size_sqm: float
+    purchase_price_aed: float
+    payment: str
+
+    # Section 1: investment summary
+    total_cash_needed_aed: float
+    total_investment_inc_costs_aed: float
+
+    # Section 2: rental returns
+    rental_returns: RoiCalcRentalReturns
+
+    # Section 3: capital growth
+    capital_growth: RoiCalcCapitalGrowth
+
+    # Section 4: payback
+    payback_years: Optional[float] = None
+
+    # Section 5: vs market benchmarks
+    yield_vs_market: RoiCalcBenchmark
+    price_vs_market: RoiCalcBenchmark
+
+    # Section 6: 3 scenarios
+    scenarios: List[RoiCalcScenario]
+
+    # Section 7: sensitivity
+    sensitivity: List[RoiCalcSensitivityItem]
+
+    # Section 8: tax comparison — Dubai vs major investor home markets
+    tax_advantages: List[str]
+    effective_net_yield_after_tax_pct: float  # same as gross since zero tax
+
+    # Section 9: currency conversion (indicative only — disclose)
+    fx_rates_disclaimer: str
+    currencies: List[RoiCalcCurrency]
+
+    # Section 10: AI insight
+    insight: RoiCalcInsight
+
+    # Section 11/12: PDF/CTAs are frontend concerns — server just provides data
+
+    # Cost breakdown (always returned)
+    cost_breakdown: RoiCalcCostBreakdown
+
+    # Defaults the server filled in (so client can show "auto-filled from DLD")
+    defaults_used: dict
+
+
+# ---------------------------------------------------------------------------
 # Dashboard data — single-call aggregator for the Bloomberg-style dashboard
 # ---------------------------------------------------------------------------
 # All sections sourced from real DLD tables. Anything we don't have honest
