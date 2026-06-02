@@ -1,0 +1,3290 @@
+[
+  {
+    "area_name": "Abu Hail",
+    "area_name_upper": "ABU HAIL",
+    "area_name_slug": "abu-hail",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1977,
+    "occurrence_count": 32104
+  },
+  {
+    "area_name": "Al Asbaq",
+    "area_name_upper": "AL ASBAQ",
+    "area_name_slug": "al-asbaq",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 23
+  },
+  {
+    "area_name": "Al Athbah",
+    "area_name_upper": "AL ATHBAH",
+    "area_name_slug": "al-athbah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2019,
+    "occurrence_count": 2836
+  },
+  {
+    "area_name": "Al Aweer First",
+    "area_name_upper": "AL AWEER FIRST",
+    "area_name_slug": "al-aweer-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2003,
+    "occurrence_count": 17345
+  },
+  {
+    "area_name": "Al Aweer Second",
+    "area_name_upper": "AL AWEER SECOND",
+    "area_name_slug": "al-aweer-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2003,
+    "occurrence_count": 2764
+  },
+  {
+    "area_name": "Al Baagh",
+    "area_name_upper": "AL BAAGH",
+    "area_name_slug": "al-baagh",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Al Bada",
+    "area_name_upper": "AL BADA",
+    "area_name_slug": "al-bada",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1988,
+    "occurrence_count": 74840
+  },
+  {
+    "area_name": "Al Baharna",
+    "area_name_upper": "AL BAHARNA",
+    "area_name_slug": "al-baharna",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 6
+  },
+  {
+    "area_name": "Al Baraha",
+    "area_name_upper": "AL BARAHA",
+    "area_name_slug": "al-baraha",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1990,
+    "occurrence_count": 63729
+  },
+  {
+    "area_name": "Al Barsha",
+    "area_name_upper": "AL BARSHA",
+    "area_name_slug": "al-barsha",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 124
+  },
+  {
+    "area_name": "Al Barsha First",
+    "area_name_upper": "AL BARSHA FIRST",
+    "area_name_slug": "al-barsha-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 209431
+  },
+  {
+    "area_name": "Al Barsha Second",
+    "area_name_upper": "AL BARSHA SECOND",
+    "area_name_slug": "al-barsha-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 12883
+  },
+  {
+    "area_name": "Al Barsha South Fifth",
+    "area_name_upper": "AL BARSHA SOUTH FIFTH",
+    "area_name_slug": "al-barsha-south-fifth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 51155
+  },
+  {
+    "area_name": "Al Barsha South Fourth",
+    "area_name_upper": "AL BARSHA SOUTH FOURTH",
+    "area_name_slug": "al-barsha-south-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 289593
+  },
+  {
+    "area_name": "Al Barsha Third",
+    "area_name_upper": "AL BARSHA THIRD",
+    "area_name_slug": "al-barsha-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 10360
+  },
+  {
+    "area_name": "Al Barshaa South First",
+    "area_name_upper": "AL BARSHAA SOUTH FIRST",
+    "area_name_slug": "al-barshaa-south-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 7250
+  },
+  {
+    "area_name": "Al Barshaa South Second",
+    "area_name_upper": "AL BARSHAA SOUTH SECOND",
+    "area_name_slug": "al-barshaa-south-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 27837
+  },
+  {
+    "area_name": "Al Barshaa South Third",
+    "area_name_upper": "AL BARSHAA SOUTH THIRD",
+    "area_name_slug": "al-barshaa-south-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 102854
+  },
+  {
+    "area_name": "Al Buteen",
+    "area_name_upper": "AL BUTEEN",
+    "area_name_slug": "al-buteen",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1984,
+    "occurrence_count": 53188
+  },
+  {
+    "area_name": "Al Dhagaya",
+    "area_name_upper": "AL DHAGAYA",
+    "area_name_slug": "al-dhagaya",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 62073
+  },
+  {
+    "area_name": "Al Eyas",
+    "area_name_upper": "AL EYAS",
+    "area_name_slug": "al-eyas",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 426
+  },
+  {
+    "area_name": "Al Faga'A",
+    "area_name_upper": "AL FAGA'A",
+    "area_name_slug": "al-faga-a",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 267
+  },
+  {
+    "area_name": "Al Fahidi",
+    "area_name_upper": "AL FAHIDI",
+    "area_name_slug": "al-fahidi",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al Garhoud",
+    "area_name_upper": "AL GARHOUD",
+    "area_name_slug": "al-garhoud",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 74857
+  },
+  {
+    "area_name": "Al Goze First",
+    "area_name_upper": "AL GOZE FIRST",
+    "area_name_slug": "al-goze-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 25492
+  },
+  {
+    "area_name": "Al Goze Fourth",
+    "area_name_upper": "AL GOZE FOURTH",
+    "area_name_slug": "al-goze-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2002,
+    "occurrence_count": 40585
+  },
+  {
+    "area_name": "Al Goze Industrial First",
+    "area_name_upper": "AL GOZE INDUSTRIAL FIRST",
+    "area_name_slug": "al-goze-industrial-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 74627
+  },
+  {
+    "area_name": "Al Goze Industrial Fourth",
+    "area_name_upper": "AL GOZE INDUSTRIAL FOURTH",
+    "area_name_slug": "al-goze-industrial-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2001,
+    "occurrence_count": 81903
+  },
+  {
+    "area_name": "Al Goze Industrial Second",
+    "area_name_upper": "AL GOZE INDUSTRIAL SECOND",
+    "area_name_slug": "al-goze-industrial-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 260027
+  },
+  {
+    "area_name": "Al Goze Industrial Third",
+    "area_name_upper": "AL GOZE INDUSTRIAL THIRD",
+    "area_name_slug": "al-goze-industrial-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 58814
+  },
+  {
+    "area_name": "Al Goze Third",
+    "area_name_upper": "AL GOZE THIRD",
+    "area_name_slug": "al-goze-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 159858
+  },
+  {
+    "area_name": "Al Hamriya",
+    "area_name_upper": "AL HAMRIYA",
+    "area_name_slug": "al-hamriya",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1422,
+    "occurrence_count": 78744
+  },
+  {
+    "area_name": "Al Hamriya Port",
+    "area_name_upper": "AL HAMRIYA PORT",
+    "area_name_slug": "al-hamriya-port",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 1321
+  },
+  {
+    "area_name": "Al Hathmah",
+    "area_name_upper": "AL HATHMAH",
+    "area_name_slug": "al-hathmah",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al Hebiah Fifth",
+    "area_name_upper": "AL HEBIAH FIFTH",
+    "area_name_slug": "al-hebiah-fifth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 71313
+  },
+  {
+    "area_name": "Al Hebiah First",
+    "area_name_upper": "AL HEBIAH FIRST",
+    "area_name_slug": "al-hebiah-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 62351
+  },
+  {
+    "area_name": "Al Hebiah Fourth",
+    "area_name_upper": "AL HEBIAH FOURTH",
+    "area_name_slug": "al-hebiah-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 139478
+  },
+  {
+    "area_name": "Al Hebiah Second",
+    "area_name_upper": "AL HEBIAH SECOND",
+    "area_name_slug": "al-hebiah-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 17450
+  },
+  {
+    "area_name": "Al Hebiah Sixth",
+    "area_name_upper": "AL HEBIAH SIXTH",
+    "area_name_slug": "al-hebiah-sixth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 18673
+  },
+  {
+    "area_name": "Al Hebiah Third",
+    "area_name_upper": "AL HEBIAH THIRD",
+    "area_name_slug": "al-hebiah-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 54518
+  },
+  {
+    "area_name": "Al Hudaiba",
+    "area_name_upper": "AL HUDAIBA",
+    "area_name_slug": "al-hudaiba",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 31529
+  },
+  {
+    "area_name": "Al Jadaf",
+    "area_name_upper": "AL JADAF",
+    "area_name_slug": "al-jadaf",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 74021
+  },
+  {
+    "area_name": "Al Jafliya",
+    "area_name_upper": "AL JAFLIYA",
+    "area_name_slug": "al-jafliya",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1987,
+    "occurrence_count": 15536
+  },
+  {
+    "area_name": "Al Karama",
+    "area_name_upper": "AL KARAMA",
+    "area_name_slug": "al-karama",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1976,
+    "occurrence_count": 261632
+  },
+  {
+    "area_name": "Al Khabeesi",
+    "area_name_upper": "AL KHABEESI",
+    "area_name_slug": "al-khabeesi",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1983,
+    "occurrence_count": 84385
+  },
+  {
+    "area_name": "Al Khairan First",
+    "area_name_upper": "AL KHAIRAN FIRST",
+    "area_name_slug": "al-khairan-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 50487
+  },
+  {
+    "area_name": "Al Khairan Second",
+    "area_name_upper": "AL KHAIRAN SECOND",
+    "area_name_slug": "al-khairan-second",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 4
+  },
+  {
+    "area_name": "Al Khawaneej",
+    "area_name_upper": "AL KHAWANEEJ",
+    "area_name_slug": "al-khawaneej",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 142
+  },
+  {
+    "area_name": "Al Khawaneej First",
+    "area_name_upper": "AL KHAWANEEJ FIRST",
+    "area_name_slug": "al-khawaneej-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 9779
+  },
+  {
+    "area_name": "Al Khawaneej Second",
+    "area_name_upper": "AL KHAWANEEJ SECOND",
+    "area_name_slug": "al-khawaneej-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 10110
+  },
+  {
+    "area_name": "Al Kheeran",
+    "area_name_upper": "AL KHEERAN",
+    "area_name_slug": "al-kheeran",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 18329
+  },
+  {
+    "area_name": "Al Kifaf",
+    "area_name_upper": "AL KIFAF",
+    "area_name_slug": "al-kifaf",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 7241
+  },
+  {
+    "area_name": "Al Layan 1",
+    "area_name_upper": "AL LAYAN 1",
+    "area_name_slug": "al-layan-1",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2021,
+    "occurrence_count": 615
+  },
+  {
+    "area_name": "Al Layan 2",
+    "area_name_upper": "AL LAYAN 2",
+    "area_name_slug": "al-layan-2",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Al Lusaily",
+    "area_name_upper": "AL LUSAILY",
+    "area_name_slug": "al-lusaily",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 4480
+  },
+  {
+    "area_name": "Al Maha",
+    "area_name_upper": "AL MAHA",
+    "area_name_slug": "al-maha",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 664
+  },
+  {
+    "area_name": "Al Mamzer",
+    "area_name_upper": "AL MAMZER",
+    "area_name_slug": "al-mamzer",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1966,
+    "occurrence_count": 53430
+  },
+  {
+    "area_name": "Al Manara",
+    "area_name_upper": "AL MANARA",
+    "area_name_slug": "al-manara",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 11408
+  },
+  {
+    "area_name": "Al Mararr",
+    "area_name_upper": "AL MARARR",
+    "area_name_slug": "al-mararr",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1417,
+    "occurrence_count": 221505
+  },
+  {
+    "area_name": "Al Marmoom",
+    "area_name_upper": "AL MARMOOM",
+    "area_name_slug": "al-marmoom",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 265
+  },
+  {
+    "area_name": "Al Merkadh",
+    "area_name_upper": "AL MERKADH",
+    "area_name_slug": "al-merkadh",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 74846
+  },
+  {
+    "area_name": "Al Meryal",
+    "area_name_upper": "AL MERYAL",
+    "area_name_slug": "al-meryal",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al Mizhar",
+    "area_name_upper": "AL MIZHAR",
+    "area_name_slug": "al-mizhar",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 74
+  },
+  {
+    "area_name": "Al Mizhar First",
+    "area_name_upper": "AL MIZHAR FIRST",
+    "area_name_slug": "al-mizhar-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 13547
+  },
+  {
+    "area_name": "Al Mizhar Fourth",
+    "area_name_upper": "AL MIZHAR FOURTH",
+    "area_name_slug": "al-mizhar-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 4491
+  },
+  {
+    "area_name": "Al Mizhar Second",
+    "area_name_upper": "AL MIZHAR SECOND",
+    "area_name_slug": "al-mizhar-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1416,
+    "occurrence_count": 4163
+  },
+  {
+    "area_name": "Al Mizhar Third",
+    "area_name_upper": "AL MIZHAR THIRD",
+    "area_name_slug": "al-mizhar-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 2625
+  },
+  {
+    "area_name": "Al Murqabat",
+    "area_name_upper": "AL MURQABAT",
+    "area_name_slug": "al-murqabat",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1977,
+    "occurrence_count": 198030
+  },
+  {
+    "area_name": "Al Musalla (Dubai)",
+    "area_name_upper": "AL MUSALLA (DUBAI)",
+    "area_name_slug": "al-musalla-dubai",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1977,
+    "occurrence_count": 57
+  },
+  {
+    "area_name": "Al Muteena",
+    "area_name_upper": "AL MUTEENA",
+    "area_name_slug": "al-muteena",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1975,
+    "occurrence_count": 114335
+  },
+  {
+    "area_name": "Al Nahda First",
+    "area_name_upper": "AL NAHDA FIRST",
+    "area_name_slug": "al-nahda-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 139410
+  },
+  {
+    "area_name": "Al Nahda Second",
+    "area_name_upper": "AL NAHDA SECOND",
+    "area_name_slug": "al-nahda-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 208714
+  },
+  {
+    "area_name": "Al Oshoosh",
+    "area_name_upper": "AL OSHOOSH",
+    "area_name_slug": "al-oshoosh",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Al Qoaz",
+    "area_name_upper": "AL QOAZ",
+    "area_name_slug": "al-qoaz",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 267
+  },
+  {
+    "area_name": "Al Qusais",
+    "area_name_upper": "AL QUSAIS",
+    "area_name_slug": "al-qusais",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 152523
+  },
+  {
+    "area_name": "Al Qusais Industrial Fifth",
+    "area_name_upper": "AL QUSAIS INDUSTRIAL FIFTH",
+    "area_name_slug": "al-qusais-industrial-fifth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 36970
+  },
+  {
+    "area_name": "Al Qusais Industrial First",
+    "area_name_upper": "AL QUSAIS INDUSTRIAL FIRST",
+    "area_name_slug": "al-qusais-industrial-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1991,
+    "occurrence_count": 47546
+  },
+  {
+    "area_name": "Al Qusais Industrial Fourth",
+    "area_name_upper": "AL QUSAIS INDUSTRIAL FOURTH",
+    "area_name_slug": "al-qusais-industrial-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 18725
+  },
+  {
+    "area_name": "Al Qusais Industrial Second",
+    "area_name_upper": "AL QUSAIS INDUSTRIAL SECOND",
+    "area_name_slug": "al-qusais-industrial-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 33504
+  },
+  {
+    "area_name": "Al Qusais Industrial Third",
+    "area_name_upper": "AL QUSAIS INDUSTRIAL THIRD",
+    "area_name_slug": "al-qusais-industrial-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 17699
+  },
+  {
+    "area_name": "Al Qusais Old",
+    "area_name_upper": "AL QUSAIS OLD",
+    "area_name_slug": "al-qusais-old",
+    "source_datasets": [
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 87
+  },
+  {
+    "area_name": "Al Raffa",
+    "area_name_upper": "AL RAFFA",
+    "area_name_slug": "al-raffa",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1977,
+    "occurrence_count": 134274
+  },
+  {
+    "area_name": "Al Ras",
+    "area_name_upper": "AL RAS",
+    "area_name_slug": "al-ras",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1984,
+    "occurrence_count": 54397
+  },
+  {
+    "area_name": "Al Rashidiya",
+    "area_name_upper": "AL RASHIDIYA",
+    "area_name_slug": "al-rashidiya",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 25916
+  },
+  {
+    "area_name": "Al Rega",
+    "area_name_upper": "AL REGA",
+    "area_name_slug": "al-rega",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 71982
+  },
+  {
+    "area_name": "Al Rowaiyah First",
+    "area_name_upper": "AL ROWAIYAH FIRST",
+    "area_name_slug": "al-rowaiyah-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2010,
+    "occurrence_count": 5216
+  },
+  {
+    "area_name": "Al Rowaiyah Second",
+    "area_name_upper": "AL ROWAIYAH SECOND",
+    "area_name_slug": "al-rowaiyah-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 148
+  },
+  {
+    "area_name": "Al Rowaiyah Third",
+    "area_name_upper": "AL ROWAIYAH THIRD",
+    "area_name_slug": "al-rowaiyah-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 2972
+  },
+  {
+    "area_name": "Al Ruwayyah",
+    "area_name_upper": "AL RUWAYYAH",
+    "area_name_slug": "al-ruwayyah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 2352
+  },
+  {
+    "area_name": "Al Sabkha",
+    "area_name_upper": "AL SABKHA",
+    "area_name_slug": "al-sabkha",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 27813
+  },
+  {
+    "area_name": "Al Safaa",
+    "area_name_upper": "AL SAFAA",
+    "area_name_slug": "al-safaa",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 41
+  },
+  {
+    "area_name": "Al Saffa First",
+    "area_name_upper": "AL SAFFA FIRST",
+    "area_name_slug": "al-saffa-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 22368
+  },
+  {
+    "area_name": "Al Saffa Second",
+    "area_name_upper": "AL SAFFA SECOND",
+    "area_name_slug": "al-saffa-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 10281
+  },
+  {
+    "area_name": "Al Safouh First",
+    "area_name_upper": "AL SAFOUH FIRST",
+    "area_name_slug": "al-safouh-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 16542
+  },
+  {
+    "area_name": "Al Safouh Second",
+    "area_name_upper": "AL SAFOUH SECOND",
+    "area_name_slug": "al-safouh-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 54314
+  },
+  {
+    "area_name": "Al Satwa",
+    "area_name_upper": "AL SATWA",
+    "area_name_slug": "al-satwa",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1978,
+    "occurrence_count": 55535
+  },
+  {
+    "area_name": "Al Suq Al Kabeer",
+    "area_name_upper": "AL SUQ AL KABEER",
+    "area_name_slug": "al-suq-al-kabeer",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1979,
+    "occurrence_count": 193014
+  },
+  {
+    "area_name": "Al Thanayah Fourth",
+    "area_name_upper": "AL THANAYAH FOURTH",
+    "area_name_slug": "al-thanayah-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 80853
+  },
+  {
+    "area_name": "Al Thanyah Fifth",
+    "area_name_upper": "AL THANYAH FIFTH",
+    "area_name_slug": "al-thanyah-fifth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2003,
+    "occurrence_count": 275385
+  },
+  {
+    "area_name": "Al Thanyah First",
+    "area_name_upper": "AL THANYAH FIRST",
+    "area_name_slug": "al-thanyah-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 117102
+  },
+  {
+    "area_name": "Al Thanyah Second",
+    "area_name_upper": "AL THANYAH SECOND",
+    "area_name_slug": "al-thanyah-second",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 78
+  },
+  {
+    "area_name": "Al Thanyah Third",
+    "area_name_upper": "AL THANYAH THIRD",
+    "area_name_slug": "al-thanyah-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 97548
+  },
+  {
+    "area_name": "Al Ttay",
+    "area_name_upper": "AL TTAY",
+    "area_name_slug": "al-ttay",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 17641
+  },
+  {
+    "area_name": "Al Twar Fifth",
+    "area_name_upper": "AL TWAR FIFTH",
+    "area_name_slug": "al-twar-fifth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 50864
+  },
+  {
+    "area_name": "Al Twar First",
+    "area_name_upper": "AL TWAR FIRST",
+    "area_name_slug": "al-twar-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 12737
+  },
+  {
+    "area_name": "Al Twar Fourth",
+    "area_name_upper": "AL TWAR FOURTH",
+    "area_name_slug": "al-twar-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1991,
+    "occurrence_count": 3347
+  },
+  {
+    "area_name": "Al Twar Second",
+    "area_name_upper": "AL TWAR SECOND",
+    "area_name_slug": "al-twar-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 1478
+  },
+  {
+    "area_name": "Al Twar Third",
+    "area_name_upper": "AL TWAR THIRD",
+    "area_name_slug": "al-twar-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 3607
+  },
+  {
+    "area_name": "Al Waheda",
+    "area_name_upper": "AL WAHEDA",
+    "area_name_slug": "al-waheda",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1984,
+    "occurrence_count": 6741
+  },
+  {
+    "area_name": "Al Wajehah Al Bhariyah",
+    "area_name_upper": "AL WAJEHAH AL BHARIYAH",
+    "area_name_slug": "al-wajehah-al-bhariyah",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al Warqa Fifth",
+    "area_name_upper": "AL WARQA FIFTH",
+    "area_name_slug": "al-warqa-fifth",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 7
+  },
+  {
+    "area_name": "Al Warqa First",
+    "area_name_upper": "AL WARQA FIRST",
+    "area_name_slug": "al-warqa-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2002,
+    "occurrence_count": 105494
+  },
+  {
+    "area_name": "Al Warqa Fourth",
+    "area_name_upper": "AL WARQA FOURTH",
+    "area_name_slug": "al-warqa-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2002,
+    "occurrence_count": 5983
+  },
+  {
+    "area_name": "Al Warqa Second",
+    "area_name_upper": "AL WARQA SECOND",
+    "area_name_slug": "al-warqa-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 5545
+  },
+  {
+    "area_name": "Al Warqa Third",
+    "area_name_upper": "AL WARQA THIRD",
+    "area_name_slug": "al-warqa-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 8376
+  },
+  {
+    "area_name": "Al Warsan First",
+    "area_name_upper": "AL WARSAN FIRST",
+    "area_name_slug": "al-warsan-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 427775
+  },
+  {
+    "area_name": "Al Warsan Second",
+    "area_name_upper": "AL WARSAN SECOND",
+    "area_name_slug": "al-warsan-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 6502
+  },
+  {
+    "area_name": "Al Warsan Third",
+    "area_name_upper": "AL WARSAN THIRD",
+    "area_name_slug": "al-warsan-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 23702
+  },
+  {
+    "area_name": "Al Wasl",
+    "area_name_upper": "AL WASL",
+    "area_name_slug": "al-wasl",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1980,
+    "occurrence_count": 55870
+  },
+  {
+    "area_name": "Al Wohoosh",
+    "area_name_upper": "AL WOHOOSH",
+    "area_name_slug": "al-wohoosh",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Al Yelayiss 1",
+    "area_name_upper": "AL YELAYISS 1",
+    "area_name_slug": "al-yelayiss-1",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 44966
+  },
+  {
+    "area_name": "Al Yelayiss 2",
+    "area_name_upper": "AL YELAYISS 2",
+    "area_name_slug": "al-yelayiss-2",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 63506
+  },
+  {
+    "area_name": "Al Yelayiss 3",
+    "area_name_upper": "AL YELAYISS 3",
+    "area_name_slug": "al-yelayiss-3",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 22
+  },
+  {
+    "area_name": "Al Yelayiss 4",
+    "area_name_upper": "AL YELAYISS 4",
+    "area_name_slug": "al-yelayiss-4",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 220
+  },
+  {
+    "area_name": "Al Yelayiss 5",
+    "area_name_upper": "AL YELAYISS 5",
+    "area_name_slug": "al-yelayiss-5",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2023,
+    "occurrence_count": 10209
+  },
+  {
+    "area_name": "Al Yufrah 1",
+    "area_name_upper": "AL YUFRAH 1",
+    "area_name_slug": "al-yufrah-1",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 16216
+  },
+  {
+    "area_name": "Al Yufrah 2",
+    "area_name_upper": "AL YUFRAH 2",
+    "area_name_slug": "al-yufrah-2",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 5844
+  },
+  {
+    "area_name": "Al Yufrah 3",
+    "area_name_upper": "AL YUFRAH 3",
+    "area_name_slug": "al-yufrah-3",
+    "source_datasets": [
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2015,
+    "occurrence_count": 3553
+  },
+  {
+    "area_name": "Al Yufrah 4",
+    "area_name_upper": "AL YUFRAH 4",
+    "area_name_slug": "al-yufrah-4",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2022,
+    "occurrence_count": 13
+  },
+  {
+    "area_name": "Al Zaroob",
+    "area_name_upper": "AL ZAROOB",
+    "area_name_slug": "al-zaroob",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al-Aweer",
+    "area_name_upper": "AL-AWEER",
+    "area_name_slug": "al-aweer",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 38
+  },
+  {
+    "area_name": "Al-Baloosh",
+    "area_name_upper": "AL-BALOOSH",
+    "area_name_slug": "al-baloosh",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1983,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Al-Bastakiyah",
+    "area_name_upper": "AL-BASTAKIYAH",
+    "area_name_slug": "al-bastakiyah",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 7
+  },
+  {
+    "area_name": "Al-Cornich",
+    "area_name_upper": "AL-CORNICH",
+    "area_name_slug": "al-cornich",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 11116
+  },
+  {
+    "area_name": "Al-Dzahiyyah Al-Jadeedah",
+    "area_name_upper": "AL-DZAHIYYAH AL-JADEEDAH",
+    "area_name_slug": "al-dzahiyyah-al-jadeedah",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Al-Muhaisnah North",
+    "area_name_upper": "AL-MUHAISNAH NORTH",
+    "area_name_slug": "al-muhaisnah-north",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 8
+  },
+  {
+    "area_name": "Al-Murar Jadeed",
+    "area_name_upper": "AL-MURAR JADEED",
+    "area_name_slug": "al-murar-jadeed",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 29
+  },
+  {
+    "area_name": "Al-Murar Qadeem",
+    "area_name_upper": "AL-MURAR QADEEM",
+    "area_name_slug": "al-murar-qadeem",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1991,
+    "occurrence_count": 62
+  },
+  {
+    "area_name": "Al-Musalla (Deira)",
+    "area_name_upper": "AL-MUSALLA (DEIRA)",
+    "area_name_slug": "al-musalla-deira",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Al-Mustashfa West",
+    "area_name_upper": "AL-MUSTASHFA WEST",
+    "area_name_slug": "al-mustashfa-west",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Al-Nahdah",
+    "area_name_upper": "AL-NAHDAH",
+    "area_name_slug": "al-nahdah",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al-Nakhal",
+    "area_name_upper": "AL-NAKHAL",
+    "area_name_slug": "al-nakhal",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 24
+  },
+  {
+    "area_name": "Al-Qiyadah",
+    "area_name_upper": "AL-QIYADAH",
+    "area_name_slug": "al-qiyadah",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1990,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Al-Raulah",
+    "area_name_upper": "AL-RAULAH",
+    "area_name_slug": "al-raulah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 37
+  },
+  {
+    "area_name": "Al-Riqqa East",
+    "area_name_upper": "AL-RIQQA EAST",
+    "area_name_slug": "al-riqqa-east",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 27
+  },
+  {
+    "area_name": "Al-Riqqa West",
+    "area_name_upper": "AL-RIQQA WEST",
+    "area_name_slug": "al-riqqa-west",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1983,
+    "occurrence_count": 12
+  },
+  {
+    "area_name": "Al-Safiyyah",
+    "area_name_upper": "AL-SAFIYYAH",
+    "area_name_slug": "al-safiyyah",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 29
+  },
+  {
+    "area_name": "Al-Shumaal",
+    "area_name_upper": "AL-SHUMAAL",
+    "area_name_slug": "al-shumaal",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 9
+  },
+  {
+    "area_name": "Al-Souq Al Kabeer (Deira)",
+    "area_name_upper": "AL-SOUQ AL KABEER (DEIRA)",
+    "area_name_slug": "al-souq-al-kabeer-deira",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1967,
+    "occurrence_count": 13
+  },
+  {
+    "area_name": "Al-Tawar",
+    "area_name_upper": "AL-TAWAR",
+    "area_name_slug": "al-tawar",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 51
+  },
+  {
+    "area_name": "Al-Zarouniyyah",
+    "area_name_upper": "AL-ZAROUNIYYAH",
+    "area_name_slug": "al-zarouniyyah",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1990,
+    "occurrence_count": 7
+  },
+  {
+    "area_name": "Anakhali",
+    "area_name_upper": "ANAKHALI",
+    "area_name_slug": "anakhali",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Bukadra",
+    "area_name_upper": "BUKADRA",
+    "area_name_slug": "bukadra",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 10995
+  },
+  {
+    "area_name": "Bur Dubai",
+    "area_name_upper": "BUR DUBAI",
+    "area_name_slug": "bur-dubai",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1975,
+    "occurrence_count": 247
+  },
+  {
+    "area_name": "Burj Khalifa",
+    "area_name_upper": "BURJ KHALIFA",
+    "area_name_slug": "burj-khalifa",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 180961
+  },
+  {
+    "area_name": "Burj Nahar",
+    "area_name_upper": "BURJ NAHAR",
+    "area_name_slug": "burj-nahar",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1979,
+    "occurrence_count": 43
+  },
+  {
+    "area_name": "Business Bay",
+    "area_name_upper": "BUSINESS BAY",
+    "area_name_slug": "business-bay",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 398071
+  },
+  {
+    "area_name": "Cornich Deira",
+    "area_name_upper": "CORNICH DEIRA",
+    "area_name_slug": "cornich-deira",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 8039
+  },
+  {
+    "area_name": "Dubai International Airport",
+    "area_name_upper": "DUBAI INTERNATIONAL AIRPORT",
+    "area_name_slug": "dubai-international-airport",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 12523
+  },
+  {
+    "area_name": "Dubai Investment Park First",
+    "area_name_upper": "DUBAI INVESTMENT PARK FIRST",
+    "area_name_slug": "dubai-investment-park-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 195328
+  },
+  {
+    "area_name": "Dubai Investment Park Second",
+    "area_name_upper": "DUBAI INVESTMENT PARK SECOND",
+    "area_name_slug": "dubai-investment-park-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 164362
+  },
+  {
+    "area_name": "Eyal Nasser",
+    "area_name_upper": "EYAL NASSER",
+    "area_name_slug": "eyal-nasser",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1987,
+    "occurrence_count": 61990
+  },
+  {
+    "area_name": "Festival City First",
+    "area_name_upper": "FESTIVAL CITY FIRST",
+    "area_name_slug": "festival-city-first",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2010,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Ghadeer Al Tair",
+    "area_name_upper": "GHADEER AL TAIR",
+    "area_name_slug": "ghadeer-al-tair",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 5235
+  },
+  {
+    "area_name": "Ghadeer Barashy",
+    "area_name_upper": "GHADEER BARASHY",
+    "area_name_slug": "ghadeer-barashy",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2016,
+    "occurrence_count": 10
+  },
+  {
+    "area_name": "Grayteesah",
+    "area_name_upper": "GRAYTEESAH",
+    "area_name_slug": "grayteesah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2001,
+    "occurrence_count": 647
+  },
+  {
+    "area_name": "Hadaeq Sheikh Mohammed Bin Rashid",
+    "area_name_upper": "HADAEQ SHEIKH MOHAMMED BIN RASHID",
+    "area_name_slug": "hadaeq-sheikh-mohammed-bin-rashid",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 80951
+  },
+  {
+    "area_name": "Hafair",
+    "area_name_upper": "HAFAIR",
+    "area_name_slug": "hafair",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Hatta",
+    "area_name_upper": "HATTA",
+    "area_name_slug": "hatta",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 5539
+  },
+  {
+    "area_name": "Hessyan First",
+    "area_name_upper": "HESSYAN FIRST",
+    "area_name_slug": "hessyan-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 6085
+  },
+  {
+    "area_name": "Hessyan Second",
+    "area_name_upper": "HESSYAN SECOND",
+    "area_name_slug": "hessyan-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 11559
+  },
+  {
+    "area_name": "Hor Al Anz",
+    "area_name_upper": "HOR AL ANZ",
+    "area_name_slug": "hor-al-anz",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1976,
+    "occurrence_count": 136772
+  },
+  {
+    "area_name": "Hor Al Anz East",
+    "area_name_upper": "HOR AL ANZ EAST",
+    "area_name_slug": "hor-al-anz-east",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1990,
+    "occurrence_count": 92430
+  },
+  {
+    "area_name": "Island 2",
+    "area_name_upper": "ISLAND 2",
+    "area_name_slug": "island-2",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 1656
+  },
+  {
+    "area_name": "Jabal Ali",
+    "area_name_upper": "JABAL ALI",
+    "area_name_slug": "jabal-ali",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 1881
+  },
+  {
+    "area_name": "Jabal Ali First",
+    "area_name_upper": "JABAL ALI FIRST",
+    "area_name_slug": "jabal-ali-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 391109
+  },
+  {
+    "area_name": "Jabal Ali Industrial First",
+    "area_name_upper": "JABAL ALI INDUSTRIAL FIRST",
+    "area_name_slug": "jabal-ali-industrial-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 373863
+  },
+  {
+    "area_name": "Jabal Ali Industrial Second",
+    "area_name_upper": "JABAL ALI INDUSTRIAL SECOND",
+    "area_name_slug": "jabal-ali-industrial-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 9046
+  },
+  {
+    "area_name": "Jabal Ali Industrial Third",
+    "area_name_upper": "JABAL ALI INDUSTRIAL THIRD",
+    "area_name_slug": "jabal-ali-industrial-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 307
+  },
+  {
+    "area_name": "Jabal Ali Second",
+    "area_name_upper": "JABAL ALI SECOND",
+    "area_name_slug": "jabal-ali-second",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 34
+  },
+  {
+    "area_name": "Jabal Ali Third",
+    "area_name_upper": "JABAL ALI THIRD",
+    "area_name_slug": "jabal-ali-third",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2022,
+    "occurrence_count": 12
+  },
+  {
+    "area_name": "Jumeira Island 2",
+    "area_name_upper": "JUMEIRA ISLAND 2",
+    "area_name_slug": "jumeira-island-2",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Jumeirah",
+    "area_name_upper": "JUMEIRAH",
+    "area_name_slug": "jumeirah",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1983,
+    "occurrence_count": 154
+  },
+  {
+    "area_name": "Jumeirah First",
+    "area_name_upper": "JUMEIRAH FIRST",
+    "area_name_slug": "jumeirah-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 46856
+  },
+  {
+    "area_name": "Jumeirah Second",
+    "area_name_upper": "JUMEIRAH SECOND",
+    "area_name_slug": "jumeirah-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 14967
+  },
+  {
+    "area_name": "Jumeirah Third",
+    "area_name_upper": "JUMEIRAH THIRD",
+    "area_name_slug": "jumeirah-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 20920
+  },
+  {
+    "area_name": "Le Hemaira",
+    "area_name_upper": "LE HEMAIRA",
+    "area_name_slug": "le-hemaira",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2017,
+    "occurrence_count": 13
+  },
+  {
+    "area_name": "Lehbab",
+    "area_name_upper": "LEHBAB",
+    "area_name_slug": "lehbab",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 185
+  },
+  {
+    "area_name": "Lehbab First",
+    "area_name_upper": "LEHBAB FIRST",
+    "area_name_slug": "lehbab-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 1633
+  },
+  {
+    "area_name": "Lehbab Second",
+    "area_name_upper": "LEHBAB SECOND",
+    "area_name_slug": "lehbab-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 1290
+  },
+  {
+    "area_name": "Madinat Al Mataar",
+    "area_name_upper": "MADINAT AL MATAAR",
+    "area_name_slug": "madinat-al-mataar",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 84017
+  },
+  {
+    "area_name": "Madinat Dubai Almelaheyah",
+    "area_name_upper": "MADINAT DUBAI ALMELAHEYAH",
+    "area_name_slug": "madinat-dubai-almelaheyah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 43851
+  },
+  {
+    "area_name": "Madinat Hind 1",
+    "area_name_upper": "MADINAT HIND 1",
+    "area_name_slug": "madinat-hind-1",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 3285
+  },
+  {
+    "area_name": "Madinat Hind 2",
+    "area_name_upper": "MADINAT HIND 2",
+    "area_name_slug": "madinat-hind-2",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 46
+  },
+  {
+    "area_name": "Madinat Hind 3",
+    "area_name_upper": "MADINAT HIND 3",
+    "area_name_slug": "madinat-hind-3",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 5037
+  },
+  {
+    "area_name": "Madinat Hind 4",
+    "area_name_upper": "MADINAT HIND 4",
+    "area_name_slug": "madinat-hind-4",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 60232
+  },
+  {
+    "area_name": "Madinat Latifa",
+    "area_name_upper": "MADINAT LATIFA",
+    "area_name_slug": "madinat-latifa",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2009,
+    "occurrence_count": 3127
+  },
+  {
+    "area_name": "Mankhool",
+    "area_name_upper": "MANKHOOL",
+    "area_name_slug": "mankhool",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1984,
+    "occurrence_count": 171520
+  },
+  {
+    "area_name": "Margham",
+    "area_name_upper": "MARGHAM",
+    "area_name_slug": "margham",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2000,
+    "occurrence_count": 2710
+  },
+  {
+    "area_name": "Marsa Dubai",
+    "area_name_upper": "MARSA DUBAI",
+    "area_name_slug": "marsa-dubai",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 375480
+  },
+  {
+    "area_name": "Me'Aisem First",
+    "area_name_upper": "ME'AISEM FIRST",
+    "area_name_slug": "me-aisem-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 113058
+  },
+  {
+    "area_name": "Me'Aisem Second",
+    "area_name_upper": "ME'AISEM SECOND",
+    "area_name_slug": "me-aisem-second",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2022,
+    "occurrence_count": 4902
+  },
+  {
+    "area_name": "Mena Jabal Ali",
+    "area_name_upper": "MENA JABAL ALI",
+    "area_name_slug": "mena-jabal-ali",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 265
+  },
+  {
+    "area_name": "Mereiyeel",
+    "area_name_upper": "MEREIYEEL",
+    "area_name_slug": "mereiyeel",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 8
+  },
+  {
+    "area_name": "Mirdif",
+    "area_name_upper": "MIRDIF",
+    "area_name_slug": "mirdif",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1975,
+    "occurrence_count": 185028
+  },
+  {
+    "area_name": "Muashrah Al Bahraana",
+    "area_name_upper": "MUASHRAH AL BAHRAANA",
+    "area_name_slug": "muashrah-al-bahraana",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Mugatrah",
+    "area_name_upper": "MUGATRAH",
+    "area_name_slug": "mugatrah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 72
+  },
+  {
+    "area_name": "Muhaisanah Fifth",
+    "area_name_upper": "MUHAISANAH FIFTH",
+    "area_name_slug": "muhaisanah-fifth",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2018,
+    "occurrence_count": 14
+  },
+  {
+    "area_name": "Muhaisanah First",
+    "area_name_upper": "MUHAISANAH FIRST",
+    "area_name_slug": "muhaisanah-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 7884
+  },
+  {
+    "area_name": "Muhaisanah Fourth",
+    "area_name_upper": "MUHAISANAH FOURTH",
+    "area_name_slug": "muhaisanah-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 139540
+  },
+  {
+    "area_name": "Muhaisanah Second",
+    "area_name_upper": "MUHAISANAH SECOND",
+    "area_name_slug": "muhaisanah-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 324763
+  },
+  {
+    "area_name": "Muhaisanah Third",
+    "area_name_upper": "MUHAISANAH THIRD",
+    "area_name_slug": "muhaisanah-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 2668
+  },
+  {
+    "area_name": "Muhaisna",
+    "area_name_upper": "MUHAISNA",
+    "area_name_slug": "muhaisna",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 17
+  },
+  {
+    "area_name": "Muragab",
+    "area_name_upper": "MURAGAB",
+    "area_name_slug": "muragab",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2011,
+    "occurrence_count": 147
+  },
+  {
+    "area_name": "Mushrif",
+    "area_name_upper": "MUSHRIF",
+    "area_name_slug": "mushrif",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 742
+  },
+  {
+    "area_name": "Nad Al Hamar",
+    "area_name_upper": "NAD AL HAMAR",
+    "area_name_slug": "nad-al-hamar",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 37873
+  },
+  {
+    "area_name": "Nad Al Shiba",
+    "area_name_upper": "NAD AL SHIBA",
+    "area_name_slug": "nad-al-shiba",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 1551
+  },
+  {
+    "area_name": "Nad Al Shiba First",
+    "area_name_upper": "NAD AL SHIBA FIRST",
+    "area_name_slug": "nad-al-shiba-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2003,
+    "occurrence_count": 31970
+  },
+  {
+    "area_name": "Nad Al Shiba Fourth",
+    "area_name_upper": "NAD AL SHIBA FOURTH",
+    "area_name_slug": "nad-al-shiba-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 4002
+  },
+  {
+    "area_name": "Nad Al Shiba Second",
+    "area_name_upper": "NAD AL SHIBA SECOND",
+    "area_name_slug": "nad-al-shiba-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2001,
+    "occurrence_count": 1678
+  },
+  {
+    "area_name": "Nad Al Shiba Third",
+    "area_name_upper": "NAD AL SHIBA THIRD",
+    "area_name_slug": "nad-al-shiba-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2010,
+    "occurrence_count": 12915
+  },
+  {
+    "area_name": "Nad Rashid",
+    "area_name_upper": "NAD RASHID",
+    "area_name_slug": "nad-rashid",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 67
+  },
+  {
+    "area_name": "Nad Shamma",
+    "area_name_upper": "NAD SHAMMA",
+    "area_name_slug": "nad-shamma",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 646
+  },
+  {
+    "area_name": "Nadd Hessa",
+    "area_name_upper": "NADD HESSA",
+    "area_name_slug": "nadd-hessa",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 235803
+  },
+  {
+    "area_name": "Naif",
+    "area_name_upper": "NAIF",
+    "area_name_slug": "naif",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1987,
+    "occurrence_count": 259526
+  },
+  {
+    "area_name": "Naif North",
+    "area_name_upper": "NAIF NORTH",
+    "area_name_slug": "naif-north",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1988,
+    "occurrence_count": 7
+  },
+  {
+    "area_name": "Naif South",
+    "area_name_upper": "NAIF SOUTH",
+    "area_name_slug": "naif-south",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 7
+  },
+  {
+    "area_name": "Nazwah",
+    "area_name_upper": "NAZWAH",
+    "area_name_slug": "nazwah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2017,
+    "occurrence_count": 115
+  },
+  {
+    "area_name": "Oud Al Muteena",
+    "area_name_upper": "OUD AL MUTEENA",
+    "area_name_slug": "oud-al-muteena",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 269
+  },
+  {
+    "area_name": "Oud Metha",
+    "area_name_upper": "OUD METHA",
+    "area_name_slug": "oud-metha",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1996,
+    "occurrence_count": 84267
+  },
+  {
+    "area_name": "Palm Deira",
+    "area_name_upper": "PALM DEIRA",
+    "area_name_slug": "palm-deira",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 11551
+  },
+  {
+    "area_name": "Palm Jabal Ali",
+    "area_name_upper": "PALM JABAL ALI",
+    "area_name_slug": "palm-jabal-ali",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 4321
+  },
+  {
+    "area_name": "Palm Jumeirah",
+    "area_name_upper": "PALM JUMEIRAH",
+    "area_name_slug": "palm-jumeirah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 111460
+  },
+  {
+    "area_name": "Port Saeed",
+    "area_name_upper": "PORT SAEED",
+    "area_name_slug": "port-saeed",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 129509
+  },
+  {
+    "area_name": "Ras Al Khor",
+    "area_name_upper": "RAS AL KHOR",
+    "area_name_slug": "ras-al-khor",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 142
+  },
+  {
+    "area_name": "Ras Al Khor Industrial First",
+    "area_name_upper": "RAS AL KHOR INDUSTRIAL FIRST",
+    "area_name_slug": "ras-al-khor-industrial-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 27307
+  },
+  {
+    "area_name": "Ras Al Khor Industrial Second",
+    "area_name_upper": "RAS AL KHOR INDUSTRIAL SECOND",
+    "area_name_slug": "ras-al-khor-industrial-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 53493
+  },
+  {
+    "area_name": "Ras Al Khor Industrial Third",
+    "area_name_upper": "RAS AL KHOR INDUSTRIAL THIRD",
+    "area_name_slug": "ras-al-khor-industrial-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2005,
+    "occurrence_count": 59142
+  },
+  {
+    "area_name": "Rega Al Buteen",
+    "area_name_upper": "REGA AL BUTEEN",
+    "area_name_slug": "rega-al-buteen",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1975,
+    "occurrence_count": 32194
+  },
+  {
+    "area_name": "Remah",
+    "area_name_upper": "REMAH",
+    "area_name_slug": "remah",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2023,
+    "occurrence_count": 6
+  },
+  {
+    "area_name": "Riqat Masali",
+    "area_name_upper": "RIQAT MASALI",
+    "area_name_slug": "riqat-masali",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Saih Aldahal",
+    "area_name_upper": "SAIH ALDAHAL",
+    "area_name_slug": "saih-aldahal",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2016,
+    "occurrence_count": 59
+  },
+  {
+    "area_name": "Saih Alsalam",
+    "area_name_upper": "SAIH ALSALAM",
+    "area_name_slug": "saih-alsalam",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 9
+  },
+  {
+    "area_name": "Saih Shuaelah",
+    "area_name_upper": "SAIH SHUAELAH",
+    "area_name_slug": "saih-shuaelah",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 2
+  },
+  {
+    "area_name": "Saih Shuaib 1",
+    "area_name_upper": "SAIH SHUAIB 1",
+    "area_name_slug": "saih-shuaib-1",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 10262
+  },
+  {
+    "area_name": "Saih Shuaib 2",
+    "area_name_upper": "SAIH SHUAIB 2",
+    "area_name_slug": "saih-shuaib-2",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 70090
+  },
+  {
+    "area_name": "Saih Shuaib 3",
+    "area_name_upper": "SAIH SHUAIB 3",
+    "area_name_slug": "saih-shuaib-3",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2010,
+    "occurrence_count": 29820
+  },
+  {
+    "area_name": "Saih Shuaib 4",
+    "area_name_upper": "SAIH SHUAIB 4",
+    "area_name_slug": "saih-shuaib-4",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 17371
+  },
+  {
+    "area_name": "Shandagha",
+    "area_name_upper": "SHANDAGHA",
+    "area_name_slug": "shandagha",
+    "source_datasets": [
+      "lands",
+      "rents"
+    ],
+    "first_seen_year": 2013,
+    "occurrence_count": 995
+  },
+  {
+    "area_name": "Shandagha East",
+    "area_name_upper": "SHANDAGHA EAST",
+    "area_name_slug": "shandagha-east",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 33
+  },
+  {
+    "area_name": "Shandagha West",
+    "area_name_upper": "SHANDAGHA WEST",
+    "area_name_slug": "shandagha-west",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 23
+  },
+  {
+    "area_name": "Sikkat Al Khail North",
+    "area_name_upper": "SIKKAT AL KHAIL NORTH",
+    "area_name_slug": "sikkat-al-khail-north",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 9
+  },
+  {
+    "area_name": "Sikkat Al Khail South",
+    "area_name_upper": "SIKKAT AL KHAIL SOUTH",
+    "area_name_slug": "sikkat-al-khail-south",
+    "source_datasets": [
+      "transactions"
+    ],
+    "first_seen_year": 1989,
+    "occurrence_count": 6
+  },
+  {
+    "area_name": "Souq Sikkat Al Khail",
+    "area_name_upper": "SOUQ SIKKAT AL KHAIL",
+    "area_name_slug": "souq-sikkat-al-khail",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Tawaa Al Sayegh",
+    "area_name_upper": "TAWAA AL SAYEGH",
+    "area_name_slug": "tawaa-al-sayegh",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 43
+  },
+  {
+    "area_name": "Tawi Al Muraqqab",
+    "area_name_upper": "TAWI AL MURAQQAB",
+    "area_name_slug": "tawi-al-muraqqab",
+    "source_datasets": [
+      "lands",
+      "transactions"
+    ],
+    "first_seen_year": 2002,
+    "occurrence_count": 39
+  },
+  {
+    "area_name": "Tawi Alfuqa",
+    "area_name_upper": "TAWI ALFUQA",
+    "area_name_slug": "tawi-alfuqa",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 3
+  },
+  {
+    "area_name": "Trade Center First",
+    "area_name_upper": "TRADE CENTER FIRST",
+    "area_name_slug": "trade-center-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 113584
+  },
+  {
+    "area_name": "Trade Center Second",
+    "area_name_upper": "TRADE CENTER SECOND",
+    "area_name_slug": "trade-center-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1998,
+    "occurrence_count": 51938
+  },
+  {
+    "area_name": "Um Al Sheif",
+    "area_name_upper": "UM AL SHEIF",
+    "area_name_slug": "um-al-sheif",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1995,
+    "occurrence_count": 8150
+  },
+  {
+    "area_name": "Um Almoameneen",
+    "area_name_upper": "UM ALMOAMENEEN",
+    "area_name_slug": "um-almoameneen",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 11
+  },
+  {
+    "area_name": "Um Esalay",
+    "area_name_upper": "UM ESALAY",
+    "area_name_slug": "um-esalay",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2016,
+    "occurrence_count": 43
+  },
+  {
+    "area_name": "Um Hurair First",
+    "area_name_upper": "UM HURAIR FIRST",
+    "area_name_slug": "um-hurair-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1999,
+    "occurrence_count": 18759
+  },
+  {
+    "area_name": "Um Hurair Second",
+    "area_name_upper": "UM HURAIR SECOND",
+    "area_name_slug": "um-hurair-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 25494
+  },
+  {
+    "area_name": "Um Ramool",
+    "area_name_upper": "UM RAMOOL",
+    "area_name_slug": "um-ramool",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1985,
+    "occurrence_count": 31204
+  },
+  {
+    "area_name": "Um Suqaim",
+    "area_name_upper": "UM SUQAIM",
+    "area_name_slug": "um-suqaim",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1984,
+    "occurrence_count": 558
+  },
+  {
+    "area_name": "Um Suqaim First",
+    "area_name_upper": "UM SUQAIM FIRST",
+    "area_name_slug": "um-suqaim-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 17623
+  },
+  {
+    "area_name": "Um Suqaim Second",
+    "area_name_upper": "UM SUQAIM SECOND",
+    "area_name_slug": "um-suqaim-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1994,
+    "occurrence_count": 18032
+  },
+  {
+    "area_name": "Um Suqaim Third",
+    "area_name_upper": "UM SUQAIM THIRD",
+    "area_name_slug": "um-suqaim-third",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1993,
+    "occurrence_count": 15916
+  },
+  {
+    "area_name": "Umm Addamin",
+    "area_name_upper": "UMM ADDAMIN",
+    "area_name_slug": "umm-addamin",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2014,
+    "occurrence_count": 52
+  },
+  {
+    "area_name": "Universe Islands",
+    "area_name_upper": "UNIVERSE ISLANDS",
+    "area_name_slug": "universe-islands",
+    "source_datasets": [
+      "lands"
+    ],
+    "first_seen_year": null,
+    "occurrence_count": 1
+  },
+  {
+    "area_name": "Wadi Al Amardi",
+    "area_name_upper": "WADI AL AMARDI",
+    "area_name_slug": "wadi-al-amardi",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1997,
+    "occurrence_count": 3506
+  },
+  {
+    "area_name": "Wadi Al Safa 2",
+    "area_name_upper": "WADI AL SAFA 2",
+    "area_name_slug": "wadi-al-safa-2",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 56279
+  },
+  {
+    "area_name": "Wadi Al Safa 3",
+    "area_name_upper": "WADI AL SAFA 3",
+    "area_name_slug": "wadi-al-safa-3",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 58264
+  },
+  {
+    "area_name": "Wadi Al Safa 4",
+    "area_name_upper": "WADI AL SAFA 4",
+    "area_name_slug": "wadi-al-safa-4",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2004,
+    "occurrence_count": 6229
+  },
+  {
+    "area_name": "Wadi Al Safa 5",
+    "area_name_upper": "WADI AL SAFA 5",
+    "area_name_slug": "wadi-al-safa-5",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 152998
+  },
+  {
+    "area_name": "Wadi Al Safa 6",
+    "area_name_upper": "WADI AL SAFA 6",
+    "area_name_slug": "wadi-al-safa-6",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2006,
+    "occurrence_count": 46223
+  },
+  {
+    "area_name": "Wadi Al Safa 7",
+    "area_name_upper": "WADI AL SAFA 7",
+    "area_name_slug": "wadi-al-safa-7",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 50495
+  },
+  {
+    "area_name": "Warsan Fourth",
+    "area_name_upper": "WARSAN FOURTH",
+    "area_name_slug": "warsan-fourth",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2008,
+    "occurrence_count": 76215
+  },
+  {
+    "area_name": "World Islands",
+    "area_name_upper": "WORLD ISLANDS",
+    "area_name_slug": "world-islands",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2007,
+    "occurrence_count": 1559
+  },
+  {
+    "area_name": "Yaraah",
+    "area_name_upper": "YARAAH",
+    "area_name_slug": "yaraah",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2020,
+    "occurrence_count": 17
+  },
+  {
+    "area_name": "Zaabeel First",
+    "area_name_upper": "ZAABEEL FIRST",
+    "area_name_slug": "zaabeel-first",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2012,
+    "occurrence_count": 3455
+  },
+  {
+    "area_name": "Zaabeel Second",
+    "area_name_upper": "ZAABEEL SECOND",
+    "area_name_slug": "zaabeel-second",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 2002,
+    "occurrence_count": 13991
+  },
+  {
+    "area_name": "Zareeba Duviya",
+    "area_name_upper": "ZAREEBA DUVIYA",
+    "area_name_slug": "zareeba-duviya",
+    "source_datasets": [
+      "lands",
+      "rents",
+      "transactions"
+    ],
+    "first_seen_year": 1992,
+    "occurrence_count": 68
+  }
+]
