@@ -40,5 +40,107 @@
     "latitude": 25.1934,
     "longitude": 55.2298,
     "notes": "Adjacent to Al Safa First, towards Umm Suqeim"
+  },
+  {
+    "area_name_upper": "AL REGA",
+    "latitude": 25.2641,
+    "longitude": 55.3231,
+    "notes": "Al Rigga — Deira commercial/retail district near Al Rigga Metro. 71,982 DLD records — major investor area"
+  },
+  {
+    "area_name_upper": "AL MERKADH",
+    "latitude": 25.1670,
+    "longitude": 55.3015,
+    "notes": "Meydan / Nad Al Sheba sector — includes Meydan One. 74,846 DLD records — top-occurrence stuck area"
+  },
+  {
+    "area_name_upper": "EYAL NASSER",
+    "latitude": 25.2705,
+    "longitude": 55.3060,
+    "notes": "Deira sub-district near Naif / Al Ras. 61,990 DLD records"
+  },
+  {
+    "area_name_upper": "AL KHAIRAN FIRST",
+    "latitude": 25.1875,
+    "longitude": 55.3578,
+    "notes": "Coastal lagoon area near Ras Al Khor / Dubai Creek Harbour development. 50,487 DLD records"
+  },
+  {
+    "area_name_upper": "AL KHAIRAN SECOND",
+    "latitude": 25.1810,
+    "longitude": 55.3625,
+    "notes": "South of Al Khairan First, Ras Al Khor coastal sector"
+  },
+  {
+    "area_name_upper": "MADINAT DUBAI ALMELAHEYAH",
+    "latitude": 25.2540,
+    "longitude": 55.2900,
+    "notes": "Dubai Maritime City — between Port Rashid and Jumeirah coast. 43,851 DLD records"
+  },
+  {
+    "area_name_upper": "UM SUQAIM FIRST",
+    "latitude": 25.1437,
+    "longitude": 55.1995,
+    "notes": "Umm Suqeim 1 — Jumeirah coastal district, closest to Al Wasl Road. 17,623 DLD records"
+  },
+  {
+    "area_name_upper": "UM SUQAIM SECOND",
+    "latitude": 25.1353,
+    "longitude": 55.1890,
+    "notes": "Umm Suqeim 2 — middle section of Umm Suqeim. 18,032 DLD records"
+  },
+  {
+    "area_name_upper": "UM SUQAIM THIRD",
+    "latitude": 25.1290,
+    "longitude": 55.1782,
+    "notes": "Umm Suqeim 3 — western section, contains Burj Al Arab vicinity. 15,916 DLD records"
+  },
+  {
+    "area_name_upper": "UM SUQAIM",
+    "latitude": 25.1366,
+    "longitude": 55.1894,
+    "notes": "Umm Suqeim — generic district centroid"
+  },
+  {
+    "area_name_upper": "MENA JABAL ALI",
+    "latitude": 24.9876,
+    "longitude": 55.0594,
+    "notes": "Mina Jebel Ali — Jebel Ali Port + Free Zone industrial harbour"
+  },
+  {
+    "area_name_upper": "SHANDAGHA EAST",
+    "latitude": 25.2680,
+    "longitude": 55.2895,
+    "notes": "Al Shindagha East — historic Deira side at Creek mouth"
+  },
+  {
+    "area_name_upper": "SHANDAGHA WEST",
+    "latitude": 25.2655,
+    "longitude": 55.2870,
+    "notes": "Al Shindagha West — historic Bur Dubai side at Creek mouth"
+  },
+  {
+    "area_name_upper": "UNIVERSE ISLANDS",
+    "latitude": 25.2310,
+    "longitude": 55.1660,
+    "notes": "The World Islands — offshore archipelago off Jumeirah coast"
+  },
+  {
+    "area_name_upper": "SIKKAT AL KHAIL NORTH",
+    "latitude": 25.2685,
+    "longitude": 55.2965,
+    "notes": "Historic Old Deira souq area, north section"
+  },
+  {
+    "area_name_upper": "SIKKAT AL KHAIL SOUTH",
+    "latitude": 25.2675,
+    "longitude": 55.2960,
+    "notes": "Historic Old Deira souq area, south section"
+  },
+  {
+    "area_name_upper": "SOUQ SIKKAT AL KHAIL",
+    "latitude": 25.2680,
+    "longitude": 55.2962,
+    "notes": "Old Deira souq — historic 'horse path' market area"
   }
 ]
