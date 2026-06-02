@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -86,6 +86,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   } catch {
     // both already swallowed individually
   }
+
+  // Pull top buildings in this area via DLD overlay's mapped name_norm.
+  // Soft-fail: many community-named areas have 0 mapped buildings (admin
+  // sector mismatch — known taxonomy gap), so we hide the section quietly.
+  const topBuildings = area.dld?.dld_name
+    ? await getDldAreaTopBuildings(area.dld.dld_name.toLowerCase(), 6).catch(
+        () => null
+      )
+    : null;
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
   const hasCoords = area.latitude != null && area.longitude != null;
@@ -368,6 +377,51 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               Source: {area.data_source ?? 'Dubai Land Department Open Data'}.
               Updated {area.last_updated ?? '2026-06-01'}. Mapped DLD area:{' '}
               <span className="font-mono text-fg">{area.dld.dld_name}</span>.
+            </div>
+          </section>
+        )}
+
+        {/* Top buildings in this area — Building X-Ray integration */}
+        {topBuildings && topBuildings.items.length > 0 && (
+          <section
+            id="top-buildings"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                Top buildings in {topBuildings.area_name} · DLD Ejari
+              </span>
+              <Link
+                href={`/buildings?area=${encodeURIComponent(area.dld?.dld_name?.toLowerCase() ?? '')}`}
+                className="text-[11px] font-medium text-accent hover:text-accent/80"
+              >
+                See all →
+              </Link>
+            </div>
+            <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-3">
+              {topBuildings.items.map((b) => (
+                <Link
+                  key={b.id}
+                  href={`/buildings/${b.id}`}
+                  className="bg-bg-card p-3 hover:bg-bg-elev/40 transition-colors min-h-[88px]"
+                >
+                  <div className="text-sm font-medium text-fg truncate">
+                    {b.project_name ?? '—'}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-fg-subtle">
+                    {b.active_rent_count.toLocaleString()} active rents
+                    {b.prop_sub_type ? ` · ${b.prop_sub_type}` : ''}
+                  </div>
+                  <div className="mt-1 text-[11px] text-fg-muted">
+                    Income:{' '}
+                    <span className="text-fg">{b.income_range_label ?? '—'}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
+              Source: Dubai Land Department · Ejari rent contract registry.
             </div>
           </section>
         )}

@@ -884,6 +884,10 @@ function ResultPanel({
       {/* F6: Best time to negotiate */}
       <BestTimeToNegotiate result={result} />
 
+      {/* Building X-Ray suggestion — quietly hide if no mapped buildings */}
+      <BuildingsInArea areaNorm={result.area_name_norm ?? area.name_norm} />
+
+
       {/* F7: Rent alert signup */}
       <RentAlertSignup
         areaNorm={result.area_name_norm ?? area.name_norm}
@@ -1081,3 +1085,77 @@ function ShareRow({
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Building X-Ray suggestion — shown on /rent-check after a successful check.
+// Hidden when the picked area has no mapped buildings (community↔admin gap).
+// ---------------------------------------------------------------------------
+function BuildingsInArea({ areaNorm }: { areaNorm: string }) {
+  const [items, setItems] = useState<
+    Array<{ id: string; project_name: string | null; active_rent_count: number; income_range_label: string | null }>
+  >([]);
+  const [areaName, setAreaName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('@/lib/api');
+        const res = await mod.getDldAreaTopBuildings(areaNorm, 6);
+        if (cancelled) return;
+        setItems(res.items);
+        setAreaName(res.area_name);
+      } catch {
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [areaNorm]);
+
+  if (loading || items.length === 0) return null;
+
+  return (
+    <section className="card p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span aria-hidden>🏢</span>
+          <h3 className="text-sm font-semibold text-fg">
+            Top buildings in {areaName ?? 'your area'}
+          </h3>
+        </div>
+        <a
+          href={`/buildings?area=${encodeURIComponent(areaNorm)}`}
+          className="text-[11px] text-accent hover:underline"
+        >
+          See all →
+        </a>
+      </div>
+      <p className="mt-1 text-[11px] text-fg-subtle">
+        Per-building income from DLD Ejari contracts — useful for picking the
+        right tower, not just the right neighbourhood.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {items.slice(0, 6).map((b) => (
+          <a
+            key={b.id}
+            href={`/buildings/${b.id}`}
+            className="rounded border border-border bg-bg-elev px-3 py-2.5 hover:border-accent/40 min-h-[64px] block"
+          >
+            <div className="text-sm text-fg truncate">
+              {b.project_name ?? '—'}
+            </div>
+            <div className="mt-0.5 text-[11px] text-fg-subtle">
+              {b.active_rent_count.toLocaleString()} active rents
+              {b.income_range_label ? ` · ${b.income_range_label}` : ''}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}

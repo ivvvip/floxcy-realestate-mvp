@@ -430,6 +430,7 @@ async def comparable_buildings(
     if not base:
         raise HTTPException(status_code=404, detail="Building not found")
 
+    # Exclude zero-rent buildings — those have no useful comparison signal.
     stmt = (
         select(DldBuilding, DldArea.name_display)
         .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
@@ -437,6 +438,7 @@ async def comparable_buildings(
             DldBuilding.id != building_id,
             DldBuilding.dld_area_id == base.dld_area_id,
             DldBuilding.prop_sub_type == base.prop_sub_type,
+            DldBuilding.active_rent_count > 0,
         )
         .order_by(
             DldBuilding.occupancy_proxy_pct.desc().nullslast(),
@@ -468,10 +470,15 @@ async def area_top_buildings(
     if not area:
         raise HTTPException(status_code=404, detail="Area not found")
 
+    # Only buildings with active rent contracts — otherwise we leak
+    # zero-signal entries to the "Top buildings in this area" surface.
     stmt = (
         select(DldBuilding, DldArea.name_display)
         .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
-        .where(DldBuilding.dld_area_id == area.id)
+        .where(
+            DldBuilding.dld_area_id == area.id,
+            DldBuilding.active_rent_count > 0,
+        )
         .order_by(DldBuilding.active_rent_count.desc())
         .limit(k)
     )

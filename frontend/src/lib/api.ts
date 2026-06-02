@@ -43,6 +43,9 @@ import type {
   DldAreaDetailResponse,
   DldStatsResponse,
   DldBuildingsResponse,
+  DldBuildingDetailResponse,
+  DldBuildingsComparableResponse,
+  DldAreaTopBuildingsResponse,
   DldBrokersResponse,
   DldBrokerItem,
   RentCheckRequest,
@@ -622,19 +625,50 @@ export async function getDldArea(nameNorm: string): Promise<DldAreaDetailRespons
 export async function getDldBuildings(opts?: {
   area?: string;
   project?: string;
+  prop_sub_type?: string;
   min_rents?: number;
+  sort_by?: 'rent_count' | 'rent_per_sqft' | 'avg_rent' | 'occupancy';
   limit?: number;
   offset?: number;
 }): Promise<DldBuildingsResponse> {
   const params = new URLSearchParams();
   if (opts?.area) params.set('area', opts.area);
   if (opts?.project) params.set('project', opts.project);
+  if (opts?.prop_sub_type) params.set('prop_sub_type', opts.prop_sub_type);
   if (opts?.min_rents != null) params.set('min_rents', String(opts.min_rents));
+  if (opts?.sort_by) params.set('sort_by', opts.sort_by);
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.offset) params.set('offset', String(opts.offset));
   const q = params.toString();
   return request<DldBuildingsResponse>(
     `/api/v1/dld/buildings${q ? `?${q}` : ''}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getDldBuilding(id: string): Promise<DldBuildingDetailResponse> {
+  return request<DldBuildingDetailResponse>(
+    `/api/v1/dld/buildings/${encodeURIComponent(id)}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getDldBuildingComparable(
+  id: string,
+  k = 5
+): Promise<DldBuildingsComparableResponse> {
+  return request<DldBuildingsComparableResponse>(
+    `/api/v1/dld/buildings/${encodeURIComponent(id)}/comparable?k=${k}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getDldAreaTopBuildings(
+  nameNorm: string,
+  k = 10
+): Promise<DldAreaTopBuildingsResponse> {
+  return request<DldAreaTopBuildingsResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/top-buildings?k=${k}`,
     { revalidate: 600 }
   );
 }

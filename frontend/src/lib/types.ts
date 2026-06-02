@@ -221,11 +221,64 @@ export interface DldBuildingItem {
   active_rent_count: number;
   occupancy_proxy_pct: number | null;
   is_freehold: boolean | null;
+  // Derived
+  total_annual_income: number | null;
+  income_range_label: string | null;
+  confidence: 'low' | 'medium' | 'high' | null;
 }
 
 export interface DldBuildingsResponse extends DldAttribution {
   count: number;
   total_available: number;
+  items: DldBuildingItem[];
+}
+
+// Building X-Ray detail
+
+export interface DldBuildingAreaContext {
+  dld_area_id: string;
+  name: string;
+  name_norm: string;
+  median_price_per_sqft: number | null;
+  median_annual_rent: number | null;
+  median_rent_per_sqft: number | null;
+  rental_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  sales_count: number;
+  rent_count_2026: number;
+}
+
+export interface DldBuildingDetail extends DldBuildingItem {
+  swimming_pools: number | null;
+  car_parks: number | null;
+  elevators: number | null;
+  bld_levels: number | null;
+  is_offplan: boolean | null;
+  implied_yield_pct: number | null;
+  estimated_unit_size_sqft: number | null;
+  estimated_unit_price: number | null;
+  area_context: DldBuildingAreaContext | null;
+}
+
+export interface DldBuildingDetailResponse {
+  data_source: string;
+  last_updated: string;
+  building: DldBuildingDetail;
+}
+
+export interface DldBuildingsComparableResponse {
+  data_source: string;
+  last_updated: string;
+  base_building_id: string;
+  count: number;
+  items: DldBuildingItem[];
+}
+
+export interface DldAreaTopBuildingsResponse {
+  data_source: string;
+  last_updated: string;
+  area_name: string;
+  count: number;
   items: DldBuildingItem[];
 }
 

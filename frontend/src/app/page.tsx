@@ -14,8 +14,13 @@ import {
   Activity,
   Scale,
 } from 'lucide-react';
-import { getDashboardSummary, getAreaStats } from '@/lib/api';
-import type { DashboardSummary, AreaStats, TopAreaItem } from '@/lib/types';
+import { getDashboardSummary, getAreaStats, getDldStats } from '@/lib/api';
+import type {
+  DashboardSummary,
+  AreaStats,
+  TopAreaItem,
+  DldStatsResponse,
+} from '@/lib/types';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { Container } from '@/components/Container';
 import { MetricTile } from '@/components/data/MetricTile';
@@ -31,10 +36,12 @@ export const revalidate = 300;
 export default async function HomePage() {
   let summary: DashboardSummary | null = null;
   let stats: AreaStats | null = null;
+  let dld: DldStatsResponse | null = null;
   try {
-    [summary, stats] = await Promise.all([
+    [summary, stats, dld] = await Promise.all([
       getDashboardSummary(),
       getAreaStats(),
+      getDldStats().catch(() => null),
     ]);
   } catch {
     // fallthrough
@@ -89,6 +96,11 @@ export default async function HomePage() {
               label="Tracked Areas"
               value={formatNumber(totalAreas)}
               hint={`${Object.keys(segCounts).length} segments`}
+            />
+            <MetricTile
+              label="Tracked Buildings"
+              value={formatNumber(dld?.total_buildings ?? 8075)}
+              hint="DLD Ejari"
             />
             <MetricTile
               label="Avg Yield · UAE"
