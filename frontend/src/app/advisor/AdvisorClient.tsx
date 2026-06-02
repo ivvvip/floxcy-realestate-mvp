@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, ChevronRight, ArrowUpRight, Sparkles, Loader2 } from 'lucide-react';
+import {
+  ChevronDown, ChevronRight, ArrowUpRight, Calculator, MapPin, RotateCcw,
+  Sparkles, Loader2, Users,
+} from 'lucide-react';
 import { advisorQuery } from '@/lib/api';
 import type {
   AdvisorGoal,
@@ -14,6 +17,45 @@ import type {
 } from '@/lib/types';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import {
+  AdvisorOnboarding,
+  markOnboardingSeen,
+  readOnboardingSeen,
+  type OnboardingResult,
+} from './AdvisorOnboarding';
+import { AdvisorHistoryPanel, pushHistory, type HistoryEntry } from './AdvisorHistory';
+import {
+  BestBuildingLink,
+  DataConfidencePanel,
+  FollowupChips,
+  InvestorVisaBadge,
+  MarketTimingBadge,
+  WhatIfPanel,
+} from './AdvisorRecExtras';
+
+// Map onboarding result → existing form state types
+function onboardingToGoal(g: OnboardingResult['goal']): AdvisorGoal {
+  if (g === 'income') return 'yield';
+  if (g === 'growth') return 'appreciation';
+  // 'both' and 'offplan' both map to balanced for the underlying API today;
+  // the existing /advisor/query endpoint doesn't yet have an offplan goal
+  // (only the new /opportunities-filtered endpoint does). Off-plan users
+  // still benefit from the rest of the personalised flow.
+  return 'balanced';
+}
+
+function onboardingToRisk(r: OnboardingResult['risk']): AdvisorRisk {
+  if (r === 'conservative') return 'low';
+  if (r === 'aggressive') return 'high';
+  return 'med';
+}
+
+function onboardingToBudget(b: OnboardingResult['budget']): number {
+  if (b === 'lt500k') return 400_000;
+  if (b === '500k-1m') return 750_000;
+  if (b === '1m-3m') return 2_000_000;
+  return 5_000_000;
+}
 
 const GOALS: { value: AdvisorGoal; label: string }[] = [
   { value: 'yield', label: 'Cash flow' },
@@ -46,20 +88,48 @@ export function AdvisorClient() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Onboarding state — surfaced on first visit only. Read once on mount
+  // to avoid SSR hydration mismatch.
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (!readOnboardingSeen()) setShowOnboarding(true);
+  }, []);
+
+  // Auto-submit after onboarding completes
+  const runQuery = async (overrides?: {
+    budget?: number;
+    goal?: AdvisorGoal;
+    risk?: AdvisorRisk;
+    city?: string;
+    question?: string;
+  }) => {
     setLoading(true);
     setError(null);
+    const b = overrides?.budget ?? budget;
+    const g = overrides?.goal ?? goal;
+    const r = overrides?.risk ?? risk;
+    const c = overrides?.city ?? city;
+    const q = (overrides?.question ?? question).trim();
     try {
       const res = await advisorQuery({
-        budget_aed: budget,
-        goal,
-        risk,
-        preferred_city: city || undefined,
-        user_question: question.trim() || undefined,
+        budget_aed: b,
+        goal: g,
+        risk: r,
+        preferred_city: c || undefined,
+        user_question: q || undefined,
       });
       setResult(res);
       setExpanded(res.recommendations[0]?.area_id ?? null);
+      // Save history (best-effort; ignore failures)
+      pushHistory({
+        ts: new Date().toISOString(),
+        budget_aed: b,
+        goal: g,
+        risk: r,
+        preferred_city: c,
+        user_question: q,
+        top_picks: res.recommendations.slice(0, 3).map((rr) => rr.area_name),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Query failed');
     } finally {
@@ -67,10 +137,67 @@ export function AdvisorClient() {
     }
   };
 
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runQuery();
+  };
+
+  const onOnboardingComplete = (o: OnboardingResult) => {
+    const newBudget = onboardingToBudget(o.budget);
+    const newGoal = onboardingToGoal(o.goal);
+    const newRisk = onboardingToRisk(o.risk);
+    // Echo timeline + off-plan preference as a user_question so the LLM
+    // prompt knows about both, since the rules-based scorer can't see them.
+    const q = [
+      `Timeline: ${o.timeline.replace('y', ' years').replace('-', ' to ')}.`,
+      o.goal === 'offplan' ? 'Prefer off-plan / pre-completion properties.' : '',
+    ].filter(Boolean).join(' ');
+    setBudget(newBudget);
+    setGoal(newGoal);
+    setRisk(newRisk);
+    setQuestion(q);
+    setShowOnboarding(false);
+    void runQuery({ budget: newBudget, goal: newGoal, risk: newRisk, question: q });
+  };
+
+  const onResumeHistory = (h: HistoryEntry) => {
+    setBudget(h.budget_aed);
+    setGoal(h.goal);
+    setRisk(h.risk);
+    setCity(h.preferred_city);
+    setQuestion(h.user_question);
+    void runQuery({
+      budget: h.budget_aed,
+      goal: h.goal,
+      risk: h.risk,
+      city: h.preferred_city,
+      question: h.user_question,
+    });
+  };
+
+  const askFollowup = (q: string) => {
+    setQuestion(q);
+    void runQuery({ question: q });
+  };
+
+  const replayOnboarding = () => {
+    setShowOnboarding(true);
+  };
+  // Suppress unused — exposed below in the JSX
+  void replayOnboarding;
+
   const questionLen = question.length;
 
   return (
     <div className="grid gap-5 lg:grid-cols-12">
+      {/* Onboarding wizard — modal on first visit */}
+      {showOnboarding && (
+        <AdvisorOnboarding
+          onComplete={onOnboardingComplete}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
+
       {/* Form */}
       <form
         onSubmit={submit}
@@ -227,14 +354,26 @@ export function AdvisorClient() {
       {/* Results */}
       <div className="lg:col-span-8 space-y-5">
         {!result ? (
-          <div className="border border-border rounded-lg bg-bg-card p-10 text-center">
-            <h3 className="text-base font-semibold text-fg">
-              Ready when you are
-            </h3>
-            <p className="mt-1 text-xs text-fg-muted">
-              Set parameters and we&apos;ll rank the top UAE areas matched to your profile,
-              plus an AI-generated analysis of the picks.
-            </p>
+          <div className="space-y-3">
+            {/* History panel — only renders if localStorage has entries */}
+            <AdvisorHistoryPanel onResume={onResumeHistory} />
+            <div className="border border-border rounded-lg bg-bg-card p-10 text-center">
+              <h3 className="text-base font-semibold text-fg">
+                Ready when you are
+              </h3>
+              <p className="mt-1 text-xs text-fg-muted">
+                Set parameters and we&apos;ll rank the top UAE areas matched to your profile,
+                plus an AI-generated analysis of the picks.
+              </p>
+              <button
+                type="button"
+                onClick={replayOnboarding}
+                className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-[11px] text-accent hover:border-accent/40"
+              >
+                <RotateCcw className="h-3 w-3" strokeWidth={2.5} />
+                Use the guided setup wizard
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -326,6 +465,14 @@ export function AdvisorClient() {
                     Informational only · not financial advice
                   </span>
                 </div>
+
+                {/* Follow-up chips — populate question + auto-resubmit */}
+                <div className="px-5 py-3 border-t border-border bg-bg-elev/10">
+                  <FollowupChips
+                    recommendations={result.recommendations}
+                    onAsk={askFollowup}
+                  />
+                </div>
               </div>
             )}
 
@@ -366,6 +513,7 @@ export function AdvisorClient() {
                       <RecRow
                         key={r.area_id}
                         rec={r}
+                        budgetAed={result.budget_aed}
                         expanded={expanded === r.area_id}
                         onToggle={() =>
                           setExpanded((cur) =>
@@ -389,10 +537,12 @@ function RecRow({
   rec,
   expanded,
   onToggle,
+  budgetAed,
 }: {
   rec: AdvisorRecommendation;
   expanded: boolean;
   onToggle: () => void;
+  budgetAed: number;
 }) {
   const riskTone =
     rec.risk_score == null
@@ -447,7 +597,26 @@ function RecRow({
         <tr className="bg-bg-elev/30">
           <td colSpan={9} className="border-b border-border">
             <div className="px-5 py-4 space-y-4">
+              {/* Badges row — visa eligibility + supply risk dot */}
+              <div className="flex flex-wrap gap-1.5">
+                <InvestorVisaBadge entryPriceAed={budgetAed} />
+                {rec.supply_risk && (
+                  <span className={cn(
+                    'pill text-[10px] inline-flex items-center gap-1',
+                    rec.supply_risk === 'low' ? 'pill-positive' :
+                    rec.supply_risk === 'high' ? 'pill-negative' : ''
+                  )}>
+                    {rec.supply_risk === 'low' ? '🟢' : rec.supply_risk === 'high' ? '🔴' : '🟡'}
+                    {' '}Supply: {rec.supply_risk}
+                  </span>
+                )}
+              </div>
+
               <DldSignals rec={rec} />
+
+              {/* Per-rec market timing — fetches on first expand */}
+              <MarketTimingBadge areaName={rec.area_name} />
+
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
                   Reasoning (cited DLD facts where available)
@@ -461,13 +630,37 @@ function RecRow({
                   ))}
                 </ul>
               </div>
-              <Link
-                href={`/areas/${rec.area_id}`}
-                className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
-              >
-                View area details
-                <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
-              </Link>
+
+              {/* DLD data panel + what-if scenarios (expandable) */}
+              <DataConfidencePanel rec={rec} />
+              <WhatIfPanel rec={rec} budgetAed={budgetAed} />
+
+              {/* Footer CTAs */}
+              <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60">
+                <Link
+                  href={`/areas/${rec.area_id}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                >
+                  <MapPin className="h-3 w-3" strokeWidth={2.5} />
+                  Area details
+                  <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
+                </Link>
+                <BestBuildingLink areaName={rec.area_name} />
+                <Link
+                  href={`/roi-calculator?area=${encodeURIComponent(rec.area_name)}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                >
+                  <Calculator className="h-3 w-3" strokeWidth={2.5} />
+                  ROI calc
+                </Link>
+                <Link
+                  href={`/brokers/directory?area=${encodeURIComponent(rec.area_name)}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                >
+                  <Users className="h-3 w-3" strokeWidth={2.5} />
+                  Find broker
+                </Link>
+              </div>
             </div>
           </td>
         </tr>
