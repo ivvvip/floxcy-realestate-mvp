@@ -64,15 +64,58 @@ class DldAreaListResponse(Attribution):
     items: List[DldAreaListItem]
 
 
+class PriceHistoryPoint(BaseModel):
+    year: int
+    avg_ppsf: Optional[float] = None          # all-units blended
+    avg_ppsf_ready: Optional[float] = None    # ready-stock only (preferred for charts)
+    avg_ppsf_offplan: Optional[float] = None  # off-plan launches
+    median_ppsf: Optional[float] = None
+    transaction_count: int = 0
+    offplan_pct: Optional[float] = None
+
+
 class DldAreaDetail(DldAreaListItem):
     building_count: int = 0
     avg_price_per_sqft: Optional[float] = None
     avg_annual_rent: Optional[float] = None
     avg_rent_per_sqft: Optional[float] = None
+    # Historical price signals from scripts/etl_dld_history.py
+    price_appreciation_1y_pct: Optional[float] = None
+    price_appreciation_3y_pct: Optional[float] = None
+    price_appreciation_5y_pct: Optional[float] = None
+    cagr_5y_pct: Optional[float] = None
+    years_of_history: int = 0
+    price_history: List[PriceHistoryPoint] = []
 
 
 class DldAreaDetailResponse(Attribution):
     area: DldAreaDetail
+
+
+class DldPriceHistoryResponse(Attribution):
+    area_name_norm: str
+    area_name_display: str
+    points: List[PriceHistoryPoint]
+    appreciation_1y_pct: Optional[float] = None
+    appreciation_3y_pct: Optional[float] = None
+    appreciation_5y_pct: Optional[float] = None
+    cagr_5y_pct: Optional[float] = None
+    years_of_history: int = 0
+
+
+class TopAppreciationItem(BaseModel):
+    area_name_norm: str
+    area_name_display: str
+    appreciation_5y_pct: float
+    cagr_5y_pct: Optional[float] = None
+    appreciation_1y_pct: Optional[float] = None
+    latest_avg_ppsf: Optional[float] = None
+    years_of_data: int
+
+
+class TopAppreciationResponse(Attribution):
+    count: int
+    items: List[TopAppreciationItem]
 
 
 class DldStatsResponse(Attribution):

@@ -241,11 +241,54 @@ export interface DldAreaListResponse extends DldAttribution {
   items: DldAreaListItem[];
 }
 
+export interface PriceHistoryPoint {
+  year: number;
+  avg_ppsf: number | null;
+  avg_ppsf_ready: number | null;
+  avg_ppsf_offplan: number | null;
+  median_ppsf: number | null;
+  transaction_count: number;
+  offplan_pct: number | null;
+}
+
 export interface DldAreaDetail extends DldAreaListItem {
   building_count: number;
   avg_price_per_sqft: number | null;
   avg_annual_rent: number | null;
   avg_rent_per_sqft: number | null;
+  // 5-year historical signals from etl_dld_history.py
+  price_appreciation_1y_pct: number | null;
+  price_appreciation_3y_pct: number | null;
+  price_appreciation_5y_pct: number | null;
+  cagr_5y_pct: number | null;
+  years_of_history: number;
+  price_history: PriceHistoryPoint[];
+}
+
+export interface DldPriceHistoryResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string;
+  points: PriceHistoryPoint[];
+  appreciation_1y_pct: number | null;
+  appreciation_3y_pct: number | null;
+  appreciation_5y_pct: number | null;
+  cagr_5y_pct: number | null;
+  years_of_history: number;
+}
+
+export interface TopAppreciationItem {
+  area_name_norm: string;
+  area_name_display: string;
+  appreciation_5y_pct: number;
+  cagr_5y_pct: number | null;
+  appreciation_1y_pct: number | null;
+  latest_avg_ppsf: number | null;
+  years_of_data: number;
+}
+
+export interface TopAppreciationResponse extends DldAttribution {
+  count: number;
+  items: TopAppreciationItem[];
 }
 
 export interface DldAreaDetailResponse extends DldAttribution {

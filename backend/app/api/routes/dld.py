@@ -20,8 +20,10 @@ from app.data.dld_area_aliases import (
 from app.database import get_db
 from app.models.dld import (
     DldArea,
+    DldAreaAppreciation,
     DldAreaMetrics,
     DldBuilding,
+    DldPriceHistory,
     DldRentBenchmark,
     DldReraBroker,
 )
@@ -41,6 +43,10 @@ from app.schemas.dld import (
     DldAreaListItem,
     DldAreaListResponse,
     DldAreaTopBuildingsResponse,
+    DldPriceHistoryResponse,
+    PriceHistoryPoint,
+    TopAppreciationItem,
+    TopAppreciationResponse,
     DldBrokerItem,
     DldBrokersResponse,
     DldBuildingAreaContext,
@@ -160,6 +166,65 @@ async def list_dld_areas(
     return DldAreaListResponse(count=len(items), total_available=int(total or 0), items=items)
 
 
+@router.get("/areas/top-appreciation", response_model=TopAppreciationResponse)
+async def dld_top_appreciation(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(5, ge=1, le=50),
+    min_years: int = Query(5, ge=1, le=10, description="Require at least N years of history"),
+):
+    """Top-N areas by 5-year price appreciation (registered Sales-of-Unit).
+
+    Powers the homepage "Fastest Growing Areas" widget. Requires a full
+    `min_years` series so we don't surface noisy 1-2 year jumps. Pulls the
+    latest avg PPSF alongside so the widget can show 'AED 16,752/sqft'
+    context without another round-trip.
+    """
+    stmt = (
+        select(DldAreaAppreciation, DldArea.name_display)
+        .outerjoin(DldArea, DldArea.name_norm == DldAreaAppreciation.area_name_norm)
+        .where(
+            DldAreaAppreciation.appreciation_5y_pct.isnot(None),
+            DldAreaAppreciation.years_of_data >= min_years,
+        )
+        .order_by(DldAreaAppreciation.appreciation_5y_pct.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    # Look up the latest avg PPSF per area in one batch query
+    area_names = [a.area_name_norm for a, _ in rows]
+    latest_ppsf: dict[str, float] = {}
+    if area_names:
+        ppsf_rows = (
+            await db.execute(
+                select(DldPriceHistory.area_name_norm, DldPriceHistory.avg_ppsf_all)
+                .where(
+                    DldPriceHistory.area_name_norm.in_(area_names),
+                    DldPriceHistory.year == DldPriceHistory.year,  # noqa
+                )
+                .order_by(DldPriceHistory.year.desc())
+            )
+        ).all()
+        # First row per area is the latest (we ordered desc)
+        for name, ppsf in ppsf_rows:
+            if name not in latest_ppsf and ppsf is not None:
+                latest_ppsf[name] = float(ppsf)
+
+    items = [
+        TopAppreciationItem(
+            area_name_norm=a.area_name_norm,
+            area_name_display=display or a.area_name_norm.title(),
+            appreciation_5y_pct=float(a.appreciation_5y_pct),
+            cagr_5y_pct=float(a.cagr_5y_pct) if a.cagr_5y_pct is not None else None,
+            appreciation_1y_pct=float(a.appreciation_1y_pct) if a.appreciation_1y_pct is not None else None,
+            latest_avg_ppsf=latest_ppsf.get(a.area_name_norm),
+            years_of_data=int(a.years_of_data or 0),
+        )
+        for a, display in rows
+    ]
+    return TopAppreciationResponse(count=len(items), items=items)
+
+
 @router.get("/areas/stats", response_model=DldStatsResponse)
 async def dld_stats(db: AsyncSession = Depends(get_db)):
     total_areas = await db.scalar(select(func.count()).select_from(DldArea))
@@ -194,9 +259,52 @@ async def dld_stats(db: AsyncSession = Depends(get_db)):
     )
 
 
+async def _load_price_history_block(
+    db: AsyncSession, area_name_norm: str
+) -> tuple[list[PriceHistoryPoint], dict | None]:
+    """Return (sorted-by-year price points, appreciation row as dict-or-None)
+    for a given area. Empty list + None when the area has no history rows."""
+    hist_rows = (
+        await db.execute(
+            select(DldPriceHistory)
+            .where(DldPriceHistory.area_name_norm == area_name_norm)
+            .order_by(DldPriceHistory.year)
+        )
+    ).scalars().all()
+    points = [
+        PriceHistoryPoint(
+            year=int(h.year),
+            avg_ppsf=float(h.avg_ppsf_all) if h.avg_ppsf_all is not None else None,
+            avg_ppsf_ready=float(h.avg_ppsf_ready) if h.avg_ppsf_ready is not None else None,
+            avg_ppsf_offplan=float(h.avg_ppsf_offplan) if h.avg_ppsf_offplan is not None else None,
+            median_ppsf=float(h.median_ppsf_all) if h.median_ppsf_all is not None else None,
+            transaction_count=int(h.transaction_count or 0),
+            offplan_pct=float(h.offplan_pct) if h.offplan_pct is not None else None,
+        )
+        for h in hist_rows
+    ]
+    appreciation = (
+        await db.execute(
+            select(DldAreaAppreciation)
+            .where(DldAreaAppreciation.area_name_norm == area_name_norm)
+        )
+    ).scalar_one_or_none()
+    if appreciation is None:
+        return points, None
+    return points, {
+        "appreciation_1y_pct": float(appreciation.appreciation_1y_pct) if appreciation.appreciation_1y_pct is not None else None,
+        "appreciation_3y_pct": float(appreciation.appreciation_3y_pct) if appreciation.appreciation_3y_pct is not None else None,
+        "appreciation_5y_pct": float(appreciation.appreciation_5y_pct) if appreciation.appreciation_5y_pct is not None else None,
+        "cagr_5y_pct": float(appreciation.cagr_5y_pct) if appreciation.cagr_5y_pct is not None else None,
+        "years_of_data": int(appreciation.years_of_data or 0),
+    }
+
+
 @router.get("/areas/{name_or_norm}", response_model=DldAreaDetailResponse)
 async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
-    """Get one area by name_norm (case-insensitive)."""
+    """Get one area by name_norm (case-insensitive). Now includes the
+    5-year price history series + 1y/3y/5y appreciation + CAGR derived
+    from scripts/etl_dld_history.py."""
     norm = name_or_norm.strip().lower()
     row = (
         await db.execute(
@@ -211,6 +319,9 @@ async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Area not found")
     area, m = row
+
+    price_history, appreciation = await _load_price_history_block(db, area.name_norm)
+
     base = _build_area_item(area, m)
     detail = DldAreaDetail(
         **base.model_dump(),
@@ -218,8 +329,53 @@ async def get_dld_area(name_or_norm: str, db: AsyncSession = Depends(get_db)):
         avg_price_per_sqft=float(m.avg_price_per_sqft) if m and m.avg_price_per_sqft is not None else None,
         avg_annual_rent=float(m.avg_annual_rent) if m and m.avg_annual_rent is not None else None,
         avg_rent_per_sqft=float(m.avg_rent_per_sqft) if m and m.avg_rent_per_sqft is not None else None,
+        price_appreciation_1y_pct=(appreciation or {}).get("appreciation_1y_pct"),
+        price_appreciation_3y_pct=(appreciation or {}).get("appreciation_3y_pct"),
+        price_appreciation_5y_pct=(appreciation or {}).get("appreciation_5y_pct"),
+        cagr_5y_pct=(appreciation or {}).get("cagr_5y_pct"),
+        years_of_history=(appreciation or {}).get("years_of_data", len(price_history)),
+        price_history=price_history,
     )
     return DldAreaDetailResponse(area=detail)
+
+
+@router.get(
+    "/areas/{name_or_norm}/price-history",
+    response_model=DldPriceHistoryResponse,
+)
+async def get_dld_area_price_history(
+    name_or_norm: str, db: AsyncSession = Depends(get_db)
+):
+    """Time series + appreciation block, separated from the area detail
+    so frontends that only want the chart data don't pull the whole DLD
+    detail payload."""
+    norm = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+    points, appreciation = await _load_price_history_block(db, area.name_norm)
+    if not points:
+        # Honest empty: the area exists but no 2021–2026 sales rows
+        # qualified the ETL filter (typically because PROP_TYPE_EN != 'Unit'
+        # for whole-villa/land areas).
+        return DldPriceHistoryResponse(
+            area_name_norm=area.name_norm,
+            area_name_display=area.name_display,
+            points=[],
+            years_of_history=0,
+        )
+    return DldPriceHistoryResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        points=points,
+        appreciation_1y_pct=(appreciation or {}).get("appreciation_1y_pct"),
+        appreciation_3y_pct=(appreciation or {}).get("appreciation_3y_pct"),
+        appreciation_5y_pct=(appreciation or {}).get("appreciation_5y_pct"),
+        cagr_5y_pct=(appreciation or {}).get("cagr_5y_pct"),
+        years_of_history=(appreciation or {}).get("years_of_data", len(points)),
+    )
 
 
 # ---------------------------------------------------------------------------

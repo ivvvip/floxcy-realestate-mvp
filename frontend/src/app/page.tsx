@@ -30,6 +30,7 @@ import { summaryForLatest, describeOpportunity, interpretRisk } from '@/lib/insi
 import { cn } from '@/lib/cn';
 import { RoiMiniWidget } from './RoiMiniWidget';
 import { HomeOpportunities } from './HomeOpportunities';
+import { HomeFastestGrowing } from './HomeFastestGrowing';
 
 export const revalidate = 300;
 
@@ -292,6 +293,9 @@ export default async function HomePage() {
 
       {/* Today's Top Opportunities (P1B — Opportunity Engine) */}
       <HomeOpportunities />
+
+      {/* Fastest Growing Areas — DLD 2021–2026 appreciation widget */}
+      <HomeFastestGrowing />
 
       {/* Featured: Top Investment Opportunity (legacy single-area card) */}
       {featured && featuredSummary && featuredOpp && (

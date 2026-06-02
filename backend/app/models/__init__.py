@@ -8,8 +8,10 @@ from app.models.broker_application import BrokerApplication
 from app.models.consultation import Consultation
 from app.models.dld import (
     DldArea,
+    DldAreaAppreciation,
     DldAreaMetrics,
     DldBuilding,
+    DldPriceHistory,
     DldRentBenchmark,
     DldReraBroker,
 )
@@ -28,8 +30,10 @@ __all__ = [
     "BrokerApplication",
     "Consultation",
     "DldArea",
+    "DldAreaAppreciation",
     "DldAreaMetrics",
     "DldBuilding",
+    "DldPriceHistory",
     "DldRentBenchmark",
     "DldReraBroker",
     "InvestmentOpportunity",

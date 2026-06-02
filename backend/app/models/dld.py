@@ -150,3 +150,54 @@ class DldRentBenchmark(Base):
             name="uq_dld_rent_benchmark_key",
         ),
     )
+
+
+class DldPriceHistory(Base):
+    """Per-(area, year) Sales-of-Unit aggregates from 2021–2026 DLD export.
+
+    Populated by scripts/etl_dld_history.py. Idempotent rebuild: the ETL
+    truncates and bulk-inserts. UNIQUE(area_name_norm, year).
+    """
+    __tablename__ = "dld_price_history"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    avg_ppsf_ready: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    avg_ppsf_offplan: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    avg_ppsf_all: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    median_ppsf_all: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    transaction_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    transaction_count_ready: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    transaction_count_offplan: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_value_aed: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
+    median_deal_size: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    offplan_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("area_name_norm", "year", name="uq_dld_price_history_area_year"),
+    )
+
+
+class DldAreaAppreciation(Base):
+    """Derived 1y/3y/5y appreciation + 5y CAGR per area, computed from
+    dld_price_history at ETL time. UNIQUE(area_name_norm)."""
+    __tablename__ = "dld_area_appreciation"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    base_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    latest_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    appreciation_1y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    appreciation_3y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    appreciation_5y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    cagr_5y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    years_of_data: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -44,8 +44,10 @@ import type {
   OpportunityFeedResponse,
   DldAreaListResponse,
   DldAreaDetailResponse,
+  DldPriceHistoryResponse,
   DldStatsResponse,
   DldBuildingsResponse,
+  TopAppreciationResponse,
   DldBuildingDetailResponse,
   DldBuildingsComparableResponse,
   DldAreaTopBuildingsResponse,
@@ -654,6 +656,25 @@ export async function getDldArea(nameNorm: string): Promise<DldAreaDetailRespons
   return request<DldAreaDetailResponse>(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}`,
     { revalidate: 600 }
+  );
+}
+
+export async function getDldAreaPriceHistory(
+  nameNorm: string
+): Promise<DldPriceHistoryResponse> {
+  return request<DldPriceHistoryResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/price-history`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getTopAppreciation(
+  limit = 5,
+  minYears = 5
+): Promise<TopAppreciationResponse> {
+  return request<TopAppreciationResponse>(
+    `/api/v1/dld/areas/top-appreciation?limit=${limit}&min_years=${minYears}`,
+    { revalidate: 3600 }
   );
 }
 

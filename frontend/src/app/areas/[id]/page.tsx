@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { PriceTrend } from '@/components/charts/PriceTrend';
@@ -115,6 +115,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // sector mismatch — known taxonomy gap), so we hide the section quietly.
   const topBuildings = area.dld?.dld_name
     ? await getDldAreaTopBuildings(area.dld.dld_name.toLowerCase(), 6).catch(
+        () => null
+      )
+    : null;
+
+  // 5-year price history from etl_dld_history.py — hidden when the area
+  // has no qualifying Sales-of-Unit rows in the 2021–2026 export.
+  const priceHistory = area.dld?.dld_name
+    ? await getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(
         () => null
       )
     : null;
@@ -400,6 +408,101 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               Source: {area.data_source ?? 'Dubai Land Department Open Data'}.
               Updated {area.last_updated ?? '2026-06-01'}. Mapped DLD area:{' '}
               <span className="font-mono text-fg">{area.dld.dld_name}</span>.
+            </div>
+          </section>
+        )}
+
+        {/* Price History (2021–2026) — DLD historical Sales-of-Unit */}
+        {priceHistory && priceHistory.points.length >= 2 && (
+          <section
+            id="price-history"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
+                Price History · {priceHistory.area_name_display} · 2021–2026
+              </span>
+              <span className="text-[11px] text-fg-subtle">
+                {priceHistory.years_of_history} years · DLD Sales-of-Unit
+              </span>
+            </div>
+            {/* 4-tile appreciation strip */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
+              <MetricTile
+                label="5-year growth"
+                value={
+                  priceHistory.appreciation_5y_pct != null
+                    ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
+                    : '—'
+                }
+                hint="2021 → 2026"
+                tone={
+                  priceHistory.appreciation_5y_pct == null
+                    ? 'default'
+                    : priceHistory.appreciation_5y_pct >= 0
+                      ? 'positive'
+                      : 'negative'
+                }
+                mono
+              />
+              <MetricTile
+                label="Annual growth rate"
+                value={
+                  priceHistory.cagr_5y_pct != null
+                    ? `${priceHistory.cagr_5y_pct >= 0 ? '+' : ''}${priceHistory.cagr_5y_pct.toFixed(2)}%`
+                    : '—'
+                }
+                hint="5y CAGR"
+                tone={
+                  priceHistory.cagr_5y_pct == null
+                    ? 'default'
+                    : priceHistory.cagr_5y_pct >= 0
+                      ? 'positive'
+                      : 'negative'
+                }
+                mono
+              />
+              <MetricTile
+                label="3-year growth"
+                value={
+                  priceHistory.appreciation_3y_pct != null
+                    ? `${priceHistory.appreciation_3y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_3y_pct.toFixed(1)}%`
+                    : '—'
+                }
+                hint="2023 → 2026"
+                mono
+              />
+              <MetricTile
+                label="Last year"
+                value={
+                  priceHistory.appreciation_1y_pct != null
+                    ? `${priceHistory.appreciation_1y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_1y_pct.toFixed(1)}%`
+                    : '—'
+                }
+                hint="2025 → 2026"
+                mono
+              />
+            </div>
+            {/* Line chart — prefer ready-only series; fall back to all-units */}
+            <div className="p-4 sm:p-5">
+              <PriceTrend
+                data={priceHistory.points.map((p) => ({
+                  label: String(p.year),
+                  price:
+                    (p.avg_ppsf_ready ?? p.avg_ppsf) != null
+                      ? Math.round(p.avg_ppsf_ready ?? p.avg_ppsf!)
+                      : undefined,
+                }))}
+                height={220}
+                showYield={false}
+              />
+              <p className="mt-2 text-[10px] text-fg-subtle">
+                Series: average AED/sqft per year, ready stock preferred
+                (off-plan launches blended only when no ready trades
+                cleared). Source: DLD registered Sales-of-Unit transactions
+                2021–2026.
+              </p>
             </div>
           </section>
         )}
