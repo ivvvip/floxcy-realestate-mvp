@@ -82,12 +82,21 @@ def classify_property(
     if pt in ("Labor Camps", "Staff Accommodation"):
         return LABOR_CAMP_CATEGORY
 
-    # Residential — apartment includes Flat + Studio (per spec).
-    if pt in ("Flat", "Studio"):
+    # Residential — apartment includes Flat + Studio + Penthouse (per spec).
+    # Penthouses (190 rows) are residential apartments at the top floor;
+    # leaving them in `other` was an unintended drop.
+    if pt in ("Flat", "Studio", "Penthouse"):
         return "apartment"
-    if pt in ("Villa", "Complex Villas"):
+    # Villa types: regular Villa, Complex Villas (compound clusters),
+    # Arabian House (1,588 rows — traditional villa style), Villa addendum
+    # (207 rows — annexes attached to a parent villa contract).
+    if pt in ("Villa", "Complex Villas", "Arabian House", "Villa addendum"):
         return "villa"
-    if pt in ("Hotel Apartment", "Hotel apartments", "Hotel"):
+    # Hotel-styled residential. "hotel building" (131 rows) is a whole-
+    # building lease of a hotel — slot it under hotel_apt rather than
+    # whole_building so its rents land in the residential analytics it
+    # was always meant for.
+    if pt in ("Hotel Apartment", "Hotel apartments", "Hotel", "hotel building"):
         return "hotel_apt"
 
     # Commercial.
