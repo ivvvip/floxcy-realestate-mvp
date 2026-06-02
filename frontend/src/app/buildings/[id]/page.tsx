@@ -87,7 +87,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                       📍{' '}
                       {ctx ? (
                         <Link
-                          href={`/dld/areas/${encodeURIComponent(ctx.name_norm)}`}
+                          href={`/buildings?area=${encodeURIComponent(ctx.name_norm)}`}
                           className="text-accent hover:underline"
                         >
                           {b.area_name}
@@ -95,6 +95,18 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                       ) : (
                         b.area_name
                       )}
+                    </span>
+                  )}
+                  {ctx?.community_name && (
+                    <span className="text-fg">
+                      ·{' '}
+                      <Link
+                        href={`/buildings?area=${encodeURIComponent(ctx.community_name.toLowerCase())}`}
+                        className="text-accent hover:underline"
+                        title={`part of ${ctx.community_name}`}
+                      >
+                        part of {ctx.community_name}
+                      </Link>
                     </span>
                   )}
                   {b.master_project && <span>· {b.master_project}</span>}

@@ -124,6 +124,10 @@ class DldBuildingAreaContext(BaseModel):
     dld_area_id: UUID
     name: str
     name_norm: str
+    # If the admin sector aliases to a marketing-friendly community name
+    # (e.g. "Wadi Al Safa 5" → "Arabian Ranches"), surface that here so the
+    # building detail page can render a natural subtitle.
+    community_name: Optional[str] = None
     median_price_per_sqft: Optional[float] = None
     median_annual_rent: Optional[float] = None
     median_rent_per_sqft: Optional[float] = None

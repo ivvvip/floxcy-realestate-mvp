@@ -239,6 +239,7 @@ export interface DldBuildingAreaContext {
   dld_area_id: string;
   name: string;
   name_norm: string;
+  community_name?: string | null;
   median_price_per_sqft: number | null;
   median_annual_rent: number | null;
   median_rent_per_sqft: number | null;

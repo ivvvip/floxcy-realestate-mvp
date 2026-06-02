@@ -12,6 +12,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit_dependency
+from app.data.dld_area_aliases import (
+    admin_sector_to_community,
+    community_to_admin_sectors,
+    is_tower_density,
+)
 from app.database import get_db
 from app.models.dld import (
     DldArea,
@@ -301,7 +306,15 @@ async def list_buildings(
     )
     conds = []
     if area:
-        conds.append(DldArea.name_norm == area.strip().lower())
+        # Expand community → admin sectors via the alias table. When the
+        # user filters by "damac hills 2" we look up Al Hebiah Fifth instead;
+        # falls back to exact-match if the area isn't an aliased community.
+        norm = area.strip().lower()
+        sectors = community_to_admin_sectors(norm)
+        if sectors:
+            conds.append(DldArea.name_norm.in_(sectors))
+        else:
+            conds.append(DldArea.name_norm == norm)
     if project:
         conds.append(DldBuilding.project_name.ilike(f"%{project.strip()}%"))
     if prop_sub_type:
@@ -358,6 +371,7 @@ async def _load_area_context(
         dld_area_id=a.id,
         name=a.name_display,
         name_norm=a.name_norm,
+        community_name=admin_sector_to_community(a.name_norm),
         median_price_per_sqft=float(m.median_price_per_sqft) if m and m.median_price_per_sqft is not None else None,
         median_annual_rent=float(m.median_annual_rent) if m and m.median_annual_rent is not None else None,
         median_rent_per_sqft=float(m.median_rent_per_sqft) if m and m.median_rent_per_sqft is not None else None,
@@ -462,16 +476,70 @@ async def area_top_buildings(
     db: AsyncSession = Depends(get_db),
     k: int = Query(10, ge=1, le=50),
 ):
-    """Top-K buildings in an area, ranked by active rent count desc."""
+    """Top-K buildings in an area, ranked by active rent count desc.
+
+    Handles three input shapes:
+      1. An admin-sector name (e.g. "wadi al safa 5") — direct match.
+      2. An aliased community name (e.g. "damac hills 2", "arabian ranches",
+         "jvc") — expanded via dld_area_aliases to the list of admin sectors,
+         then aggregated across those.
+      3. A tower-density community (e.g. "business bay", "marsa dubai") —
+         204 No Content equivalent: returns an empty list with a hint, so
+         the frontend can render an honest empty-state instead of 404.
+    """
     norm = name_norm.strip().lower()
+    sectors = community_to_admin_sectors(norm)
+
+    # Path 2: community → expand to admin sectors
+    if sectors:
+        # Resolve the parent community's display name (use the first sector's
+        # name_display as a fallback if not in DLD)
+        display_name = norm.title()
+        # Get IDs for those admin sectors
+        sector_areas = (
+            await db.execute(
+                select(DldArea).where(DldArea.name_norm.in_(sectors))
+            )
+        ).scalars().all()
+        if not sector_areas:
+            # Aliased name but DLD doesn't actually have any of these sectors
+            return DldAreaTopBuildingsResponse(
+                area_name=display_name, count=0, items=[]
+            )
+        sector_ids = [a.id for a in sector_areas]
+        stmt = (
+            select(DldBuilding, DldArea.name_display)
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+            .where(
+                DldBuilding.dld_area_id.in_(sector_ids),
+                DldBuilding.active_rent_count > 0,
+            )
+            .order_by(DldBuilding.active_rent_count.desc())
+            .limit(k)
+        )
+        rows = (await db.execute(stmt)).all()
+        items = [_build_building_item(b, name) for b, name in rows]
+        return DldAreaTopBuildingsResponse(
+            area_name=display_name, count=len(items), items=items
+        )
+
+    # Path 1: direct admin-sector match
     area = (
         await db.execute(select(DldArea).where(DldArea.name_norm == norm))
     ).scalar_one_or_none()
     if not area:
+        # Path 3: tower-density community we know is rent-only, no buildings.
+        # Return 200 + empty so the frontend can render an honest empty-state.
+        if is_tower_density(norm):
+            return DldAreaTopBuildingsResponse(
+                area_name=norm.title(), count=0, items=[]
+            )
         raise HTTPException(status_code=404, detail="Area not found")
 
-    # Only buildings with active rent contracts — otherwise we leak
-    # zero-signal entries to the "Top buildings in this area" surface.
+    # If the matched admin sector aliases to a canonical community, surface
+    # that as the display name so the frontend header reads naturally.
+    display_name = admin_sector_to_community(norm) or area.name_display
+
     stmt = (
         select(DldBuilding, DldArea.name_display)
         .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
@@ -485,7 +553,7 @@ async def area_top_buildings(
     rows = (await db.execute(stmt)).all()
     items = [_build_building_item(b, name) for b, name in rows]
     return DldAreaTopBuildingsResponse(
-        area_name=area.name_display, count=len(items), items=items
+        area_name=display_name, count=len(items), items=items
     )
 
 

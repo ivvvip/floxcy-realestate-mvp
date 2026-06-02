@@ -1,0 +1,167 @@
+"""Community ↔ admin-sector aliases for Dubai areas.
+
+DLD ships two area taxonomies:
+  - buildings.csv uses admin-sector names: "Wadi Al Safa 5", "Al Hebiah Fifth"
+  - transactions/rents.csv use community names: "Arabian Ranches", "Damac Hills 2"
+
+Both taxonomies live as separate rows in `dld_areas`. Users search by the
+community name (what's on signs, listings, WhatsApp groups), but the
+building-level data is filed under the admin-sector name. This map lets us
+expand a community → list of admin sectors and roll up Building X-Ray for
+the master-planned communities where DLD actually publishes building data.
+
+Tower-density communities (Business Bay, Marina, Downtown, Burj Khalifa,
+JBR, Palm Jumeirah) are NOT in this map because DLD's buildings.csv does
+not cover them — those are individual strata towers, not master-planned
+projects. The frontend renders a friendly empty-state for those instead.
+
+Maintenance note: the source of truth for what's in the buildings dataset
+is the production DB. When new master-planned communities go live in DLD
+(e.g. a new Nshama project), add the mapping here.
+
+All keys + values are `name_norm` (lowercase, space-separated).
+"""
+from __future__ import annotations
+
+# community_name_norm  →  list of admin_sector name_norm values
+# Ordering inside the list doesn't matter; the lookup is set membership.
+COMMUNITY_TO_ADMIN_SECTORS: dict[str, list[str]] = {
+    # Damac Hills 2 (formerly Akoya Oxygen) — single admin sector, big footprint
+    "damac hills 2": ["al hebiah fifth"],
+    "akoya oxygen": ["al hebiah fifth"],
+    "akoya": ["al hebiah fifth"],
+
+    # Damac Hills (original Akoya) — Hadaeq Sheikh MBR + scattered Al Hebiah
+    "damac hills": ["hadaeq sheikh mohammed bin rashid", "al hebiah fourth"],
+
+    # Arabian Ranches family — Wadi Al Safa cluster
+    "arabian ranches": [
+        "wadi al safa 3", "wadi al safa 5", "wadi al safa 2", "wadi al safa 7"
+    ],
+    "arabian ranches 2": ["wadi al safa 3", "wadi al safa 5"],
+    "arabian ranches 3": ["wadi al safa 5"],
+    "arabian ranches iii": ["wadi al safa 5"],
+
+    # Town Square Dubai (Nshama)
+    "town square": ["al yelayiss 1", "al yelayiss 2"],
+    "town square dubai": ["al yelayiss 1", "al yelayiss 2"],
+
+    # Tilal Al Ghaf (Majid Al Futtaim)
+    "tilal al ghaf": ["al yelayiss 5"],
+
+    # Dubai Investment Park
+    "dubai investment park": [
+        "dubai investment park first", "dubai investment park second"
+    ],
+    "dip": ["dubai investment park first", "dubai investment park second"],
+
+    # Dubai South / Expo / Aviation City — multiple admin sectors
+    "dubai south": [
+        "madinat al mataar", "saih shuaib 1", "saih shuaib 2", "saih shuaib 4"
+    ],
+    "expo city": ["madinat al mataar"],
+
+    # Jumeirah Village Circle (JVC) — Nakheel
+    "jumeirah village circle": ["al barsha south fourth"],
+    "jvc": ["al barsha south fourth"],
+
+    # Jumeirah Village Triangle (JVT)
+    "jumeirah village triangle": ["al barshaa south third"],
+    "jvt": ["al barshaa south third"],
+
+    # MBR City — Sobha Hartland, District One, Meydan
+    "mbr city": ["hadaeq sheikh mohammed bin rashid"],
+    "mohammed bin rashid city": ["hadaeq sheikh mohammed bin rashid"],
+    "district one": ["hadaeq sheikh mohammed bin rashid"],
+    "sobha hartland": ["hadaeq sheikh mohammed bin rashid"],
+
+    # The Villa / Nad Al Sheba
+    "the villa": ["nad al shiba first"],
+    "nad al sheba": ["nad al shiba first"],
+
+    # Dubailand area (multiple master-planned subcommunities)
+    "dubailand": ["al yufrah 1", "madinat hind 4"],
+
+    # International City
+    "international city": ["warsan fourth"],
+
+    # Mira / Reem (Emaar)
+    "reem": ["me'aisem first", "me'aisem second"],
+    "mira": ["me'aisem first"],
+}
+
+
+def _norm(name: str) -> str:
+    return (name or "").strip().lower()
+
+
+def community_to_admin_sectors(name_norm: str) -> list[str] | None:
+    """Return the list of admin sectors for a community, or None if the
+    name isn't a community in our map. Callers should fall back to using
+    the original name_norm when this returns None."""
+    return COMMUNITY_TO_ADMIN_SECTORS.get(_norm(name_norm))
+
+
+# Display map: which admin sector should resolve to which canonical community
+# name on building detail subtitles. Hand-picked to use the modern marketing
+# name (e.g. "Damac Hills 2" not "Akoya Oxygen", "Arabian Ranches" not
+# "Wadi Al Safa N"). Falls back to None when there's no curated alias.
+_ADMIN_TO_CANONICAL_COMMUNITY: dict[str, str] = {
+    "al hebiah fifth": "Damac Hills 2",
+    "hadaeq sheikh mohammed bin rashid": "MBR City",
+    "al hebiah fourth": "Damac Hills",
+    "wadi al safa 5": "Arabian Ranches",
+    "wadi al safa 3": "Arabian Ranches",
+    "wadi al safa 2": "Arabian Ranches",
+    "wadi al safa 7": "Arabian Ranches",
+    "al yelayiss 1": "Town Square",
+    "al yelayiss 2": "Town Square",
+    "al yelayiss 5": "Tilal Al Ghaf",
+    "dubai investment park first": "Dubai Investment Park",
+    "dubai investment park second": "Dubai Investment Park",
+    "madinat al mataar": "Dubai South",
+    "saih shuaib 1": "Dubai South",
+    "saih shuaib 2": "Dubai South",
+    "saih shuaib 4": "Dubai South",
+    "al barsha south fourth": "Jumeirah Village Circle",
+    "al barshaa south third": "Jumeirah Village Triangle",
+    "nad al shiba first": "Nad Al Sheba",
+    "al yufrah 1": "Dubailand",
+    "madinat hind 4": "Dubailand",
+    "warsan fourth": "International City",
+    "me'aisem first": "Reem",
+    "me'aisem second": "Reem",
+}
+
+
+def admin_sector_to_community(name_norm: str) -> str | None:
+    """Return the display-friendly community name for an admin sector, or
+    None if no curated alias exists. Already title-cased for display."""
+    return _ADMIN_TO_CANONICAL_COMMUNITY.get(_norm(name_norm))
+
+
+# Tower-density communities — DLD has rent contracts and area metrics for
+# these, but does NOT publish building-level data because they're individual
+# strata towers, not master-planned projects. Frontend uses this list to
+# render an honest empty-state on /areas/[id] instead of silently hiding the
+# top-buildings section.
+TOWER_DENSITY_COMMUNITIES: frozenset[str] = frozenset({
+    "business bay",
+    "marsa dubai",        # the admin name for Dubai Marina
+    "dubai marina",
+    "burj khalifa",       # Downtown / Burj Khalifa community
+    "downtown dubai",
+    "palm jumeirah",
+    "jbr",
+    "jumeirah beach residence",
+    "blue waters",
+    "city walk",
+    "old town",
+    "al sufouh first",
+    "al sufouh second",
+    "nad al hamar",
+})
+
+
+def is_tower_density(name_norm: str) -> bool:
+    return _norm(name_norm) in TOWER_DENSITY_COMMUNITIES

@@ -426,6 +426,45 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           </section>
         )}
 
+        {/* Honest empty-state: API succeeded but no buildings linked. Happens
+            for tower-density communities (Business Bay, Marina, Downtown)
+            where DLD doesn't publish building-level data. */}
+        {topBuildings && topBuildings.items.length === 0 && (
+          <section
+            id="top-buildings-empty"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-fg-muted" strokeWidth={2} />
+                Building X-Ray · {topBuildings.area_name}
+              </span>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="text-sm text-fg-muted leading-relaxed">
+                <span className="text-fg font-medium">
+                  {topBuildings.area_name}
+                </span>{' '}
+                is mostly individual strata towers, not a master-planned
+                community. Dubai Land Department publishes building-level
+                rent data only for master-planned projects (Damac Hills,
+                Arabian Ranches, Town Square, Dubai South, JVC, etc.).
+              </p>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <Link
+                  href="/buildings"
+                  className="inline-flex h-9 items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent hover:bg-accent/20"
+                >
+                  Browse 8,075 covered buildings →
+                </Link>
+                <span className="text-[11px] text-fg-subtle">
+                  Source: DLD Ejari rent contract registry
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* AI insight card (P2) */}
         <div className="mt-5">
           <AreaAiInsightCard areaId={params.id} />
