@@ -101,6 +101,15 @@ class DldBuilding(Base):
     avg_rent_per_sqft: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     active_rent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     occupancy_proxy_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    # Building-name classification — see scripts/_building_classifier.py.
+    # building_name_type ∈ {real_building, sub_project, master_project,
+    # developer_name, area_name, no_name}. is_identifiable is the gate for
+    # building-level rent analytics; the others contribute area-level signal
+    # only.
+    building_name_clean: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    building_name_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_identifiable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

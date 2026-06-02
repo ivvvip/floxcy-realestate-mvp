@@ -34,13 +34,18 @@ COMMUNITY_TO_ADMIN_SECTORS: dict[str, list[str]] = {
     # Damac Hills (original Akoya) — Hadaeq Sheikh MBR + scattered Al Hebiah
     "damac hills": ["hadaeq sheikh mohammed bin rashid", "al hebiah fourth"],
 
-    # Arabian Ranches family — Wadi Al Safa cluster
+    # Arabian Ranches family — Wadi Al Safa 3/5/2 cluster.
+    # wadi al safa 7 was removed from this list — it geographically sits in
+    # the Majan/Dubailand corridor, not the Ranches, and was double-attributing.
     "arabian ranches": [
-        "wadi al safa 3", "wadi al safa 5", "wadi al safa 2", "wadi al safa 7"
+        "wadi al safa 3", "wadi al safa 5", "wadi al safa 2"
     ],
     "arabian ranches 2": ["wadi al safa 3", "wadi al safa 5"],
     "arabian ranches 3": ["wadi al safa 5"],
     "arabian ranches iii": ["wadi al safa 5"],
+
+    # Majan (Dubailand) — Wadi Al Safa 7 admin sector
+    "majan": ["wadi al safa 7"],
 
     # Town Square Dubai (Nshama)
     "town square": ["al yelayiss 1", "al yelayiss 2"],
@@ -113,7 +118,7 @@ _ADMIN_TO_CANONICAL_COMMUNITY: dict[str, str] = {
     "wadi al safa 5": "Arabian Ranches",
     "wadi al safa 3": "Arabian Ranches",
     "wadi al safa 2": "Arabian Ranches",
-    "wadi al safa 7": "Arabian Ranches",
+    "wadi al safa 7": "Majan",
     "al yelayiss 1": "Town Square",
     "al yelayiss 2": "Town Square",
     "al yelayiss 5": "Tilal Al Ghaf",

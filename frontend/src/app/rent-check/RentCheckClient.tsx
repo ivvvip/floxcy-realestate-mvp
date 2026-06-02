@@ -712,6 +712,14 @@ function ResultPanel({
         </div>
         <p className="mt-2 text-sm text-fg">{subHeadline}</p>
 
+        {result.low_confidence && (
+          <p className="mt-2 text-xs text-warning bg-warning/10 border border-warning/30 rounded px-2 py-1.5">
+            ⚠ Limited data ({result.sample_size} contract{result.sample_size === 1 ? '' : 's'}).
+            Verdict is a hint, not a hard signal — read it alongside the
+            negotiation tips below.
+          </p>
+        )}
+
         <div className="mt-4 grid grid-cols-3 gap-px bg-border rounded overflow-hidden">
           <Cell
             label="Your rent"

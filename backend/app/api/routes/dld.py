@@ -1323,6 +1323,10 @@ def _build_building_item(
         rent_psf_vs_area_pct=delta_pct,
         area_median_rent_psf=area_median_rent_psf,
         demand_signal=_demand_signal(b.active_rent_count),
+        building_name_clean=b.building_name_clean,
+        building_name_type=b.building_name_type,
+        display_name=b.display_name,
+        is_identifiable=bool(b.is_identifiable),
     )
 
 
@@ -1864,6 +1868,7 @@ async def rent_check(req: RentCheckRequest, db: AsyncSession = Depends(get_db)):
         yoy_trend=round(yoy, 2) if yoy is not None else None,
         size_band=band,
         confidence=confidence_for(bm.sample_count),
+        low_confidence=bm.sample_count < 5,
         area_name_display=area.name_display,
         area_name_norm=area.name_norm,
         median_price_per_sqft=float(am.median_price_per_sqft)

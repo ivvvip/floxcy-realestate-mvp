@@ -309,14 +309,20 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
               </span>
             </div>
           )}
-          <div className="text-sm font-semibold text-fg truncate" title={b.project_name ?? ''}>
-            {b.project_name ?? '—'}
+          <div
+            className="text-sm font-semibold text-fg truncate"
+            title={b.display_name ?? b.project_name ?? ''}
+          >
+            {b.display_name ?? b.project_name ?? '—'}
           </div>
           <div className="mt-0.5 text-[11px] text-fg-muted truncate">
             {b.area_name ?? '—'}
             {b.prop_sub_type ? ` · ${b.prop_sub_type}` : ''}
             {b.age_years != null && (
               <> · Built ~{2026 - b.age_years} (<span className="font-mono">{b.age_years}y</span>)</>
+            )}
+            {b.is_identifiable === false && (
+              <span className="ml-1 text-fg-subtle">· area-level</span>
             )}
           </div>
         </div>

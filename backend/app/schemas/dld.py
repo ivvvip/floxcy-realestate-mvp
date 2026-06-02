@@ -265,6 +265,14 @@ class DldBuildingItem(BaseModel):
     building_type: Optional[str] = None
     building_type_label: Optional[str] = None
     building_type_emoji: Optional[str] = None
+    # Building-name classification (from etl _building_classifier.py).
+    # building_name_type ∈ real_building | sub_project | master_project |
+    # developer_name | area_name | no_name. display_name is the
+    # user-facing label the frontend should render in place of project_name.
+    building_name_clean: Optional[str] = None
+    building_name_type: Optional[str] = None
+    display_name: Optional[str] = None
+    is_identifiable: bool = False
     # When project_name equals master_project the row is a community-wide
     # aggregate rather than a single tower. We surface a count of how many
     # records share the same (master_project, area) for the "5 towers in
@@ -398,6 +406,10 @@ class RentCheckResponse(Attribution):
     yoy_trend: Optional[float] = None
     size_band: str
     confidence: str
+    # True when the benchmark cell drew on <5 contracts. The cell is still
+    # served (better signal than nothing) but the frontend renders a
+    # "Limited data (N contracts)" caveat next to the verdict.
+    low_confidence: bool = False
     # Enriched fields for the Rent-vs-Buy feature on the frontend
     area_name_display: Optional[str] = None
     area_name_norm: Optional[str] = None

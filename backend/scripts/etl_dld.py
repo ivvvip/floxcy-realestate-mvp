@@ -37,6 +37,33 @@ from _dld_category import (  # noqa: E402
     is_residential,
     residential_amount_cap,
 )
+from _building_classifier import (  # noqa: E402
+    classify_building_name,
+    display_name,
+    is_identifiable,
+)
+
+# Community ↔ admin-sector aliases. Without this, community names like
+# "Jumeirah Village Circle" / "Majan" show zero rent because DLD files
+# rent contracts under their admin sectors ("Al Barsha South Fourth",
+# "Wadi Al Safa 7"). Inverse-map below routes each rent row to BOTH the
+# admin sector AND any communities that claim it.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.data.dld_area_aliases import COMMUNITY_TO_ADMIN_SECTORS  # noqa: E402
+
+ADMIN_SECTOR_TO_COMMUNITIES: dict[str, list[str]] = collections.defaultdict(list)
+for _community, _sectors in COMMUNITY_TO_ADMIN_SECTORS.items():
+    for _sector in _sectors:
+        ADMIN_SECTOR_TO_COMMUNITIES[_sector].append(_community)
+
+
+def areas_for_rent_row(area_norm: str) -> list[str]:
+    """Returns the list of dld_area name_norms a rent row should aggregate
+    into: the row's own admin sector plus every community that aliases it.
+    A contract under 'al barsha south fourth' counts for both that sector
+    AND for 'jumeirah village circle' / 'jvc'.
+    """
+    return [area_norm] + ADMIN_SECTOR_TO_COMMUNITIES.get(area_norm, [])
 
 DATA_DIR = Path(os.environ.get("DLD_DATA_DIR", str(Path.home() / "dld-data")))
 TODAY = dt.date(2026, 6, 1)
@@ -49,7 +76,11 @@ SIZE_BANDS = [
     ("200-299", 200, 300),
     ("300+", 300, float("inf")),
 ]
-MIN_BENCHMARK_SAMPLES = 5
+MIN_BENCHMARK_SAMPLES = 3
+# Sample count threshold below which a cell is flagged low_confidence. The
+# cell still ships (better a hint than a hole) but the endpoint surfaces the
+# flag so the frontend can render "Limited data (N contracts)".
+LOW_CONFIDENCE_SAMPLE_THRESHOLD = 5
 
 
 def norm(s: Optional[str]) -> str:
@@ -302,40 +333,43 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
             continue
         sales_ppsf[area].append(ppsf)
 
-    # Rents 2026: annual rent + annual rent per sqft (NEW schema column names)
+    # Rents 2026: annual rent + annual rent per sqft (NEW schema column names).
+    # Each rent row is fanned out to its admin sector + every community
+    # alias so JVC / JVT / Majan inherit metrics from their parent sectors.
     rent_amounts: dict[str, list[float]] = collections.defaultdict(list)
     rent_ppsf: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2026: dict[str, int] = collections.Counter()
     for r in rents_2026:
-        area = norm(r.get("area_name_en"))
-        if not area:
+        sector = norm(r.get("area_name_en"))
+        if not sector:
             continue
-        rent_count_2026[area] += 1
         amt = parse_float(r.get("annual_amount"))
         a = parse_float(r.get("actual_area"))
         if amt is None or amt <= 0:
             continue
-        rent_amounts[area].append(amt)
-        if a and a > 0:
-            ppsf = amt / a
-            if 10 <= ppsf <= 5000:
+        ppsf = (amt / a) if (a and a > 0) else None
+        for area in areas_for_rent_row(sector):
+            rent_count_2026[area] += 1
+            rent_amounts[area].append(amt)
+            if ppsf is not None and 10 <= ppsf <= 5000:
                 rent_ppsf[area].append(ppsf)
 
-    # Rents 2025: just rent per sqft median (for YoY)
+    # Rents 2025: just rent per sqft median (for YoY) — same alias fan-out.
     rent_ppsf_2025: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2025: dict[str, int] = collections.Counter()
     for r in rents_2025:
-        area = norm(r.get("area_name_en"))
-        if not area:
+        sector = norm(r.get("area_name_en"))
+        if not sector:
             continue
-        rent_count_2025[area] += 1
         amt = parse_float(r.get("annual_amount"))
         a = parse_float(r.get("actual_area"))
         if amt is None or a is None or amt <= 0 or a <= 0:
             continue
         ppsf = amt / a
         if 10 <= ppsf <= 5000:
-            rent_ppsf_2025[area].append(ppsf)
+            for area in areas_for_rent_row(sector):
+                rent_count_2025[area] += 1
+                rent_ppsf_2025[area].append(ppsf)
 
     all_areas = set(sales_ppsf) | set(rent_amounts) | set(rent_count_2026) | set(rent_count_2025) | set(sales_count)
     out: dict[str, dict] = {}
@@ -396,6 +430,7 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
     for b in buildings:
         area_n = norm(b.get("AREA_EN"))
         proj_name = (b.get("PROJECT_EN") or "").strip()
+        master_proj = (b.get("MASTER_PROJECT_EN") or "").strip() or None
         proj_key = (area_n, proj_name.lower()) if proj_name else None
 
         rents_for = proj_rents.get(proj_key, []) if proj_key else []
@@ -406,11 +441,20 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
         if flats > 0:
             occ = min(100.0, (len(rents_for) / flats) * 100)
 
+        # Classify the project_name into a building identity type.
+        area_display = (b.get("AREA_EN") or "").strip() or None
+        bn_clean, bn_type = classify_building_name(
+            proj_name or None, master_proj, area_display
+        )
+        bn_display = display_name(
+            proj_name or None, master_proj, area_display, bn_clean, bn_type
+        )
+
         out.append(dict(
             area_norm=area_n if area_n else None,
             project_number=(b.get("PROJECT_NUMBER") or "").strip() or None,
             project_name=proj_name or None,
-            master_project=(b.get("MASTER_PROJECT_EN") or "").strip() or None,
+            master_project=master_proj,
             zone=(b.get("ZONE_EN") or "").strip() or None,
             prop_sub_type=(b.get("PROP_SUB_TYPE_EN") or "").strip() or None,
             land_type=(b.get("LAND_TYPE_EN") or "").strip() or None,
@@ -431,6 +475,10 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
             avg_rent_per_sqft=(sum(ppsfs) / len(ppsfs)) if ppsfs else None,
             active_rent_count=len(rents_for),
             occupancy_proxy_pct=occ,
+            building_name_clean=bn_clean,
+            building_name_type=bn_type,
+            display_name=bn_display,
+            is_identifiable=is_identifiable(bn_type),
         ))
     return out
 
@@ -455,7 +503,7 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
         for r in buckets.get(category, []):
             if not r.get("_is_person"):
                 continue
-            area = norm(r.get("area_name_en"))
+            sector = norm(r.get("area_name_en"))
             # prop_sub_type semantics match the OLD pipeline: it's the
             # property sub-type (Flat / Studio / Villa / Hotel apartments)
             # — the same value the /dld/rent-check endpoint passes from
@@ -464,7 +512,7 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
             # bedroom-count granularity ("1 bed rooms+hall") which would
             # explode the cell count and break rent-check lookups.
             pst = (r.get("ejari_property_type_en") or "").strip()
-            if not area or not pst:
+            if not sector or not pst:
                 continue
             amt = parse_float(r.get("annual_amount"))
             sq = parse_float(r.get("actual_area"))
@@ -477,7 +525,10 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
             if not (10 <= ppsf <= 5000):
                 continue
             is_bulk = bool(r.get("_is_bulk"))
-            bucket[(area, pst, band, category, is_bulk)].append((amt, ppsf))
+            # Fan out to admin sector + every community alias so /rent-check
+            # for JVC returns the same cell as "al barsha south fourth".
+            for area in areas_for_rent_row(sector):
+                bucket[(area, pst, band, category, is_bulk)].append((amt, ppsf))
 
     out: list[dict] = []
     for (area, pst, band, category, is_bulk), pairs in bucket.items():
@@ -609,8 +660,10 @@ def write_to_db(
         print("[db] writing dld_buildings...", flush=True)
         cur.execute("DELETE FROM dld_buildings")
         rows = []
+        type_counts: collections.Counter = collections.Counter()
         for b in buildings:
             aid = area_norm_to_id.get(b["area_norm"]) if b["area_norm"] else None
+            type_counts[b["building_name_type"]] += 1
             rows.append((
                 str(uuid.uuid4()), aid,
                 b["project_number"], b["project_name"], b["master_project"], b["zone"],
@@ -621,6 +674,8 @@ def write_to_db(
                 b["is_freehold"], b["is_offplan"], b["creation_date"],
                 b["avg_annual_rent"], b["avg_rent_per_sqft"],
                 b["active_rent_count"], b["occupancy_proxy_pct"],
+                b["building_name_clean"], b["building_name_type"],
+                b["display_name"], b["is_identifiable"],
             ))
         psycopg2.extras.execute_values(
             cur,
@@ -630,13 +685,16 @@ def write_to_db(
                 prop_sub_type, land_type, actual_area, built_up_area,
                 flats, shops, offices, floors, bld_levels, elevators,
                 swimming_pools, car_parks, is_freehold, is_offplan, creation_date,
-                avg_annual_rent, avg_rent_per_sqft, active_rent_count, occupancy_proxy_pct)
+                avg_annual_rent, avg_rent_per_sqft, active_rent_count, occupancy_proxy_pct,
+                building_name_clean, building_name_type, display_name, is_identifiable)
             VALUES %s
             """,
             rows,
             page_size=500,
         )
         print(f"[db]   dld_buildings: {len(rows)} rows", flush=True)
+        type_summary = ", ".join(f"{k}={v:,}" for k, v in type_counts.most_common())
+        print(f"[db]   building name types: {type_summary}", flush=True)
 
         # ---- dld_rera_brokers — wipe + insert ----
         print("[db] writing dld_rera_brokers...", flush=True)
@@ -852,11 +910,23 @@ def main():
     print(f"[etl] canonical DLD areas: {len(areas):,}", flush=True)
 
     # --- Area counts. Residential-person-nonbulk counts feed dld_areas so
-    # the "how much real signal do we have here" stat is honest.
+    # the "how much real signal do we have here" stat is honest. Rent counts
+    # are fanned out via the community-alias map (each contract counted under
+    # its admin sector AND every community parent).
+    def _rent_count(rows: list[dict]) -> collections.Counter:
+        c: collections.Counter = collections.Counter()
+        for r in rows:
+            sector = norm(r.get("area_name_en"))
+            if not sector:
+                continue
+            for area in areas_for_rent_row(sector):
+                c[area] += 1
+        return c
+
     area_counts = {
         "txn": collections.Counter(norm(r.get("AREA_EN")) for r in txns),
-        "rent_2026": collections.Counter(norm(r.get("area_name_en")) for r in rents_2026_resi),
-        "rent_2025": collections.Counter(norm(r.get("area_name_en")) for r in rents_2025_resi),
+        "rent_2026": _rent_count(rents_2026_resi),
+        "rent_2025": _rent_count(rents_2025_resi),
         "building": collections.Counter(norm(r.get("AREA_EN")) for r in buildings),
         "land": collections.Counter(norm(r.get("AREA_EN")) for r in lands),
     }

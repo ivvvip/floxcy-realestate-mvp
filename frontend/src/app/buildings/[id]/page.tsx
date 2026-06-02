@@ -97,9 +97,27 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-fg-muted" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight truncate">
-                    {b.project_name ?? 'Unnamed building'}
+                    {b.display_name ?? b.project_name ?? 'Unnamed building'}
                   </h1>
                 </div>
+                {/* Honesty banner when the row isn't a specific building.
+                    Hidden when the classifier confirmed a real_building /
+                    sub_project — those are the only types where building
+                    economics are meaningful. */}
+                {b.is_identifiable === false && b.building_name_type && (
+                  <p className="mt-1 text-[11px] text-warning bg-warning/10 border border-warning/30 rounded px-2 py-1">
+                    ⓘ This DLD record is{' '}
+                    {b.building_name_type === 'master_project'
+                      ? 'a master-planned community aggregate'
+                      : b.building_name_type === 'developer_name'
+                        ? 'filed under a developer name'
+                        : b.building_name_type === 'area_name'
+                          ? 'filed under an area name'
+                          : 'unspecified'}
+                    , not a single tower. Treat the metrics as
+                    area-level signal, not per-building.
+                  </p>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg-muted">
                   {b.area_name && (
                     <span>

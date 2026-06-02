@@ -575,21 +575,26 @@ def write_rent_history_and_derive_yields(
             area_ids = {n: i for n, i in cur.fetchall()}
             print(f"  {len(area_ids):,} known dld_areas", flush=True)
 
-            # Building lookup: prefer project_number, fall back to
-            # (lower(project_name), dld_area_id).
+            # Building lookup: match by (LOWER(TRIM(project_name)), area_id)
+            # against buildings the name classifier flagged is_identifiable —
+            # i.e. real_building / sub_project types only. The other types
+            # (area_name / developer_name / master_project / no_name) don't
+            # represent specific towers, so attributing rent history to them
+            # would be misleading.
             cur.execute(
-                "SELECT id, project_number, project_name, dld_area_id FROM dld_buildings"
+                "SELECT id, project_name, dld_area_id "
+                "FROM dld_buildings "
+                "WHERE is_identifiable = TRUE"
             )
-            by_pnumber: dict[str, str] = {}
             by_pname_area: dict[tuple[str, str], str] = {}
-            for bid, pnumber, pname, daid in cur.fetchall():
-                if pnumber:
-                    by_pnumber[str(pnumber).strip()] = bid
+            for bid, pname, daid in cur.fetchall():
                 if pname and daid:
+                    # Last-write-wins is fine — every winner is interchangeable
+                    # for purposes of "which building row owns this rent history".
                     by_pname_area[(pname.strip().lower(), str(daid))] = bid
             print(
-                f"  building lookup: {len(by_pnumber):,} by project_number, "
-                f"{len(by_pname_area):,} by (project_name, area)",
+                f"  building lookup (identifiable only): {len(by_pname_area):,} "
+                f"by (project_name, area)",
                 flush=True,
             )
 
@@ -632,22 +637,16 @@ def write_rent_history_and_derive_yields(
             # 1b) Idempotent rebuild of building_rent_history
             cur.execute("DELETE FROM dld_building_rent_history")
             brh_rows = []
-            matched_pnumber = 0
-            matched_pname = 0
+            matched = 0
             unmatched = 0
             for r in building_rows:
                 area_id = area_ids.get(r["area_name_norm"])
                 bid = None
-                if r["project_number"] and r["project_number"] in by_pnumber:
-                    bid = by_pnumber[r["project_number"]]
-                    matched_pnumber += 1
-                elif r["project_name"] and area_id is not None:
+                if r["project_name"] and area_id is not None:
                     key = (r["project_name"].strip().lower(), str(area_id))
                     bid = by_pname_area.get(key)
-                    if bid:
-                        matched_pname += 1
-                    else:
-                        unmatched += 1
+                if bid:
+                    matched += 1
                 else:
                     unmatched += 1
                 brh_rows.append((
@@ -685,8 +684,7 @@ def write_rent_history_and_derive_yields(
             )
             print(
                 f"  inserted {len(brh_rows):,} building rent-history rows · "
-                f"matched: {matched_pnumber:,} by project_number, "
-                f"{matched_pname:,} by (project_name, area), "
+                f"matched: {matched:,} by (project_name, area), "
                 f"{unmatched:,} unmatched (kept for area-level analysis)",
                 flush=True,
             )

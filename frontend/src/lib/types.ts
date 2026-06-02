@@ -807,6 +807,21 @@ export interface DldBuildingItem {
   rent_psf_vs_area_pct: number | null;
   area_median_rent_psf: number | null;
   demand_signal: DemandSignal | null;
+  // Building-name classification (Fix 4). When is_identifiable=false the
+  // row represents an area / developer / master-project label rather than a
+  // specific tower — UI should use display_name and avoid promising building
+  // economics.
+  building_name_clean?: string | null;
+  building_name_type?:
+    | 'real_building'
+    | 'sub_project'
+    | 'master_project'
+    | 'developer_name'
+    | 'area_name'
+    | 'no_name'
+    | null;
+  display_name?: string | null;
+  is_identifiable?: boolean;
 }
 
 export interface DldBuildingsResponse extends DldAttribution {
@@ -929,6 +944,7 @@ export interface RentCheckResponse extends DldAttribution {
   yoy_trend: number | null;
   size_band: string;
   confidence: 'low' | 'medium' | 'high';
+  low_confidence?: boolean;
   area_name_display?: string | null;
   area_name_norm?: string | null;
   median_price_per_sqft?: number | null;
