@@ -131,6 +131,11 @@ export interface AreaDldBlock {
   rent_count_2026: number;
   building_count: number;
   confidence: 'low' | 'medium' | 'high';
+  // From land_registry ETL
+  freehold_pct?: number | null;
+  registered_pct?: number | null;
+  total_parcels?: number | null;
+  land_type_mix?: Record<string, number> | null;
 }
 
 export interface AreaDetail extends Area {

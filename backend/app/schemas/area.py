@@ -104,6 +104,11 @@ class AreaDldBlock(BaseModel):
     rent_count_2026: int = 0
     building_count: int = 0
     confidence: str = "low"
+    # From dld_area_land_summary (land_registry ETL)
+    freehold_pct: Optional[float] = None
+    registered_pct: Optional[float] = None
+    total_parcels: Optional[int] = None
+    land_type_mix: Optional[dict] = None   # {"Residential": 23.0, "Commercial": 57.0, ...}
 
 
 # -----------------------------------------------------------------------------

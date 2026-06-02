@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
-from app.models.dld import DldArea, DldAreaMetrics, DldCanonicalArea
+from app.models.dld import DldArea, DldAreaLandSummary, DldAreaMetrics, DldCanonicalArea
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.area import (
     AreaResponse,
@@ -567,6 +567,15 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
                 and sales >= MIN_RELIABLE_SAMPLES
                 and rents >= MIN_RELIABLE_SAMPLES):
             show_yield = cap_yield(float(dm.rental_yield_pct))
+        # Land-summary overlay (freehold_pct, land_type_mix, etc) — from
+        # dld_area_land_summary keyed by name_norm.
+        land = (
+            await db.execute(
+                select(DldAreaLandSummary).where(
+                    DldAreaLandSummary.area_name_norm == dld_area.name_norm
+                )
+            )
+        ).scalar_one_or_none()
         dld_block = AreaDldBlock(
             dld_area_id=dld_area.id,
             dld_name=dld_area.name_display,
@@ -582,6 +591,10 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
             rent_count_2026=rents,
             building_count=dld_area.building_count,
             confidence=confidence_for(max(sales, rents)),
+            freehold_pct=float(land.freehold_pct) if land and land.freehold_pct is not None else None,
+            registered_pct=float(land.registered_pct) if land and land.registered_pct is not None else None,
+            total_parcels=int(land.total_parcels) if land else None,
+            land_type_mix=dict(land.land_type_mix) if land and land.land_type_mix else None,
         )
 
     return AreaDetailResponse(

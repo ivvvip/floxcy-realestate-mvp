@@ -417,6 +417,59 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 mono
               />
             </div>
+            {/* Land registry overlay — freehold + land-type mix */}
+            {(area.dld.freehold_pct != null || area.dld.land_type_mix) && (
+              <div className="grid gap-px bg-border border-t border-border lg:grid-cols-3">
+                {area.dld.freehold_pct != null && (
+                  <MetricTile
+                    label="Freehold parcels"
+                    value={`${area.dld.freehold_pct.toFixed(1)}%`}
+                    hint={
+                      area.dld.total_parcels != null
+                        ? `of ${area.dld.total_parcels.toLocaleString()} registered parcels`
+                        : 'DLD land registry'
+                    }
+                    tone={
+                      area.dld.freehold_pct >= 80
+                        ? 'positive'
+                        : area.dld.freehold_pct >= 30
+                          ? 'default'
+                          : 'negative'
+                    }
+                    mono
+                  />
+                )}
+                {area.dld.land_type_mix && (() => {
+                  const mix = area.dld.land_type_mix;
+                  const sorted = Object.entries(mix)
+                    .filter(([k, v]) => k && k !== 'null' && typeof v === 'number')
+                    .sort(([, a], [, b]) => (b as number) - (a as number));
+                  const top = sorted[0];
+                  return top ? (
+                    <MetricTile
+                      label="Land use (dominant)"
+                      value={`${(top[1] as number).toFixed(0)}% ${top[0]}`}
+                      hint={
+                        sorted.length > 1
+                          ? `${(sorted[1][1] as number).toFixed(0)}% ${sorted[1][0]}` +
+                            (sorted.length > 2 ? ` · ${(sorted[2][1] as number).toFixed(0)}% ${sorted[2][0]}` : '')
+                          : 'land-type mix'
+                      }
+                      mono
+                    />
+                  ) : null;
+                })()}
+                {area.dld.registered_pct != null && (
+                  <MetricTile
+                    label="Registered parcels"
+                    value={`${area.dld.registered_pct.toFixed(1)}%`}
+                    hint="DLD registration status"
+                    tone={area.dld.registered_pct >= 95 ? 'positive' : 'default'}
+                    mono
+                  />
+                )}
+              </div>
+            )}
             <div className="px-4 py-2 text-[11px] text-fg-subtle border-t border-border">
               Source: {area.data_source ?? 'Dubai Land Department Open Data'}.
               Updated {area.last_updated ?? '2026-06-01'}. Mapped DLD area:{' '}

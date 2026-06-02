@@ -9,6 +9,7 @@ from app.models.consultation import Consultation
 from app.models.dld import (
     DldArea,
     DldAreaAppreciation,
+    DldAreaLandSummary,
     DldAreaMetrics,
     DldBuilding,
     DldCanonicalArea,
@@ -34,6 +35,7 @@ __all__ = [
     "Consultation",
     "DldArea",
     "DldAreaAppreciation",
+    "DldAreaLandSummary",
     "DldAreaMetrics",
     "DldBuilding",
     "DldCanonicalArea",

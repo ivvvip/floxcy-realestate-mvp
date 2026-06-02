@@ -274,3 +274,20 @@ class DldCanonicalArea(Base):
     first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     occurrence_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DldAreaLandSummary(Base):
+    """Per-area aggregates from dld_land_registry: freehold %, registered %,
+    land-type mix, top master projects, total parcels, total sqm."""
+    __tablename__ = "dld_area_land_summary"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    area_name_norm: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    area_name_display: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    total_parcels: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_area_sqm: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
+    freehold_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    registered_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    land_type_mix: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    top_master_projects: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
