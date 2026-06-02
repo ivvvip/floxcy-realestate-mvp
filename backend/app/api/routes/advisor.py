@@ -18,14 +18,16 @@ from app.core.dependencies import (
 from app.core.rate_limit import ai_rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
+from app.models.dld import DldArea, DldAreaMetrics
 from app.models.market_snapshot import MarketSnapshot
 from app.redis_client import redis_client
 from app.schemas.advisor import AdvisorQueryRequest, AdvisorQueryResponse
+from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield
 from app.services.advisor import build_recommendations
-from app.services.market_context import (
-    SYSTEM_PROMPT,
-    build_market_context,
-    build_user_message,
+from app.services.dld_market_context import (
+    DLD_SYSTEM_PROMPT,
+    build_dld_market_context,
+    build_dld_user_message,
 )
 from app.services.openrouter_service import chat as openrouter_chat
 
@@ -55,7 +57,11 @@ def _budget_bucket(aed: float) -> str:
 
 
 def _cache_key(model: str, req: AdvisorQueryRequest) -> str:
+    # Bumped to v2 when we switched to DLD-grounded context — invalidates any
+    # cached responses that were generated against the old curated-snapshot
+    # prompt so they don't shadow the new richer answers.
     payload = {
+        "v": 2,
         "m": model,
         "b": _budget_bucket(req.budget_aed),
         "g": req.goal,
@@ -92,6 +98,9 @@ async def advisor_query(
     The rules-based `recommendations[]` field is ALWAYS populated, so the
     response is useful even when the LLM call fails."""
     # ---- 1. Rules-based recommendations (always computed) ----
+    # Pull curated MarketSnapshot AND DLD overlay in a single composite query
+    # so we can prefer real DLD median PPSF + capped yield when available,
+    # falling back to the curated snapshot otherwise.
     latest_date_subq = (
         select(
             MarketSnapshot.area_id,
@@ -101,28 +110,42 @@ async def advisor_query(
         .subquery()
     )
     q = (
-        select(Area, MarketSnapshot)
+        select(Area, MarketSnapshot, DldAreaMetrics)
         .join(MarketSnapshot, MarketSnapshot.area_id == Area.id)
         .join(
             latest_date_subq,
             (latest_date_subq.c.area_id == MarketSnapshot.area_id)
             & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
         )
+        .outerjoin(DldArea, DldArea.curated_area_id == Area.id)
+        .outerjoin(
+            DldAreaMetrics,
+            (DldAreaMetrics.dld_area_id == DldArea.id)
+            & (DldAreaMetrics.period == "2026-ytd"),
+        )
     )
     rows = (await db.execute(q)).all()
-    snapshots = [
-        {
+    snapshots = []
+    for area, snap, dld in rows:
+        ppsf = float(snap.avg_price_per_sqft)
+        yld = float(snap.rental_yield)
+        if dld:
+            if dld.median_price_per_sqft is not None:
+                ppsf = float(dld.median_price_per_sqft)
+            if (dld.rental_yield_pct is not None
+                    and (dld.sales_count or 0) >= MIN_RELIABLE_SAMPLES
+                    and (dld.rent_count_2026 or 0) >= MIN_RELIABLE_SAMPLES):
+                yld = cap_yield(float(dld.rental_yield_pct)) or yld
+        snapshots.append({
             "area_id": area.id,
             "area_name": area.name,
             "area_name_arabic": area.name_arabic,
-            "avg_price_per_sqft": float(snap.avg_price_per_sqft),
-            "rental_yield": float(snap.rental_yield),
+            "avg_price_per_sqft": ppsf,
+            "rental_yield": yld,
             "appreciation_1y": float(snap.appreciation_1y) if snap.appreciation_1y else None,
             "risk_score": float(snap.risk_score) if snap.risk_score else None,
             "investment_score": float(snap.investment_score) if snap.investment_score else None,
-        }
-        for area, snap in rows
-    ]
+        })
     base = build_recommendations(body, snapshots)
 
     # ---- 2. LLM augmentation (cached + fallback-safe) ----
@@ -165,8 +188,9 @@ async def advisor_query(
         response.ai_error = "LLM disabled (OPENROUTER_API_KEY unset)"
         return response
 
-    context = await build_market_context(db, max_areas=20)
-    user_msg = build_user_message(
+    # DLD-grounded context (cached 1hr in Redis as ai:advisor:context:v2)
+    context = await build_dld_market_context(db, max_areas=25)
+    user_msg = build_dld_user_message(
         budget_aed=int(body.budget_aed),
         goal=body.goal,
         risk=body.risk,
@@ -176,7 +200,7 @@ async def advisor_query(
     )
 
     result = await openrouter_chat(
-        system=SYSTEM_PROMPT,
+        system=DLD_SYSTEM_PROMPT,
         user=user_msg,
         max_tokens=settings.OPENROUTER_MAX_TOKENS,
         temperature=0.3,
