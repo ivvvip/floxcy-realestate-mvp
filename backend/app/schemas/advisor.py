@@ -35,6 +35,48 @@ class AdvisorRecommendation(BaseModel):
     estimated_affordable_sqft: float
     reasoning: List[str]
 
+    # ---- DLD-grounded signals (the 4 facts the advisor should reason from) ----
+    # All optional — present only when the underlying DLD table has the area.
+    # gross_yield_pct: rent_per_sqft / sale_ppsf × 100, capped at 20% display.
+    #   Source: dld_area_metrics.rental_yield_pct (period=2026-ytd)
+    gross_yield_pct: Optional[float] = Field(
+        default=None,
+        description="DLD-derived gross rental yield (%) for the latest period",
+    )
+    # rent_growth_yoy_pct: median rent ppsf change from 2025 to 2026 YTD.
+    #   Source: dld_area_metrics.rent_growth_yoy_pct
+    rent_growth_yoy_pct: Optional[float] = Field(
+        default=None,
+        description="YoY change in median rent per sqft from DLD Ejari contracts",
+    )
+    # appreciation_5y_pct + cagr_5y_pct: from 2021 → latest year sale ppsf.
+    #   Source: dld_area_appreciation
+    appreciation_5y_pct: Optional[float] = Field(
+        default=None,
+        description="Cumulative 5y price appreciation (%) from DLD sales 2021→2026",
+    )
+    cagr_5y_pct: Optional[float] = Field(
+        default=None,
+        description="Annualized 5y CAGR (%) for sale ppsf",
+    )
+    # supply_risk: classification derived from off-plan share of latest-year
+    # sales. High off-plan share = lots of inventory coming online soon =
+    # downward rent pressure once handed over.
+    #   Source: dld_price_history.offplan_pct (latest year)
+    supply_risk: Optional[Literal["low", "medium", "high"]] = Field(
+        default=None,
+        description="Supply pressure: low (<30% off-plan), medium (30-60%), "
+                    "high (≥60%) of latest-year sales",
+    )
+    supply_risk_offplan_pct: Optional[float] = Field(
+        default=None,
+        description="Underlying off-plan share (%) that drove supply_risk",
+    )
+    dld_year_latest: Optional[int] = Field(
+        default=None,
+        description="Latest year of DLD price history used for the signals",
+    )
+
 
 class AdvisorQueryResponse(BaseModel):
     goal: str

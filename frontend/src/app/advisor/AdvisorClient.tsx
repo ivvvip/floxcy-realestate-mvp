@@ -446,21 +446,24 @@ function RecRow({
       {expanded && (
         <tr className="bg-bg-elev/30">
           <td colSpan={9} className="border-b border-border">
-            <div className="px-5 py-4">
-              <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
-                Reasoning (rules-based)
+            <div className="px-5 py-4 space-y-4">
+              <DldSignals rec={rec} />
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
+                  Reasoning (cited DLD facts where available)
+                </div>
+                <ul className="space-y-1.5 text-xs text-fg-muted">
+                  {rec.reasoning.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="space-y-1.5 text-xs text-fg-muted">
-                {rec.reasoning.map((reason, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
-                    <span>{reason}</span>
-                  </li>
-                ))}
-              </ul>
               <Link
                 href={`/areas/${rec.area_id}`}
-                className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
               >
                 View area details
                 <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
@@ -470,5 +473,117 @@ function RecRow({
         </tr>
       )}
     </>
+  );
+}
+
+function SignalTile({
+  label,
+  value,
+  source,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  source: string;
+  tone?: 'positive' | 'negative' | 'neutral' | 'warning';
+}) {
+  const toneClass =
+    tone === 'positive'
+      ? 'text-positive'
+      : tone === 'negative'
+        ? 'text-negative'
+        : tone === 'warning'
+          ? 'text-warning'
+          : 'text-fg';
+  return (
+    <div className="border border-border rounded-md bg-bg p-3">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        {label}
+      </div>
+      <div className={cn('mt-1 text-base font-semibold tabular', toneClass)}>
+        {value}
+      </div>
+      <div className="mt-1 text-[10px] text-fg-subtle">{source}</div>
+    </div>
+  );
+}
+
+const SUPPLY_RISK_TONE: Record<string, 'positive' | 'neutral' | 'warning'> = {
+  low: 'positive',
+  medium: 'neutral',
+  high: 'warning',
+};
+
+function DldSignals({ rec }: { rec: AdvisorRecommendation }) {
+  const hasAny =
+    rec.gross_yield_pct != null
+    || rec.rent_growth_yoy_pct != null
+    || rec.appreciation_5y_pct != null
+    || rec.supply_risk != null;
+
+  if (!hasAny) {
+    return (
+      <div className="rounded-md border border-border/60 bg-bg-elev/30 px-3 py-2 text-[11px] text-fg-subtle">
+        No DLD overlay for this area yet — reasoning above falls back to the
+        curated MarketSnapshot.
+      </div>
+    );
+  }
+
+  const year = rec.dld_year_latest ?? 2026;
+
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium mb-2">
+        Real DLD signals
+        <span className="ml-2 normal-case text-fg-subtle">
+          (Dubai Land Department, latest year {year})
+        </span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {rec.gross_yield_pct != null && (
+          <SignalTile
+            label="Gross yield"
+            value={formatPercent(rec.gross_yield_pct, 2)}
+            source="DLD rent ÷ sale ppsf"
+            tone={rec.gross_yield_pct >= 7 ? 'positive' : 'neutral'}
+          />
+        )}
+        {rec.rent_growth_yoy_pct != null && (
+          <SignalTile
+            label="Rent growth YoY"
+            value={`${rec.rent_growth_yoy_pct >= 0 ? '+' : ''}${rec.rent_growth_yoy_pct.toFixed(1)}%`}
+            source="DLD Ejari contracts"
+            tone={
+              rec.rent_growth_yoy_pct >= 5
+                ? 'positive'
+                : rec.rent_growth_yoy_pct < 0
+                  ? 'negative'
+                  : 'neutral'
+            }
+          />
+        )}
+        {rec.cagr_5y_pct != null && rec.appreciation_5y_pct != null && (
+          <SignalTile
+            label="5y price growth"
+            value={`+${rec.appreciation_5y_pct.toFixed(1)}%`}
+            source={`CAGR ${rec.cagr_5y_pct >= 0 ? '+' : ''}${rec.cagr_5y_pct.toFixed(1)}% · DLD 2021→${year}`}
+            tone={rec.cagr_5y_pct >= 8 ? 'positive' : 'neutral'}
+          />
+        )}
+        {rec.supply_risk != null && (
+          <SignalTile
+            label="Supply risk"
+            value={rec.supply_risk.toUpperCase()}
+            source={
+              rec.supply_risk_offplan_pct != null
+                ? `${rec.supply_risk_offplan_pct.toFixed(0)}% off-plan in ${year}`
+                : `DLD ${year} off-plan share`
+            }
+            tone={SUPPLY_RISK_TONE[rec.supply_risk]}
+          />
+        )}
+      </div>
+    </div>
   );
 }

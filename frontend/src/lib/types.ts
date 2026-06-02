@@ -623,6 +623,8 @@ export interface AdvisorQueryRequest {
   fresh?: boolean;
 }
 
+export type SupplyRisk = 'low' | 'medium' | 'high';
+
 export interface AdvisorRecommendation {
   rank: number;
   area_id: string;
@@ -636,6 +638,17 @@ export interface AdvisorRecommendation {
   investment_score: number | null;
   estimated_affordable_sqft: number;
   reasoning: string[];
+  // DLD-grounded signals — present when the area has a DldArea linkage.
+  // Frontend renders these as a dedicated "Real DLD signals" panel with
+  // explicit source attribution so users can tell DLD facts apart from
+  // curated snapshot heuristics.
+  gross_yield_pct: number | null;
+  rent_growth_yoy_pct: number | null;
+  appreciation_5y_pct: number | null;
+  cagr_5y_pct: number | null;
+  supply_risk: SupplyRisk | null;
+  supply_risk_offplan_pct: number | null;
+  dld_year_latest: number | null;
 }
 
 export interface AdvisorQueryResponse {
