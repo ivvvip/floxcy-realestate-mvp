@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { OpportunitiesClient } from './OpportunitiesClient';
+import { DldOpportunitiesPanel } from './DldOpportunitiesPanel';
 import { Sparkles } from 'lucide-react';
 import { getOpportunitiesFeed, getCanonicalAreas } from '@/lib/api';
 import type { OpportunityFeedItem } from '@/lib/types';
@@ -83,18 +84,34 @@ export default async function OpportunitiesPage() {
       </div>
 
       <Container>
-        <div className="py-5">
-          {error ? (
-            <div className="border border-negative/30 bg-negative/10 rounded-md px-3 py-2 text-sm text-negative">
-              {error}
+        <div className="py-5 space-y-6">
+          {/* DLD-grounded opportunities — primary section */}
+          <DldOpportunitiesPanel />
+
+          {/* Curated feed (broker deals + AI signals) — secondary */}
+          <div className="border-t border-border pt-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-fg inline-flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-fg-muted" strokeWidth={2.5} />
+                Curated deals + AI signals
+              </h2>
+              <p className="mt-0.5 text-[11px] text-fg-muted">
+                Hand-picked deals from verified brokers plus algorithmic signals on
+                the 70 curated areas with full MarketSnapshot history.
+              </p>
             </div>
-          ) : (
-            <OpportunitiesClient
-              opportunities={opportunities}
-              total={total}
-              areaOptions={areaOptions}
-            />
-          )}
+            {error ? (
+              <div className="border border-negative/30 bg-negative/10 rounded-md px-3 py-2 text-sm text-negative">
+                {error}
+              </div>
+            ) : (
+              <OpportunitiesClient
+                opportunities={opportunities}
+                total={total}
+                areaOptions={areaOptions}
+              />
+            )}
+          </div>
         </div>
       </Container>
     </div>
