@@ -18,6 +18,7 @@ import { DataBadge } from '@/components/data/DataBadge';
 import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaYieldHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
+import { FloxcyInsight } from './FloxcyInsight';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -334,6 +335,24 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         {confidence && (
           <div className="mt-5">
             <ConfidenceBadge report={confidence} />
+          </div>
+        )}
+
+        {/* Floxcy Insight — Investment Grade + Best For + Similar Areas */}
+        {area.latest && (
+          <div className="mt-5">
+            <FloxcyInsight
+              areaName={area.name}
+              dldName={area.dld?.dld_name ?? area.name}
+              metrics={{
+                rental_yield: area.latest.rental_yield,
+                appreciation_1y: area.latest.appreciation_1y,
+                appreciation_3y: area.latest.appreciation_3y,
+                avg_price_per_sqft: area.latest.avg_price_per_sqft,
+                investment_score: area.latest.investment_score,
+                risk_score: area.latest.risk_score,
+              }}
+            />
           </div>
         )}
 
