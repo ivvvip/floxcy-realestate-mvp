@@ -383,6 +383,36 @@ class DldCanonicalArea(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class DldAreaLifestyleScore(Base):
+    """Per-area lifestyle signal derived from rent-row nearest_* columns.
+
+    Scoring per the spec:
+      metro_score    — function of distinct metro stations near the area
+      mall_score     — Dubai Mall=10, MoE=9, City Centre Mirdif=8,
+                       Marina Mall=8, Ibn-e-Battuta=7, others 0-6
+      landmark_score — Burj Khalifa/Downtown=10, Burj Al Arab=9,
+                       Expo 2020=7, IMG/Sports City/Motor City=6,
+                       Airports=7/5, others 5-6
+      overall_score  — mean of the three components
+    """
+    __tablename__ = "dld_area_lifestyle_scores"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    metro_score: Mapped[Optional[float]] = mapped_column(Numeric(4, 2), nullable=True)
+    mall_score: Mapped[Optional[float]] = mapped_column(Numeric(4, 2), nullable=True)
+    landmark_score: Mapped[Optional[float]] = mapped_column(Numeric(4, 2), nullable=True)
+    overall_score: Mapped[Optional[float]] = mapped_column(Numeric(4, 2), nullable=True)
+    nearest_metro: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    nearest_mall: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    nearest_landmark: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    metro_stations_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class DldLaborCampStats(Base):
     """Per-(area, year) bulk Labor Camp aggregates.
 

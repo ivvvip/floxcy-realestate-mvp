@@ -56,6 +56,21 @@ from _building_classifier import (  # noqa: E402
 import re  # noqa: E402
 
 
+def normalize_project_number(s: Optional[str]) -> Optional[str]:
+    """Strip ".00" off DLD's decimal-typed project_number values
+    ("975.00" → "975") so cross-source joins line up with the bare-integer
+    form used in the buildings CSV. Returns None for blank input."""
+    if s is None:
+        return None
+    s = s.strip()
+    if not s:
+        return None
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        return s or None
+
+
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -224,7 +239,7 @@ def stream_classified_rents(path: Path, progress_every: int):
             nprop_int = int(nprop) if nprop is not None else None
             is_bulk = is_bulk_contract(category, annual, nprop_int)
 
-            project_number = (row.get("project_number") or "").strip() or None
+            project_number = normalize_project_number(row.get("project_number"))
             project_name = (row.get("project_name_en") or "").strip() or None
             master_project = (row.get("master_project_en") or "").strip() or None
             area_display = (row.get("area_name_en") or "").strip() or None

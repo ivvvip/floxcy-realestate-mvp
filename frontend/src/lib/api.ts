@@ -45,6 +45,7 @@ import type {
   DldAreaListResponse,
   DldAreaDetailResponse,
   DldPriceHistoryResponse,
+  AreaLifestyleScoreResponse,
   BuildingLeaseExpiryResponse,
   DldBuildingRentHistoryResponse,
   DldRentHistoryResponse,
@@ -725,6 +726,15 @@ export async function getDldBuildingLeaseExpiry(
 ): Promise<BuildingLeaseExpiryResponse> {
   return request<BuildingLeaseExpiryResponse>(
     `/api/v1/dld/buildings/${encodeURIComponent(buildingId)}/lease-expiry`,
+    { revalidate: 3600 }
+  );
+}
+
+export async function getDldAreaLifestyleScore(
+  nameNorm: string
+): Promise<AreaLifestyleScoreResponse> {
+  return request<AreaLifestyleScoreResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/lifestyle-score`,
     { revalidate: 3600 }
   );
 }

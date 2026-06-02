@@ -21,6 +21,7 @@ from app.database import get_db
 from app.models.dld import (
     DldArea,
     DldAreaAppreciation,
+    DldAreaLifestyleScore,
     DldAreaMetrics,
     DldBuilding,
     DldBuildingDerived,
@@ -88,6 +89,7 @@ from app.schemas.dld import (
     DldPriceHistoryResponse,
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
+    AreaLifestyleScoreResponse,
     BuildingLeaseExpiryResponse,
     BuildingRentHistoryPoint,
     DldBuildingRentHistoryResponse,
@@ -3564,3 +3566,42 @@ async def get_building_derived(
         area_context=area_ctx,
     )
     return DldBuildingDetailResponse(building=detail)
+
+
+# ---------------------------------------------------------------------------
+# Lifestyle Score
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/areas/{name_or_norm}/lifestyle-score",
+    response_model=AreaLifestyleScoreResponse,
+)
+async def get_area_lifestyle_score(
+    name_or_norm: str, db: AsyncSession = Depends(get_db)
+):
+    """Per-area lifestyle signal: metro / mall / landmark / overall score
+    derived from the rent stream's nearest_* columns. Honest empty (zeros)
+    when the area has no rent contracts with nearest_* data populated."""
+    norm_s = name_or_norm.strip().lower()
+    row = (
+        await db.execute(
+            select(DldAreaLifestyleScore, DldArea.name_display)
+            .outerjoin(DldArea, DldArea.id == DldAreaLifestyleScore.dld_area_id)
+            .where(DldAreaLifestyleScore.area_name_norm == norm_s)
+        )
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No lifestyle score for this area")
+    ls, area_display = row
+    return AreaLifestyleScoreResponse(
+        area_name_norm=ls.area_name_norm,
+        area_name_display=area_display,
+        metro_score=float(ls.metro_score) if ls.metro_score is not None else None,
+        mall_score=float(ls.mall_score) if ls.mall_score is not None else None,
+        landmark_score=float(ls.landmark_score) if ls.landmark_score is not None else None,
+        overall_score=float(ls.overall_score) if ls.overall_score is not None else None,
+        nearest_metro=ls.nearest_metro,
+        nearest_mall=ls.nearest_mall,
+        nearest_landmark=ls.nearest_landmark,
+        metro_stations_count=int(ls.metro_stations_count or 0),
+    )

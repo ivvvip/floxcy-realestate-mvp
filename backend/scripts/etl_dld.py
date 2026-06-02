@@ -57,13 +57,33 @@ for _community, _sectors in COMMUNITY_TO_ADMIN_SECTORS.items():
         ADMIN_SECTOR_TO_COMMUNITIES[_sector].append(_community)
 
 
-def areas_for_rent_row(area_norm: str) -> list[str]:
+def areas_for_rent_row(
+    area_norm: str, master_project: Optional[str] = None
+) -> list[str]:
     """Returns the list of dld_area name_norms a rent row should aggregate
-    into: the row's own admin sector plus every community that aliases it.
-    A contract under 'al barsha south fourth' counts for both that sector
-    AND for 'jumeirah village circle' / 'jvc'.
+    into:
+
+      1. The row's own admin sector (area_name_en lowercased).
+      2. Every community that aliases that sector via COMMUNITY_TO_ADMIN_SECTORS
+         (e.g. 'al barsha south fourth' fans to 'jumeirah village circle').
+      3. The row's master_project_en lowercased, when present and distinct.
+         DLD files JVC / Business Bay / Silicon Oasis / Discovery Gardens /
+         International City rents under master_project_en directly — adding
+         that branch closes the community-level gaps that the static alias
+         map can't cover.
+
+    Duplicates are collapsed (ordered uniqueness so the admin sector is
+    always first).
     """
-    return [area_norm] + ADMIN_SECTOR_TO_COMMUNITIES.get(area_norm, [])
+    out: list[str] = [area_norm]
+    for alias in ADMIN_SECTOR_TO_COMMUNITIES.get(area_norm, []):
+        if alias not in out:
+            out.append(alias)
+    if master_project:
+        mp_norm = master_project.strip().lower()
+        if mp_norm and mp_norm not in out:
+            out.append(mp_norm)
+    return out
 
 DATA_DIR = Path(os.environ.get("DLD_DATA_DIR", str(Path.home() / "dld-data")))
 TODAY = dt.date(2026, 6, 1)
@@ -105,6 +125,23 @@ def parse_float(s: Optional[str]) -> Optional[float]:
 def parse_int(s: Optional[str]) -> Optional[int]:
     f = parse_float(s)
     return int(f) if f is not None else None
+
+
+def normalize_project_number(s: Optional[str]) -> Optional[str]:
+    """DLD writes project_number in decimal form (e.g. "975.00") in the
+    rents CSV but as a bare integer in the buildings CSV. Normalize both
+    to the integer string so cross-source joins line up. Returns None for
+    blank input or anything that doesn't parse as a number."""
+    if s is None:
+        return None
+    s = s.strip()
+    if not s:
+        return None
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        # Non-numeric project_number — keep the original string.
+        return s or None
 
 
 def parse_date(s: Optional[str]) -> Optional[dt.date]:
@@ -335,7 +372,8 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
 
     # Rents 2026: annual rent + annual rent per sqft (NEW schema column names).
     # Each rent row is fanned out to its admin sector + every community
-    # alias so JVC / JVT / Majan inherit metrics from their parent sectors.
+    # alias + the row's own master_project_en (so JVC / Business Bay /
+    # Silicon Oasis etc. inherit metrics when DLD files them directly).
     rent_amounts: dict[str, list[float]] = collections.defaultdict(list)
     rent_ppsf: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2026: dict[str, int] = collections.Counter()
@@ -348,7 +386,7 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
         if amt is None or amt <= 0:
             continue
         ppsf = (amt / a) if (a and a > 0) else None
-        for area in areas_for_rent_row(sector):
+        for area in areas_for_rent_row(sector, r.get("master_project_en")):
             rent_count_2026[area] += 1
             rent_amounts[area].append(amt)
             if ppsf is not None and 10 <= ppsf <= 5000:
@@ -367,7 +405,7 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
             continue
         ppsf = amt / a
         if 10 <= ppsf <= 5000:
-            for area in areas_for_rent_row(sector):
+            for area in areas_for_rent_row(sector, r.get("master_project_en")):
                 rent_count_2025[area] += 1
                 rent_ppsf_2025[area].append(ppsf)
 
@@ -452,7 +490,7 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
 
         out.append(dict(
             area_norm=area_n if area_n else None,
-            project_number=(b.get("PROJECT_NUMBER") or "").strip() or None,
+            project_number=normalize_project_number(b.get("PROJECT_NUMBER")),
             project_name=proj_name or None,
             master_project=master_proj,
             zone=(b.get("ZONE_EN") or "").strip() or None,
@@ -479,6 +517,117 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
             building_name_type=bn_type,
             display_name=bn_display,
             is_identifiable=is_identifiable(bn_type),
+        ))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Lifestyle scores — per-area metro / mall / landmark signal from the rent
+# stream's nearest_* columns. Scoring tables encoded once here so the ETL
+# and the API doc stay in lockstep.
+# ---------------------------------------------------------------------------
+
+MALL_SCORES: dict[str, float] = {
+    "dubai mall": 10.0,
+    "mall of the emirates": 9.0,
+    "city centre mirdif": 8.0,
+    "marina mall": 8.0,
+    "ibn-e-battuta mall": 7.0,
+}
+
+LANDMARK_SCORES: dict[str, float] = {
+    "burj khalifa": 10.0,
+    "downtown dubai": 10.0,
+    "burj al arab": 9.0,
+    "expo 2020 site": 7.0,
+    "img world adventures": 6.0,
+    "sports city swimming academy": 6.0,
+    "motor city": 6.0,
+    "dubai international airport": 7.0,
+    "al makhtoum international airport": 5.0,
+    "dubai cycling course": 5.0,
+    "dubai parks and resorts": 6.0,
+    "global village": 6.0,
+    "hamdan sports complex": 5.0,
+    "jabel ali": 5.0,
+}
+
+
+def _metro_score_from_count(n: int) -> float:
+    """0 stations → 0. 1 → 6. 2 → 8. 3+ → 10. Coarse but the data only
+    carries the *nearest* metro per contract, so distinct stations per area
+    proxies for "is this area genuinely well-connected"."""
+    if n <= 0:
+        return 0.0
+    if n == 1:
+        return 6.0
+    if n == 2:
+        return 8.0
+    return 10.0
+
+
+def compute_lifestyle_scores(
+    buckets_2026: dict[str, list[dict]],
+) -> list[dict]:
+    """One row per area, modal nearest_* + score per spec. Uses the
+    Person residential 2026 snapshot — same pool the rent_check benchmarks
+    are built from, so the lifestyle signal stays consistent with the
+    rent-side claims.
+    """
+    metro_counts: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    mall_counts: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    landmark_counts: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+
+    for cat in RESIDENTIAL_CATEGORIES:
+        for r in buckets_2026.get(cat, []):
+            if not r.get("_is_person"):
+                continue
+            sector = norm(r.get("area_name_en"))
+            if not sector:
+                continue
+            for area in areas_for_rent_row(sector, r.get("master_project_en")):
+                metro = (r.get("nearest_metro_en") or "").strip()
+                if metro:
+                    metro_counts[area][metro] += 1
+                mall = (r.get("nearest_mall_en") or "").strip()
+                if mall:
+                    mall_counts[area][mall] += 1
+                lm = (r.get("nearest_landmark_en") or "").strip()
+                if lm:
+                    landmark_counts[area][lm] += 1
+
+    out: list[dict] = []
+    all_areas = set(metro_counts) | set(mall_counts) | set(landmark_counts)
+    for area in all_areas:
+        metros = metro_counts.get(area, collections.Counter())
+        malls = mall_counts.get(area, collections.Counter())
+        lms = landmark_counts.get(area, collections.Counter())
+
+        # Threshold so a single stray contract with an outlier metro doesn't
+        # inflate the station count. >=10 mentions means it's a real signal
+        # not a typo on one contract.
+        distinct_metros = sum(1 for _, n in metros.items() if n >= 10)
+        metro_score = _metro_score_from_count(distinct_metros)
+
+        nearest_metro = metros.most_common(1)[0][0] if metros else None
+        nearest_mall = malls.most_common(1)[0][0] if malls else None
+        nearest_landmark = lms.most_common(1)[0][0] if lms else None
+
+        mall_score = MALL_SCORES.get((nearest_mall or "").lower(), 0.0)
+        landmark_score = LANDMARK_SCORES.get((nearest_landmark or "").lower(), 5.0
+                                             if nearest_landmark else 0.0)
+
+        overall = (metro_score + mall_score + landmark_score) / 3
+        out.append(dict(
+            area_name_norm=area,
+            metro_score=round(metro_score, 2),
+            mall_score=round(mall_score, 2),
+            landmark_score=round(landmark_score, 2),
+            overall_score=round(overall, 2),
+            nearest_metro=nearest_metro,
+            nearest_mall=nearest_mall,
+            nearest_landmark=nearest_landmark,
+            metro_stations_count=distinct_metros,
         ))
     return out
 
@@ -525,9 +674,11 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
             if not (10 <= ppsf <= 5000):
                 continue
             is_bulk = bool(r.get("_is_bulk"))
-            # Fan out to admin sector + every community alias so /rent-check
-            # for JVC returns the same cell as "al barsha south fourth".
-            for area in areas_for_rent_row(sector):
+            # Fan out to admin sector + every community alias + master_project_en
+            # so /rent-check for JVC returns the same cell as
+            # "al barsha south fourth" AND as the rows DLD files under
+            # master_project_en="Jumeirah Village Circle" directly.
+            for area in areas_for_rent_row(sector, r.get("master_project_en")):
                 bucket[(area, pst, band, category, is_bulk)].append((amt, ppsf))
 
     out: list[dict] = []
@@ -577,6 +728,7 @@ def write_to_db(
     buildings: list[dict],
     brokers: list[dict],
     benchmarks: list[dict],
+    lifestyle: list[dict],
     update_curated: bool,
 ):
     import psycopg2
@@ -754,6 +906,38 @@ def write_to_db(
         )
         print(f"[db]   dld_rent_benchmarks: {len(rows)} rows", flush=True)
 
+        # ---- dld_area_lifestyle_scores — wipe + insert ----
+        print("[db] writing dld_area_lifestyle_scores...", flush=True)
+        cur.execute("DELETE FROM dld_area_lifestyle_scores")
+        ls_rows = []
+        for ls in lifestyle:
+            aid = area_norm_to_id.get(ls["area_name_norm"])
+            # We still emit rows that don't match a dld_area_id — useful for
+            # community alias names like "jvc" that fan out at metric time
+            # but don't exist as dld_areas. dld_area_id stays NULL there.
+            ls_rows.append((
+                str(uuid.uuid4()), aid, ls["area_name_norm"],
+                ls["metro_score"], ls["mall_score"],
+                ls["landmark_score"], ls["overall_score"],
+                ls["nearest_metro"], ls["nearest_mall"], ls["nearest_landmark"],
+                ls["metro_stations_count"],
+            ))
+        if ls_rows:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO dld_area_lifestyle_scores (
+                    id, dld_area_id, area_name_norm,
+                    metro_score, mall_score, landmark_score, overall_score,
+                    nearest_metro, nearest_mall, nearest_landmark,
+                    metro_stations_count
+                ) VALUES %s
+                """,
+                ls_rows,
+                page_size=500,
+            )
+        print(f"[db]   dld_area_lifestyle_scores: {len(ls_rows)} rows", flush=True)
+
         # ---- Optionally refresh curated market_snapshots from DLD ----
         if update_curated:
             print("[db] refreshing market_snapshots for matched curated areas...", flush=True)
@@ -919,7 +1103,7 @@ def main():
             sector = norm(r.get("area_name_en"))
             if not sector:
                 continue
-            for area in areas_for_rent_row(sector):
+            for area in areas_for_rent_row(sector, r.get("master_project_en")):
                 c[area] += 1
         return c
 
@@ -949,6 +1133,10 @@ def main():
     bench = compute_benchmarks(buckets_2026)
     print(f"[etl] rent benchmark cells (n>={MIN_BENCHMARK_SAMPLES}): {len(bench):,}", flush=True)
 
+    # --- Lifestyle scores (metro / mall / landmark per area, from rent stream)
+    lifestyle = compute_lifestyle_scores(buckets_2026)
+    print(f"[etl] lifestyle score rows: {len(lifestyle):,}", flush=True)
+
     # --- Summary preview
     print("\n[etl] === TOP 10 AREAS BY TRANSACTION COUNT ===")
     print(f"{'area':<36} {'txns':>7} {'sales':>7} {'ppsf':>9} {'rent':>10} {'rent/sqft':>11} {'yield%':>7} {'YoY%':>7}")
@@ -972,6 +1160,7 @@ def main():
             buildings=bldg_rows,
             brokers=broker_rows,
             benchmarks=bench,
+            lifestyle=lifestyle,
             update_curated=args.update_curated,
         )
     else:

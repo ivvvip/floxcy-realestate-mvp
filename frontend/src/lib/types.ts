@@ -382,6 +382,19 @@ export interface BuildingLeaseExpiryResponse extends DldAttribution {
   total_estimated_available: number;
 }
 
+export interface AreaLifestyleScoreResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string | null;
+  metro_score: number | null;
+  mall_score: number | null;
+  landmark_score: number | null;
+  overall_score: number | null;
+  nearest_metro: string | null;
+  nearest_mall: string | null;
+  nearest_landmark: string | null;
+  metro_stations_count: number;
+}
+
 export interface CanonicalAreaBbox {
   north: number;
   south: number;

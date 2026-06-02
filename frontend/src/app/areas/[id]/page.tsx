@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
@@ -148,6 +148,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         area.dld.dld_name.toLowerCase(),
         90,
       ).catch(() => null)
+    : null;
+
+  // Lifestyle score (metro / mall / landmark) — soft-fail when not computed
+  // for this area (typically because the rent stream has no nearest_*
+  // values for it).
+  const lifestyle = area.dld?.dld_name
+    ? await getDldAreaLifestyleScore(area.dld.dld_name.toLowerCase()).catch(
+        () => null,
+      )
     : null;
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
@@ -717,6 +726,66 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             </section>
           );
         })()}
+
+        {/* Lifestyle scores — metro / mall / landmark derived from rent stream */}
+        {lifestyle && lifestyle.overall_score != null && (
+          <section
+            id="lifestyle"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label">
+                Lifestyle scores
+              </span>
+              <span className="text-[11px] text-fg-subtle">
+                Overall: <span className="font-mono text-fg">{lifestyle.overall_score.toFixed(1)}/10</span>
+              </span>
+            </div>
+            <div className="grid gap-px bg-border sm:grid-cols-3">
+              <div className="bg-bg-card p-4">
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                  🚇 Metro access
+                </div>
+                <div className="mt-1 text-2xl font-mono text-fg">
+                  {(lifestyle.metro_score ?? 0).toFixed(1)}<span className="text-fg-subtle text-sm">/10</span>
+                </div>
+                <div className="mt-1 text-[11px] text-fg-muted">
+                  {lifestyle.nearest_metro ?? '—'}
+                  {lifestyle.metro_stations_count > 0 && (
+                    <> · <span className="font-mono">{lifestyle.metro_stations_count}</span> stations</>
+                  )}
+                </div>
+              </div>
+              <div className="bg-bg-card p-4">
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                  🛒 Retail
+                </div>
+                <div className="mt-1 text-2xl font-mono text-fg">
+                  {(lifestyle.mall_score ?? 0).toFixed(1)}<span className="text-fg-subtle text-sm">/10</span>
+                </div>
+                <div className="mt-1 text-[11px] text-fg-muted">
+                  {lifestyle.nearest_mall ?? '—'}
+                </div>
+              </div>
+              <div className="bg-bg-card p-4">
+                <div className="text-[11px] uppercase tracking-wide text-fg-subtle">
+                  📍 Landmarks
+                </div>
+                <div className="mt-1 text-2xl font-mono text-fg">
+                  {(lifestyle.landmark_score ?? 0).toFixed(1)}<span className="text-fg-subtle text-sm">/10</span>
+                </div>
+                <div className="mt-1 text-[11px] text-fg-muted">
+                  {lifestyle.nearest_landmark ?? '—'}
+                </div>
+              </div>
+            </div>
+            <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
+              Derived from the most-frequent nearest_* values in DLD Ejari
+              contracts for this area. Metro score uses distinct stations
+              (≥10 contracts each).
+            </div>
+          </section>
+        )}
 
         {/* Upcoming availability (next 90 days) — from Availability Tracker */}
         {upcomingAvailability && upcomingAvailability.total_expiring > 0 && (

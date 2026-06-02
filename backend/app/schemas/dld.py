@@ -1011,3 +1011,20 @@ class BuildingLeaseExpiryResponse(Attribution):
     months: List[LeaseExpiryMonthBucket]
     total_expiring: int
     total_estimated_available: int
+
+
+# ---------------------------------------------------------------------------
+# Lifestyle Score
+# ---------------------------------------------------------------------------
+
+class AreaLifestyleScoreResponse(Attribution):
+    area_name_norm: str
+    area_name_display: Optional[str] = None
+    metro_score: Optional[float] = None
+    mall_score: Optional[float] = None
+    landmark_score: Optional[float] = None
+    overall_score: Optional[float] = None
+    nearest_metro: Optional[str] = None
+    nearest_mall: Optional[str] = None
+    nearest_landmark: Optional[str] = None
+    metro_stations_count: int = 0
