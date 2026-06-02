@@ -147,6 +147,23 @@ class TopAppreciationResponse(Attribution):
 # Market overview — homepage KPI tiles
 # ---------------------------------------------------------------------------
 
+class CanonicalAreaItem(BaseModel):
+    id: UUID
+    area_name: str
+    area_name_upper: str
+    area_name_slug: str
+    area_name_ar: Optional[str] = None
+    source_datasets: List[str]
+    first_seen_year: Optional[int] = None
+    occurrence_count: int
+
+
+class CanonicalAreasResponse(Attribution):
+    count: int
+    min_occurrences: int
+    items: List[CanonicalAreaItem]
+
+
 class MarketOverviewResponse(Attribution):
     """Single-call snapshot for the homepage 'Market at a Glance' tiles.
 

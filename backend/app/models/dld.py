@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -253,3 +254,23 @@ class DldYieldHistory(Base):
     __table_args__ = (
         UniqueConstraint("area_name_norm", "year", name="uq_dld_yield_history_area_year"),
     )
+
+
+class DldCanonicalArea(Base):
+    """Single source of truth for DLD area spelling/casing/slugging.
+
+    Built by scripts/extract_canonical_areas.py from the raw 5y CSVs.
+    Other tables join via UPPER(area_name_norm) = area_name_upper.
+    """
+    __tablename__ = "dld_canonical_areas"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    area_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    area_name_upper: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    area_name_slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    area_name_ar: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Postgres JSONB at the model level — list[str] of dataset labels
+    source_datasets: Mapped[list] = mapped_column(JSONB, nullable=False)
+    first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    occurrence_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

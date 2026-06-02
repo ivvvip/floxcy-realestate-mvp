@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { CompareClient } from './CompareClient';
-import { getAreas } from '@/lib/api';
+import { getAreas, getCanonicalAreas } from '@/lib/api';
 import type { Area } from '@/lib/types';
 
 export const revalidate = 300;
@@ -12,8 +12,40 @@ export const metadata = {
 };
 
 async function loadAreas(): Promise<Area[]> {
+  // Use canonical as the picker universe (284 areas), then fall back to
+  // curated for the metadata that compare actually needs (id, type, etc).
+  // For DLD-only areas (no curated row), we synthesise a minimal Area
+  // object using name_slug as the id — /compare's backend now accepts
+  // both UUIDs and slugs, so it round-trips cleanly.
   try {
-    return await getAreas();
+    const [curated, canon] = await Promise.all([
+      getAreas().catch(() => []),
+      getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+    ]);
+    if (!canon || canon.items.length === 0) return curated;
+
+    const curatedByUpper = new Map(
+      curated.map((a) => [a.name.toUpperCase(), a])
+    );
+    const merged: Area[] = canon.items.map((c) => {
+      const found = curatedByUpper.get(c.area_name_upper);
+      if (found) return { ...found, name: c.area_name };
+      // Synthetic Area entry for DLD-only canonical areas
+      return {
+        id: c.area_name_slug,  // compare endpoint accepts name_slug now
+        name: c.area_name,
+        name_arabic: c.area_name_ar,
+        city: 'Dubai',
+        emirate: 'Dubai',
+        description: null,
+        area_type: 'residential',
+        latitude: null,
+        longitude: null,
+        created_at: '',
+        updated_at: '',
+      };
+    });
+    return merged;
   } catch {
     return [];
   }

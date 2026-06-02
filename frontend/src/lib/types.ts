@@ -324,6 +324,23 @@ export interface DldYieldHistoryResponse extends DldAttribution {
   trend: 'rising' | 'falling' | 'flat' | null;
 }
 
+export interface CanonicalAreaItem {
+  id: string;
+  area_name: string;
+  area_name_upper: string;
+  area_name_slug: string;
+  area_name_ar: string | null;
+  source_datasets: string[];
+  first_seen_year: number | null;
+  occurrence_count: number;
+}
+
+export interface CanonicalAreasResponse extends DldAttribution {
+  count: number;
+  min_occurrences: number;
+  items: CanonicalAreaItem[];
+}
+
 export interface MarketOverviewResponse extends DldAttribution {
   total_sales: number;
   total_volume_aed: number;

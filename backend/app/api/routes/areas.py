@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
-from app.models.dld import DldArea, DldAreaMetrics
+from app.models.dld import DldArea, DldAreaMetrics, DldCanonicalArea
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.area import (
     AreaResponse,
@@ -144,6 +144,12 @@ async def list_all_areas(
     ),
     min_samples: int = Query(0, ge=0, description="Filter areas with sales+rents below this"),
     coverage_tier: Optional[str] = Query(None, description="full | partial | limited | none"),
+    canonical_only: bool = Query(
+        True,
+        description="Filter to areas present in the dld_canonical_areas "
+                    "registry (default true; cuts 362 → 284 and hides "
+                    "orphan single-snapshot areas).",
+    ),
 ):
     """Universal 362-area screener — every DLD area plus curated extras.
 
@@ -273,6 +279,15 @@ async def list_all_areas(
         items = [i for i in items if i.coverage_tier == coverage_tier]
     if min_samples > 0:
         items = [i for i in items if (i.sales_count + i.rent_count_2026) >= min_samples]
+    if canonical_only:
+        # Pull the canonical universe once and intersect by name
+        canon_names = {
+            n.upper()
+            for (n,) in (
+                await db.execute(select(DldCanonicalArea.area_name_upper))
+            ).all()
+        }
+        items = [i for i in items if i.name.upper() in canon_names]
 
     def _sort_key(it: AreaCoverageItem):
         # Always push 'none' tier to the bottom; sort within by the chosen key
@@ -297,7 +312,12 @@ async def list_all_areas(
 
 @router.get("/coverage-stats", response_model=AreaCoverageStats)
 async def coverage_stats(db: AsyncSession = Depends(get_db)):
-    """Aggregate coverage health — used by the admin coverage panel."""
+    """Aggregate coverage health — used by the admin coverage panel.
+
+    Counts are reported against the canonical universe (default 284) — the
+    visible 'Dubai areas' figure across the product. The Admin panel can
+    cross-reference with dld_areas (362) via the difference if needed.
+    """
     # Quick counts that don't need to load every row
     total_curated = await db.scalar(select(func.count()).select_from(Area)) or 0
     total_dld = await db.scalar(select(func.count()).select_from(DldArea)) or 0
@@ -309,9 +329,15 @@ async def coverage_stats(db: AsyncSession = Depends(get_db)):
     )
     total_sales, total_rents = samples.one()
 
-    # Reuse the universal lister so the tier counts can't drift
+    # Reuse the universal lister with canonical_only=true so the tier
+    # counts match what the frontend renders by default.
     coverage = await list_all_areas(
-        db=db, area_type=None, sort_by="rent_count", min_samples=0, coverage_tier=None
+        db=db,
+        area_type=None,
+        sort_by="rent_count",
+        min_samples=0,
+        coverage_tier=None,
+        canonical_only=True,
     )
 
     gaps = [

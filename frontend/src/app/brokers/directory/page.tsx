@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, Users, ShieldCheck } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getDldAreas, getTopCompanies } from '@/lib/api';
+import { getDldStats, getCanonicalAreas, getTopCompanies } from '@/lib/api';
 import { BrokersDirectoryClient } from './BrokersDirectoryClient';
 
 export const metadata: Metadata = {
@@ -15,17 +15,20 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function BrokersDirectoryPage() {
-  const [stats, areas, top] = await Promise.all([
+  // Canonical areas as single source of truth (min_occurrences=5 hides
+  // ~26 noise areas). The wizard's "preferred area" picker is optional, so
+  // we drop the rent_count weighting and just show every viable area.
+  const [stats, canon, top] = await Promise.all([
     getDldStats().catch(() => null),
-    getDldAreas({ min_rents: 20, limit: 500 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
     getTopCompanies(10).catch(() => null),
   ]);
 
-  const areaOptions = (areas?.items ?? [])
+  const areaOptions = (canon?.items ?? [])
     .map((a) => ({
-      name: a.name,
-      name_norm: a.name_norm,
-      rent_count: a.rent_count_2026,
+      name: a.area_name,
+      name_norm: a.area_name_upper.toLowerCase(),
+      rent_count: a.occurrence_count,
     }))
     .sort((a, b) => b.rent_count - a.rent_count);
 

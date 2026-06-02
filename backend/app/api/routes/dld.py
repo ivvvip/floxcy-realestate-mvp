@@ -23,6 +23,7 @@ from app.models.dld import (
     DldAreaAppreciation,
     DldAreaMetrics,
     DldBuilding,
+    DldCanonicalArea,
     DldPriceHistory,
     DldRentBenchmark,
     DldRentHistory,
@@ -45,6 +46,8 @@ from app.schemas.dld import (
     DldAreaListItem,
     DldAreaListResponse,
     DldAreaTopBuildingsResponse,
+    CanonicalAreaItem,
+    CanonicalAreasResponse,
     DldPriceHistoryResponse,
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
@@ -171,6 +174,50 @@ async def list_dld_areas(
     rows = (await db.execute(stmt)).all()
     items = [_build_area_item(a, m) for a, m in rows]
     return DldAreaListResponse(count=len(items), total_available=int(total or 0), items=items)
+
+
+@router.get("/canonical-areas", response_model=CanonicalAreasResponse)
+async def list_canonical_areas(
+    db: AsyncSession = Depends(get_db),
+    min_occurrences: int = Query(
+        5, ge=0, le=100_000,
+        description="Drop areas with fewer than N total occurrences. "
+                    "Defaults to 5 so noise areas (e.g. one-off DLD entries) "
+                    "stay out of user-facing dropdowns.",
+    ),
+    source: Optional[str] = Query(
+        None,
+        description="Filter to areas seen in this dataset: "
+                    "'transactions' | 'rents' | 'lands'.",
+    ),
+):
+    """The single source of truth for area names. Sorted A→Z."""
+    stmt = select(DldCanonicalArea).where(
+        DldCanonicalArea.occurrence_count >= min_occurrences
+    )
+    if source:
+        # JSONB contains check — Postgres-native
+        stmt = stmt.where(DldCanonicalArea.source_datasets.contains([source]))
+    stmt = stmt.order_by(DldCanonicalArea.area_name)
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [
+        CanonicalAreaItem(
+            id=r.id,
+            area_name=r.area_name,
+            area_name_upper=r.area_name_upper,
+            area_name_slug=r.area_name_slug,
+            area_name_ar=r.area_name_ar,
+            source_datasets=list(r.source_datasets) if r.source_datasets else [],
+            first_seen_year=r.first_seen_year,
+            occurrence_count=int(r.occurrence_count or 0),
+        )
+        for r in rows
+    ]
+    return CanonicalAreasResponse(
+        count=len(items),
+        min_occurrences=min_occurrences,
+        items=items,
+    )
 
 
 MARKET_OVERVIEW_CACHE_KEY = "dld:market-overview:v1"

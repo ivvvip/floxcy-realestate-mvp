@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Scale } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getDldAreas } from '@/lib/api';
+import { getDldStats, getDldAreas, getCanonicalAreas } from '@/lib/api';
 import { RentCheckClient } from './RentCheckClient';
 
 export const metadata: Metadata = {
@@ -14,22 +14,30 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function RentCheckPage() {
-  // Prefetch in parallel; both are heavily cached server-side.
-  // Fetch ALL 362 DLD areas — we show every area in the dropdown and tag
-  // each with a data-availability label so users can see the limits before
-  // they submit. Filtering to ≥30 rents hid 197/362 areas (54%), forcing
-  // users into a "my area isn't here" dead end.
-  const [stats, areas] = await Promise.all([
+  // Canonical is the authoritative area list (284 entries, low-noise
+  // filtered at >=5 occurrences = 258). We still pull /dld/areas for the
+  // rent_count + median_annual_rent hint shown next to each name in the
+  // dropdown — canonical doesn't carry rent metrics.
+  const [stats, areas, canon] = await Promise.all([
     getDldStats().catch(() => null),
     getDldAreas({ limit: 500 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
   ]);
 
-  // Sort by sample size descending — high-data areas float to the top of
-  // the unfiltered list (also after a search), and zero-data areas land at
-  // the bottom.
+  const canonUpperSet = new Set(
+    (canon?.items ?? []).map((c) => c.area_name_upper)
+  );
+  const canonByUpper = new Map(
+    (canon?.items ?? []).map((c) => [c.area_name_upper, c.area_name])
+  );
+
+  // Intersect dld_areas with canonical: hides noise areas, uses canonical
+  // display name where it differs. Sort by sample size descending so
+  // high-data areas float to the top.
   const areaOptions = (areas?.items ?? [])
+    .filter((a) => canonUpperSet.size === 0 || canonUpperSet.has(a.name.toUpperCase()))
     .map((a) => ({
-      name: a.name,
+      name: canonByUpper.get(a.name.toUpperCase()) ?? a.name,
       name_norm: a.name_norm,
       rent_count: a.rent_count_2026,
       median_annual_rent: a.median_annual_rent,

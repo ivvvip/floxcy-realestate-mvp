@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Building2 } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getDldBuildings, getDldAreas } from '@/lib/api';
+import { getDldStats, getDldBuildings, getCanonicalAreas } from '@/lib/api';
 import { BuildingsIndexClient } from './BuildingsIndexClient';
 
 export const metadata: Metadata = {
@@ -16,14 +16,16 @@ export const revalidate = 3600;
 export default async function BuildingsIndexPage() {
   // Top 50 buildings + the full area picker, both prefetched. Areas filtered
   // to those actually linked to ≥1 building so the dropdown stays usable.
-  const [stats, initial, areas] = await Promise.all([
+  // Canonical areas — single source of truth across all Floxcy dropdowns.
+  // min_occurrences=5 filters the ~26 noise areas (one-off DLD entries).
+  const [stats, initial, canon] = await Promise.all([
     getDldStats().catch(() => null),
     getDldBuildings({ sort_by: 'rent_count', limit: 50 }).catch(() => null),
-    getDldAreas({ limit: 500 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
   ]);
 
-  const areaOptions = (areas?.items ?? [])
-    .map((a) => ({ name: a.name, name_norm: a.name_norm }))
+  const areaOptions = (canon?.items ?? [])
+    .map((a) => ({ name: a.area_name, name_norm: a.area_name_upper.toLowerCase() }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (

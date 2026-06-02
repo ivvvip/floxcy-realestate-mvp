@@ -52,9 +52,9 @@ export default async function AreasPage() {
                   All Dubai Areas
                 </h1>
                 <p className="mt-1 text-xs text-fg-muted">
-                  <span className="font-mono text-fg">{total}</span> DLD-tracked
-                  areas · sort, filter, and screen. Limited-data areas shown
-                  honestly — never fabricated.
+                  <span className="font-mono text-fg">{total}</span> official
+                  Dubai areas (DLD canonical registry) · sort, filter, and
+                  screen. Limited-data areas shown honestly — never fabricated.
                 </p>
               </div>
               <div className="text-left sm:text-right text-[11px] text-fg-subtle">

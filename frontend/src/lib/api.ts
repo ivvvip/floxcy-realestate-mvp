@@ -47,6 +47,7 @@ import type {
   DldPriceHistoryResponse,
   DldRentHistoryResponse,
   DldYieldHistoryResponse,
+  CanonicalAreasResponse,
   MarketOverviewResponse,
   DldStatsResponse,
   DldBuildingsResponse,
@@ -693,6 +694,28 @@ export async function getMarketOverview(): Promise<MarketOverviewResponse> {
   return request<MarketOverviewResponse>('/api/v1/dld/market-overview', {
     revalidate: 3600,
   });
+}
+
+/**
+ * Single source of truth for area names across all dropdowns.
+ * Default min_occurrences=5 hides ~26 noise areas (one-off DLD entries).
+ * Source filter narrows to areas that appear in a specific dataset
+ * (useful for /rent-check which only cares about areas with rent data).
+ */
+export async function getCanonicalAreas(opts?: {
+  min_occurrences?: number;
+  source?: 'transactions' | 'rents' | 'lands';
+}): Promise<CanonicalAreasResponse> {
+  const params = new URLSearchParams();
+  if (opts?.min_occurrences != null) {
+    params.set('min_occurrences', String(opts.min_occurrences));
+  }
+  if (opts?.source) params.set('source', opts.source);
+  const q = params.toString();
+  return request<CanonicalAreasResponse>(
+    `/api/v1/dld/canonical-areas${q ? `?${q}` : ''}`,
+    { revalidate: 3600 }
+  );
 }
 
 export async function getTopAppreciation(
