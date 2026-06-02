@@ -705,12 +705,16 @@ export async function getMarketOverview(): Promise<MarketOverviewResponse> {
 export async function getCanonicalAreas(opts?: {
   min_occurrences?: number;
   source?: 'transactions' | 'rents' | 'lands';
+  only_with_coords?: boolean;
+  only_with_polygon?: boolean;
 }): Promise<CanonicalAreasResponse> {
   const params = new URLSearchParams();
   if (opts?.min_occurrences != null) {
     params.set('min_occurrences', String(opts.min_occurrences));
   }
   if (opts?.source) params.set('source', opts.source);
+  if (opts?.only_with_coords) params.set('only_with_coords', 'true');
+  if (opts?.only_with_polygon) params.set('only_with_polygon', 'true');
   const q = params.toString();
   return request<CanonicalAreasResponse>(
     `/api/v1/dld/canonical-areas${q ? `?${q}` : ''}`,

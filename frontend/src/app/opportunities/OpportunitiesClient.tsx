@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { ArrowUpRight, Building2, Sparkles, ShieldCheck } from 'lucide-react';
+import { useMemo, useRef, useState, useEffect } from 'react';
+import {
+  ArrowUpRight, Building2, Sparkles, ShieldCheck, ChevronDown, Search,
+} from 'lucide-react';
 import type {
   AreaSignalFeedItem,
   BrokerDealFeedItem,
@@ -11,6 +13,11 @@ import type {
 import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { FilterChip } from '@/components/data/FilterChip';
+
+interface AreaOption {
+  name: string;
+  name_norm: string;
+}
 
 type KindFilter = 'all' | 'deals' | 'signals';
 type StrategyFilter =
@@ -42,13 +49,17 @@ const RISK_TONE: Record<string, string> = {
 interface Props {
   opportunities: OpportunityFeedItem[];
   total: number;
+  areaOptions: AreaOption[];
 }
 
-export function OpportunitiesClient({ opportunities, total }: Props) {
+export function OpportunitiesClient({ opportunities, total, areaOptions }: Props) {
   const [kind, setKind] = useState<KindFilter>('all');
   const [strategy, setStrategy] = useState<StrategyFilter>('all');
   const [minScore, setMinScore] = useState(0);
-  const [areaQ, setAreaQ] = useState('');
+  // Selected canonical area. null = "All areas". Matched substring-style
+  // against opportunity.area_name so DLD-only canonical entries still work
+  // even if the feed uses a slightly different spelling.
+  const [area, setArea] = useState<AreaOption | null>(null);
 
   const filtered = useMemo(() => {
     let list = opportunities;
@@ -60,18 +71,14 @@ export function OpportunitiesClient({ opportunities, total }: Props) {
       );
     }
     list = list.filter((o) => o.opportunity_score >= minScore);
-    if (areaQ.trim()) {
-      const q = areaQ.trim().toLowerCase();
-      list = list.filter((o) => {
-        const name =
-          o.kind === 'area_signal' ? o.area_name : o.area_name;
-        return name.toLowerCase().includes(q);
-      });
+    if (area) {
+      const q = area.name.toLowerCase();
+      list = list.filter((o) => o.area_name.toLowerCase().includes(q));
     }
     return [...list].sort(
       (a, b) => b.opportunity_score - a.opportunity_score
     );
-  }, [opportunities, kind, strategy, minScore, areaQ]);
+  }, [opportunities, kind, strategy, minScore, area]);
 
   const counts = useMemo(() => {
     const c = { all: opportunities.length, deals: 0, signals: 0 };
@@ -115,17 +122,10 @@ export function OpportunitiesClient({ opportunities, total }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap text-xs">
-        <label className="inline-flex items-center gap-2">
-          <span className="text-fg-muted">Area</span>
-          <input
-            type="text"
-            value={areaQ}
-            onChange={(e) => setAreaQ(e.target.value)}
-            placeholder="e.g. Marina"
-            className="h-8 w-40 rounded-md border border-border bg-bg-card px-2 text-fg text-xs"
-          />
-        </label>
+      <div className="flex items-end gap-4 flex-wrap text-xs">
+        <div className="w-48">
+          <AreaSelect value={area} onChange={setArea} options={areaOptions} />
+        </div>
         <label className="inline-flex items-center gap-2">
           <span className="text-fg-muted">Strategy</span>
           <select
@@ -318,6 +318,115 @@ function SignalCard({ signal }: { signal: AreaSignalFeedItem }) {
           </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AreaSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: AreaOption | null;
+  onChange: (v: AreaOption | null) => void;
+  options: AreaOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options.slice(0, 60);
+    return options.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 80);
+  }, [options, query]);
+
+  // No canonical areas loaded (server-side fetch failed) — fall back to
+  // a disabled-looking control so the filter still renders without crashing.
+  const empty = options.length === 0;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <label className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        Area
+      </label>
+      <button
+        type="button"
+        onClick={() => !empty && setOpen((v) => !v)}
+        disabled={empty}
+        className="mt-1 w-full flex items-center justify-between gap-2 rounded-md border border-border bg-bg-card px-3 py-2 text-left text-xs min-h-[32px] disabled:opacity-50"
+      >
+        <span className={cn(value ? 'text-fg' : 'text-fg-subtle', 'truncate')}>
+          {value ? value.name : empty ? 'Areas unavailable' : 'All areas'}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(null);
+              }}
+              className="text-[10px] text-fg-subtle hover:text-fg"
+            >
+              clear
+            </button>
+          )}
+          <ChevronDown
+            className={cn('h-3.5 w-3.5 text-fg-subtle transition-transform', open && 'rotate-180')}
+            strokeWidth={2}
+          />
+        </div>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-bg-card shadow-lg max-h-[60vh] overflow-hidden flex flex-col">
+          <div className="relative border-b border-border">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
+              strokeWidth={2}
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type to filter…"
+              autoFocus
+              className="w-full bg-transparent pl-9 pr-3 py-2 text-xs outline-none"
+            />
+          </div>
+          <ul className="overflow-y-auto py-1">
+            {filtered.map((o) => (
+              <li key={o.name_norm}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(o);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-fg hover:bg-bg-elev"
+                >
+                  {o.name}
+                </button>
+              </li>
+            ))}
+            {!filtered.length && (
+              <li className="px-3 py-2 text-[11px] text-fg-subtle">No matches</li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -329,6 +329,13 @@ export interface DldYieldHistoryResponse extends DldAttribution {
   trend: 'rising' | 'falling' | 'flat' | null;
 }
 
+export interface CanonicalAreaBbox {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 export interface CanonicalAreaItem {
   id: string;
   area_name: string;
@@ -338,11 +345,21 @@ export interface CanonicalAreaItem {
   source_datasets: string[];
   first_seen_year: number | null;
   occurrence_count: number;
+  // Geocoding payload — ~93% of canonical areas have coords.
+  latitude: number | null;
+  longitude: number | null;
+  bbox: CanonicalAreaBbox | null;
+  // GeoJSON Polygon / MultiPolygon for map rendering (~49% coverage).
+  polygon: unknown | null;
+  coords_source: string | null;
+  coords_confidence: string | null;
 }
 
 export interface CanonicalAreasResponse extends DldAttribution {
   count: number;
   min_occurrences: number;
+  coords_coverage: number;
+  polygon_coverage: number;
   items: CanonicalAreaItem[];
 }
 

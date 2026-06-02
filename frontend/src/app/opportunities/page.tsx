@@ -3,7 +3,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { OpportunitiesClient } from './OpportunitiesClient';
 import { Sparkles } from 'lucide-react';
-import { getOpportunitiesFeed } from '@/lib/api';
+import { getOpportunitiesFeed, getCanonicalAreas } from '@/lib/api';
 import type { OpportunityFeedItem } from '@/lib/types';
 
 export const metadata = {
@@ -18,10 +18,21 @@ export default async function OpportunitiesPage() {
   let opportunities: OpportunityFeedItem[] = [];
   let total = 0;
   let error: string | null = null;
+  // Canonical area names — single source of truth for the area picker.
+  // Empty list on failure degrades the combobox to a free-text input.
+  let areaOptions: { name: string; name_norm: string }[] = [];
   try {
-    const res = await getOpportunitiesFeed({ kind: 'all', limit: 60, min_score: 0 });
-    opportunities = res.opportunities ?? [];
-    total = res.total ?? 0;
+    const [feed, canonical] = await Promise.all([
+      getOpportunitiesFeed({ kind: 'all', limit: 60, min_score: 0 }),
+      getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+    ]);
+    opportunities = feed.opportunities ?? [];
+    total = feed.total ?? 0;
+    if (canonical) {
+      areaOptions = canonical.items
+        .map((a) => ({ name: a.area_name, name_norm: a.area_name_upper }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load opportunities.';
   }
@@ -78,7 +89,11 @@ export default async function OpportunitiesPage() {
               {error}
             </div>
           ) : (
-            <OpportunitiesClient opportunities={opportunities} total={total} />
+            <OpportunitiesClient
+              opportunities={opportunities}
+              total={total}
+              areaOptions={areaOptions}
+            />
           )}
         </div>
       </Container>
