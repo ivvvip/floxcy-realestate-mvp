@@ -273,6 +273,15 @@ class DldCanonicalArea(Base):
     source_datasets: Mapped[list] = mapped_column(JSONB, nullable=False)
     first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     occurrence_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Coordinates (populated by scripts/geocode_canonical_areas.py)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bbox_north: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bbox_south: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bbox_east: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bbox_west: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    coords_source: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    coords_confidence: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
