@@ -46,7 +46,11 @@ export function BuildingsIndexClient({
   const [total, setTotal] = useState(initialTotal);
   const [area, setArea] = useState<AreaOption | null>(null);
   const [project, setProject] = useState('');
+  const [qSearch, setQSearch] = useState('');
   const [propType, setPropType] = useState<PropFilter>('');
+  const [buildingType, setBuildingType] = useState<
+    '' | 'tower' | 'complex' | 'villa_community' | 'under_construction'
+  >('');
   const [sortBy, setSortBy] = useState<SortKey>('rent_count');
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -67,7 +71,9 @@ export function BuildingsIndexClient({
         const res = await getDldBuildings({
           area: area?.name_norm,
           project: project.trim() || undefined,
+          q: qSearch.trim() || undefined,
           prop_sub_type: propType || undefined,
+          building_type: buildingType || undefined,
           sort_by: sortBy,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
@@ -84,11 +90,11 @@ export function BuildingsIndexClient({
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [area, project, propType, sortBy, page]);
+  }, [area, project, qSearch, propType, buildingType, sortBy, page]);
 
   useEffect(() => {
     setPage(0);
-  }, [area, project, propType, sortBy]);
+  }, [area, project, qSearch, propType, buildingType, sortBy]);
 
   const showFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const showTo = Math.min(total, (page + 1) * PAGE_SIZE);
@@ -96,8 +102,32 @@ export function BuildingsIndexClient({
 
   return (
     <div className="space-y-4">
+      {/* Cross-search — searches project_name + master_project + area together */}
+      <section className="card p-3 sm:p-4">
+        <label
+          htmlFor="b_q"
+          className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
+        >
+          Search across building · community · area
+        </label>
+        <div className="relative mt-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fg-subtle"
+            strokeWidth={2}
+          />
+          <input
+            id="b_q"
+            type="search"
+            value={qSearch}
+            onChange={(e) => setQSearch(e.target.value)}
+            placeholder="e.g. Damac, Marsa Dubai, Burj Khalifa…"
+            className="input-field pl-10 min-h-[44px] text-sm"
+          />
+        </div>
+      </section>
+
       {/* Filter bar */}
-      <section className="card p-4 sm:p-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="card p-4 sm:p-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <AreaSelect value={area} onChange={setArea} options={areaOptions} />
         <div>
           <label
@@ -140,6 +170,28 @@ export function BuildingsIndexClient({
                 {p}
               </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor="b_btype"
+            className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
+          >
+            Building type
+          </label>
+          <select
+            id="b_btype"
+            value={buildingType}
+            onChange={(e) =>
+              setBuildingType(e.target.value as typeof buildingType)
+            }
+            className="input-field mt-1 min-h-[44px]"
+          >
+            <option value="">All types</option>
+            <option value="tower">🏢 Single Tower</option>
+            <option value="complex">🏘️ Residential Complex</option>
+            <option value="villa_community">🏡 Villa Community</option>
+            <option value="under_construction">🏗️ Under Construction</option>
           </select>
         </div>
         <div>
@@ -232,19 +284,40 @@ export function BuildingsIndexClient({
 
 function BuildingCard({ b }: { b: DldBuildingItem }) {
   const occ = b.occupancy_proxy_pct;
+  const deltaPct = b.rent_psf_vs_area_pct;
   return (
     <Link
       href={`/buildings/${b.id}`}
       className="card p-4 flex flex-col hover:border-accent/40 transition-colors min-h-[180px]"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          {/* Building type badge */}
+          {b.building_type_emoji && b.building_type_label && (
+            <div className="mb-1">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
+                  b.building_type === 'under_construction'
+                    ? 'border-warning/40 bg-warning/10 text-warning'
+                    : b.building_type === 'complex'
+                      ? 'border-accent/30 bg-accent/10 text-accent'
+                      : 'border-border bg-bg-elev/50 text-fg-muted'
+                )}
+              >
+                {b.building_type_emoji} {b.building_type_label}
+              </span>
+            </div>
+          )}
           <div className="text-sm font-semibold text-fg truncate" title={b.project_name ?? ''}>
             {b.project_name ?? '—'}
           </div>
           <div className="mt-0.5 text-[11px] text-fg-muted truncate">
             {b.area_name ?? '—'}
             {b.prop_sub_type ? ` · ${b.prop_sub_type}` : ''}
+            {b.age_years != null && (
+              <> · Built ~{2026 - b.age_years} (<span className="font-mono">{b.age_years}y</span>)</>
+            )}
           </div>
         </div>
         {b.is_freehold === true && (
@@ -254,16 +327,22 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
         )}
       </div>
 
+      {/* Community aggregate notice */}
+      {b.is_community_aggregate && b.master_project && (
+        <div className="mt-2 rounded border border-border bg-bg-elev/30 px-2 py-1 text-[10px] text-fg-muted">
+          🏘️ Part of <span className="text-fg">{b.master_project}</span> community
+          {b.siblings_in_master_project && b.siblings_in_master_project > 1 && (
+            <> · {b.siblings_in_master_project} aggregated buildings</>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-subtle">
         {b.flats != null && (
-          <span>
-            <span className="text-fg font-mono">{b.flats}</span> flats
-          </span>
+          <span><span className="text-fg font-mono">{b.flats}</span> flats</span>
         )}
         {b.floors != null && (
-          <span>
-            <span className="text-fg font-mono">{b.floors}</span> floors
-          </span>
+          <span><span className="text-fg font-mono">{b.floors}</span> floors</span>
         )}
         <span>
           <span className="text-fg font-mono">{b.active_rent_count.toLocaleString()}</span> active rents
@@ -289,7 +368,41 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
+      {/* vs-area benchmark + demand signal row */}
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+        {deltaPct != null && Math.abs(deltaPct) >= 1 && (
+          <span
+            className={cn(
+              'rounded px-1.5 py-0.5 tabular',
+              deltaPct < 0
+                ? 'bg-positive/15 text-positive'
+                : 'bg-warning/10 text-warning'
+            )}
+            title={`${b.avg_rent_per_sqft?.toFixed(0) ?? '—'} AED/sqft vs area median ${b.area_median_rent_psf?.toFixed(0) ?? '—'}`}
+          >
+            {deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(0)}% vs area
+          </span>
+        )}
+        {b.demand_signal && (
+          <span
+            className={cn(
+              'rounded px-1.5 py-0.5 inline-flex items-center gap-0.5',
+              b.demand_signal === 'very_high' && 'bg-positive/15 text-positive',
+              b.demand_signal === 'high' && 'bg-accent/15 text-accent',
+              b.demand_signal === 'moderate' && 'bg-bg-elev text-fg-muted',
+              b.demand_signal === 'low' && 'bg-bg-elev text-fg-subtle'
+            )}
+            title={`${b.active_rent_count} active contracts`}
+          >
+            {b.demand_signal === 'very_high' ? '🔥' :
+             b.demand_signal === 'high' ? '📈' :
+             b.demand_signal === 'moderate' ? '→' : '—'}
+            {' '}{b.demand_signal.replace('_', ' ')} demand
+          </span>
+        )}
+      </div>
+
+      <div className="mt-auto pt-3 flex items-center justify-between">
         <span
           className={cn(
             'rounded px-1.5 py-0.5 text-[10px]',

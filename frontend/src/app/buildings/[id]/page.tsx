@@ -141,6 +141,9 @@ export default async function BuildingDetailPage({ params }: PageProps) {
 
       <Container>
         <div className="py-4 sm:py-6 space-y-5">
+          {/* Building intelligence — type / age / vs-area / demand / community */}
+          <BuildingIntelligence b={b} />
+
           {/* 4-tile income strip */}
           <section className="card overflow-hidden">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
@@ -442,6 +445,173 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-fg-subtle">{label}</dt>
       <dd className="text-fg font-mono text-right">{value}</dd>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Building intelligence panel — type explanation, age, vs-area benchmark,
+// demand signal, community siblings. Server-rendered from the building
+// detail response (no extra fetches).
+// ---------------------------------------------------------------------------
+
+const TYPE_EXPLAINER: Record<string, string> = {
+  tower:
+    'A specific tower/development — the project name maps to a single building or a small named cluster.',
+  complex:
+    'Project name matches the master community name — this row is a community-wide aggregate of multiple buildings, not a single tower.',
+  villa_community:
+    'A villa community — units are typically standalone houses or townhouses under the same master project.',
+  under_construction:
+    'Off-plan project — units are still being built. No rental contracts yet; the row exists for tracking purposes only.',
+};
+
+const DEMAND_EXPLAINER: Record<string, { tone: string; label: string }> = {
+  very_high: { tone: 'text-positive', label: '🔥 Very high demand' },
+  high:      { tone: 'text-accent',   label: '📈 High demand' },
+  moderate:  { tone: 'text-fg-muted', label: '→ Moderate demand' },
+  low:       { tone: 'text-fg-subtle', label: '— Low / new building' },
+};
+
+function BuildingIntelligence({
+  b,
+}: {
+  b: import('@/lib/types').DldBuildingDetail;
+}) {
+  const hasAny =
+    b.building_type ||
+    b.age_years != null ||
+    b.rent_psf_vs_area_pct != null ||
+    b.demand_signal ||
+    (b.is_community_aggregate && b.master_project);
+  if (!hasAny) return null;
+
+  const typeExplain = b.building_type ? TYPE_EXPLAINER[b.building_type] : null;
+  const dem = b.demand_signal ? DEMAND_EXPLAINER[b.demand_signal] : null;
+  const deltaPct = b.rent_psf_vs_area_pct;
+  const builtYear =
+    b.age_years != null && b.age_years > 0 ? 2026 - b.age_years : null;
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-border px-4 py-2.5 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-fg">Floxcy intelligence</h2>
+        <span className="text-[10px] text-fg-subtle tabular">
+          derived from DLD building registry
+        </span>
+      </div>
+      <div className="p-4 grid gap-4 md:grid-cols-12">
+        {/* Type + explainer */}
+        <div className="md:col-span-5 rounded-md border border-border bg-bg-elev/30 p-3">
+          <div className="text-[10px] uppercase tracking-wide text-fg-subtle">
+            Building type
+          </div>
+          <div className="mt-1 text-base font-semibold text-fg inline-flex items-center gap-1.5">
+            <span>{b.building_type_emoji ?? '—'}</span>
+            <span>{b.building_type_label ?? 'Unknown'}</span>
+          </div>
+          {typeExplain && (
+            <p className="mt-1.5 text-[11px] text-fg-muted leading-snug">
+              {typeExplain}
+            </p>
+          )}
+          {b.is_community_aggregate && b.master_project && (
+            <div className="mt-2 rounded border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] text-accent">
+              🏘️ Part of <span className="text-fg">{b.master_project}</span>
+              {b.siblings_in_master_project && b.siblings_in_master_project > 1 && (
+                <>
+                  {' '}· {b.siblings_in_master_project} aggregated buildings in this community
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Age + condition */}
+        <div className="md:col-span-3 rounded-md border border-border bg-bg-elev/30 p-3">
+          <div className="text-[10px] uppercase tracking-wide text-fg-subtle">
+            Building age
+          </div>
+          {b.age_years != null && builtYear ? (
+            <>
+              <div className="mt-1 text-base font-semibold text-fg tabular">
+                {b.age_years}<span className="text-sm text-fg-muted ml-1">years</span>
+              </div>
+              <p className="mt-1 text-[10px] text-fg-muted">
+                Built ~{builtYear} ·{' '}
+                <span className={b.age_years < 5 ? 'text-positive' : b.age_years > 15 ? 'text-warning' : 'text-fg-muted'}>
+                  {b.age_years < 5 ? 'New construction' :
+                   b.age_years < 15 ? 'Modern' : 'Established'}
+                </span>
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[11px] text-fg-subtle italic">
+              No creation date in DLD registry for this building.
+            </p>
+          )}
+        </div>
+
+        {/* vs-area benchmark */}
+        <div className="md:col-span-4 rounded-md border border-border bg-bg-elev/30 p-3">
+          <div className="text-[10px] uppercase tracking-wide text-fg-subtle">
+            vs Area rent/sqft
+          </div>
+          {deltaPct != null ? (
+            <>
+              <div
+                className={`mt-1 text-base font-semibold tabular ${
+                  deltaPct < -5
+                    ? 'text-positive'
+                    : deltaPct > 5
+                      ? 'text-warning'
+                      : 'text-fg'
+                }`}
+              >
+                {deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%
+              </div>
+              <p className="mt-1 text-[10px] text-fg-muted">
+                Your {b.avg_rent_per_sqft?.toFixed(0) ?? '—'} AED/sqft vs area median{' '}
+                {b.area_median_rent_psf?.toFixed(0) ?? '—'} AED/sqft.{' '}
+                {deltaPct < -5
+                  ? 'Below market — potential value pick or lower spec.'
+                  : deltaPct > 5
+                    ? 'Above market — premium positioning.'
+                    : 'In line with the area median.'}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[11px] text-fg-subtle italic">
+              Need at least 3 buildings with rent data in this area to benchmark.
+            </p>
+          )}
+        </div>
+
+        {/* Demand signal */}
+        <div className="md:col-span-12 rounded-md border border-border bg-bg p-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">
+              Rental demand signal
+            </div>
+            {dem && (
+              <span className={`text-xs font-medium ${dem.tone}`}>{dem.label}</span>
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] text-fg-muted">
+            <span className="tabular text-fg font-medium">
+              {b.active_rent_count.toLocaleString()}
+            </span>{' '}
+            active rent contracts in DLD Ejari.{' '}
+            {b.demand_signal === 'very_high'
+              ? 'Top-tier — building is highly liquid for rental purposes.'
+              : b.demand_signal === 'high'
+                ? 'Strong activity — easy to find tenants.'
+                : b.demand_signal === 'moderate'
+                  ? 'Healthy but not top-tier — expect normal vacancy periods.'
+                  : 'Low activity — could indicate new building, less popular area, or larger units that turn over slowly.'}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -1,7 +1,7 @@
 """Pydantic schemas for DLD-sourced endpoints."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
@@ -254,10 +254,32 @@ class DldBuildingItem(BaseModel):
     active_rent_count: int = 0
     occupancy_proxy_pct: Optional[float] = None
     is_freehold: Optional[bool] = None
+    is_offplan: Optional[bool] = None
+    creation_date: Optional[datetime] = None
     # Derived (computed at response-build time)
     total_annual_income: Optional[float] = None
     income_range_label: Optional[str] = None
     confidence: Optional[str] = None
+    # Building type taxonomy (derived from name + sub-type + offplan flag).
+    # Values: "tower" | "complex" | "villa_community" | "under_construction"
+    building_type: Optional[str] = None
+    building_type_label: Optional[str] = None
+    building_type_emoji: Optional[str] = None
+    # When project_name equals master_project the row is a community-wide
+    # aggregate rather than a single tower. We surface a count of how many
+    # records share the same (master_project, area) for the "5 towers in
+    # this community" disclosure.
+    is_community_aggregate: bool = False
+    siblings_in_master_project: Optional[int] = None
+    # Age in years from creation_date — None when creation_date is unknown.
+    age_years: Optional[int] = None
+    # vs-area benchmark. Negative = cheaper than the area median.
+    rent_psf_vs_area_delta: Optional[float] = None
+    rent_psf_vs_area_pct: Optional[float] = None
+    area_median_rent_psf: Optional[float] = None
+    # Demand signal — qualitative bucket from active_rent_count.
+    # Values: "very_high" | "high" | "moderate" | "low"
+    demand_signal: Optional[str] = None
 
 
 class DldBuildingsResponse(Attribution):

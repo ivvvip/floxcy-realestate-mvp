@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
@@ -1217,8 +1217,76 @@ def _total_annual_income(b: DldBuilding) -> Optional[float]:
     return float(b.avg_annual_rent) * int(b.active_rent_count)
 
 
-def _build_building_item(b: DldBuilding, area_name: Optional[str]) -> DldBuildingItem:
+def _classify_building_type(
+    project_name: Optional[str],
+    master_project: Optional[str],
+    prop_sub_type: Optional[str],
+    is_offplan: Optional[bool],
+) -> tuple[str, str, str, bool]:
+    """Returns (type_key, human_label, emoji, is_community_aggregate).
+
+    Priority:
+      1. Off-plan flag → "Under construction" wins regardless of sub-type
+         (those buildings have no rental contracts yet and aren't a
+         tower/villa from an investor's perspective).
+      2. Villa sub-type → "Villa community".
+      3. project_name == master_project → "Residential complex" (the
+         building record is actually a community-wide aggregate).
+      4. Default → "Single tower".
+    """
+    is_community = (
+        master_project is not None
+        and project_name is not None
+        and project_name.strip().casefold() == master_project.strip().casefold()
+    )
+    if is_offplan is True:
+        return "under_construction", "Under construction", "🏗️", is_community
+    if prop_sub_type and "villa" in prop_sub_type.lower():
+        return "villa_community", "Villa community", "🏡", is_community
+    if is_community:
+        return "complex", "Residential complex", "🏘️", True
+    return "tower", "Single tower", "🏢", False
+
+
+def _demand_signal(active_rent_count: int) -> str:
+    """Bucket the contract count into a qualitative demand tier."""
+    if active_rent_count >= 50:
+        return "very_high"
+    if active_rent_count >= 20:
+        return "high"
+    if active_rent_count >= 5:
+        return "moderate"
+    return "low"
+
+
+def _age_years(creation_date: Optional[datetime]) -> Optional[int]:
+    if creation_date is None:
+        return None
+    # Use the dataset snapshot date as "today" so results are deterministic
+    today = date(2026, 6, 1)
+    delta = (today - creation_date.date()).days
+    if delta < 0:
+        return 0
+    return max(0, delta // 365)
+
+
+def _build_building_item(
+    b: DldBuilding,
+    area_name: Optional[str],
+    siblings_in_master_project: Optional[int] = None,
+    area_median_rent_psf: Optional[float] = None,
+) -> DldBuildingItem:
     total = _total_annual_income(b)
+    type_key, type_label, type_emoji, is_community = _classify_building_type(
+        b.project_name, b.master_project, b.prop_sub_type, b.is_offplan,
+    )
+    avg_psf = float(b.avg_rent_per_sqft) if b.avg_rent_per_sqft is not None else None
+    delta_psf: Optional[float] = None
+    delta_pct: Optional[float] = None
+    if avg_psf is not None and area_median_rent_psf and area_median_rent_psf > 0:
+        delta_psf = round(avg_psf - area_median_rent_psf, 2)
+        delta_pct = round((avg_psf - area_median_rent_psf) / area_median_rent_psf * 100, 1)
+
     return DldBuildingItem(
         id=b.id,
         project_name=b.project_name,
@@ -1228,13 +1296,25 @@ def _build_building_item(b: DldBuilding, area_name: Optional[str]) -> DldBuildin
         flats=b.flats,
         floors=b.floors,
         avg_annual_rent=float(b.avg_annual_rent) if b.avg_annual_rent is not None else None,
-        avg_rent_per_sqft=float(b.avg_rent_per_sqft) if b.avg_rent_per_sqft is not None else None,
+        avg_rent_per_sqft=avg_psf,
         active_rent_count=b.active_rent_count,
         occupancy_proxy_pct=float(b.occupancy_proxy_pct) if b.occupancy_proxy_pct is not None else None,
         is_freehold=b.is_freehold,
+        is_offplan=b.is_offplan,
+        creation_date=b.creation_date,
         total_annual_income=total,
         income_range_label=_income_range_label(total),
         confidence=confidence_for(b.active_rent_count),
+        building_type=type_key,
+        building_type_label=type_label,
+        building_type_emoji=type_emoji,
+        is_community_aggregate=is_community,
+        siblings_in_master_project=siblings_in_master_project,
+        age_years=_age_years(b.creation_date),
+        rent_psf_vs_area_delta=delta_psf,
+        rent_psf_vs_area_pct=delta_pct,
+        area_median_rent_psf=area_median_rent_psf,
+        demand_signal=_demand_signal(b.active_rent_count),
     )
 
 
@@ -1252,7 +1332,20 @@ async def list_buildings(
     db: AsyncSession = Depends(get_db),
     area: Optional[str] = Query(None, description="filter by area name_norm"),
     project: Optional[str] = Query(None, description="filter by project_name substring"),
+    master_project: Optional[str] = Query(None, description="filter by master_project substring"),
+    q: Optional[str] = Query(
+        None,
+        description="Cross-search across project_name + master_project + area "
+                    "name (case-insensitive). Combined with the other filters "
+                    "via AND so users can narrow further on top of a search.",
+    ),
     prop_sub_type: Optional[str] = Query(None, description="e.g. Flat, Villa"),
+    building_type: Optional[str] = Query(
+        None,
+        description="Filter by derived type bucket: tower | complex | "
+                    "villa_community | under_construction",
+        pattern="^(tower|complex|villa_community|under_construction)$",
+    ),
     min_rents: int = Query(0, ge=0),
     sort_by: str = Query(
         "rent_count",
@@ -1262,7 +1355,7 @@ async def list_buildings(
     offset: int = Query(0, ge=0),
 ):
     stmt = (
-        select(DldBuilding, DldArea.name_display)
+        select(DldBuilding, DldArea.name_display, DldArea.name_norm)
         .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
     )
     conds = []
@@ -1278,8 +1371,35 @@ async def list_buildings(
             conds.append(DldArea.name_norm == norm)
     if project:
         conds.append(DldBuilding.project_name.ilike(f"%{project.strip()}%"))
+    if master_project:
+        conds.append(DldBuilding.master_project.ilike(f"%{master_project.strip()}%"))
+    if q:
+        needle = f"%{q.strip()}%"
+        conds.append(or_(
+            DldBuilding.project_name.ilike(needle),
+            DldBuilding.master_project.ilike(needle),
+            DldArea.name_display.ilike(needle),
+            DldArea.name_norm.ilike(needle),
+        ))
     if prop_sub_type:
         conds.append(DldBuilding.prop_sub_type == prop_sub_type)
+    if building_type == "under_construction":
+        conds.append(DldBuilding.is_offplan.is_(True))
+    elif building_type == "villa_community":
+        conds.append(DldBuilding.prop_sub_type.ilike("%villa%"))
+        # Exclude off-plan (would've been bucketed under construction)
+        conds.append(or_(DldBuilding.is_offplan.is_(False), DldBuilding.is_offplan.is_(None)))
+    elif building_type == "complex":
+        conds.append(DldBuilding.project_name == DldBuilding.master_project)
+        conds.append(or_(DldBuilding.is_offplan.is_(False), DldBuilding.is_offplan.is_(None)))
+    elif building_type == "tower":
+        # NOT a complex, NOT a villa, NOT off-plan
+        conds.append(DldBuilding.project_name != DldBuilding.master_project)
+        conds.append(
+            or_(DldBuilding.prop_sub_type.is_(None),
+                ~DldBuilding.prop_sub_type.ilike("%villa%"))
+        )
+        conds.append(or_(DldBuilding.is_offplan.is_(False), DldBuilding.is_offplan.is_(None)))
     if min_rents > 0:
         conds.append(DldBuilding.active_rent_count >= min_rents)
     if conds:
@@ -1298,7 +1418,67 @@ async def list_buildings(
     # NULLS LAST for derived sorts (rent/sqft, occupancy) — Postgres-friendly
     stmt = stmt.order_by(sort_col.desc().nullslast()).limit(limit).offset(offset)
     rows = (await db.execute(stmt)).all()
-    items = [_build_building_item(b, area_name) for b, area_name in rows]
+
+    # ---- Compute siblings (same master_project + same area) for the
+    # community-aggregate disclosure. ONE roundtrip across all distinct
+    # (master_project, dld_area_id) pairs in the page.
+    sibling_keys: set[tuple[str, Optional[UUID]]] = {
+        (b.master_project, b.dld_area_id)
+        for b, _, _ in rows
+        if b.master_project
+    }
+    sibling_counts: dict[tuple[str, Optional[UUID]], int] = {}
+    if sibling_keys:
+        sib_rows = (await db.execute(
+            select(
+                DldBuilding.master_project,
+                DldBuilding.dld_area_id,
+                func.count().label("c"),
+            )
+            .where(DldBuilding.master_project.in_({k[0] for k in sibling_keys}))
+            .group_by(DldBuilding.master_project, DldBuilding.dld_area_id)
+        )).all()
+        for mp, aid, c in sib_rows:
+            sibling_counts[(mp, aid)] = int(c)
+
+    # ---- Per-area median rent-per-sqft for the "vs area" benchmark.
+    # We aggregate across the same DldBuilding rows in the area as a quick
+    # robust proxy (DldAreaMetrics.median_rent_per_sqft is also available
+    # but uses Ejari medians; building-level avg-of-avg is more directly
+    # comparable to what each card shows).
+    area_ids = {b.dld_area_id for b, _, _ in rows if b.dld_area_id}
+    area_psf: dict[UUID, float] = {}
+    if area_ids:
+        psf_rows = (await db.execute(
+            select(
+                DldBuilding.dld_area_id,
+                func.percentile_cont(0.5).within_group(
+                    DldBuilding.avg_rent_per_sqft.asc()
+                ),
+            )
+            .where(
+                DldBuilding.dld_area_id.in_(area_ids),
+                DldBuilding.avg_rent_per_sqft.is_not(None),
+                DldBuilding.active_rent_count >= 3,
+            )
+            .group_by(DldBuilding.dld_area_id)
+        )).all()
+        for aid, med in psf_rows:
+            if med is not None:
+                area_psf[aid] = float(med)
+
+    items = [
+        _build_building_item(
+            b,
+            area_display,
+            siblings_in_master_project=(
+                sibling_counts.get((b.master_project, b.dld_area_id))
+                if b.master_project else None
+            ),
+            area_median_rent_psf=area_psf.get(b.dld_area_id) if b.dld_area_id else None,
+        )
+        for b, area_display, _area_norm in rows
+    ]
     return DldBuildingsResponse(count=len(items), total_available=int(total or 0), items=items)
 
 
@@ -1373,9 +1553,44 @@ async def get_building(building_id: UUID, db: AsyncSession = Depends(get_db)):
         est_sqft = float(b.avg_annual_rent) / float(b.avg_rent_per_sqft)
         est_price = est_sqft * float(area_ctx.median_price_per_sqft)
 
-    base = _build_building_item(b, area_name)
+    # Enrich the detail with the same derived fields as the list endpoint:
+    # siblings_in_master_project + area_median_rent_psf benchmark.
+    siblings: Optional[int] = None
+    if b.master_project and dld_area_id:
+        siblings = int(await db.scalar(
+            select(func.count()).select_from(DldBuilding).where(
+                DldBuilding.master_project == b.master_project,
+                DldBuilding.dld_area_id == dld_area_id,
+            )
+        ) or 0)
+
+    area_psf: Optional[float] = None
+    if dld_area_id:
+        area_psf_val = await db.scalar(
+            select(func.percentile_cont(0.5).within_group(
+                DldBuilding.avg_rent_per_sqft.asc()
+            ))
+            .where(
+                DldBuilding.dld_area_id == dld_area_id,
+                DldBuilding.avg_rent_per_sqft.is_not(None),
+                DldBuilding.active_rent_count >= 3,
+            )
+        )
+        if area_psf_val is not None:
+            area_psf = float(area_psf_val)
+
+    base = _build_building_item(
+        b, area_name,
+        siblings_in_master_project=siblings,
+        area_median_rent_psf=area_psf,
+    )
+    # Drop fields that DldBuildingDetail re-declares so we don't pass them
+    # twice via **base.model_dump() + explicit kwargs (Pydantic raises).
+    base_dict = base.model_dump()
+    for k in ("is_offplan",):
+        base_dict.pop(k, None)
     detail = DldBuildingDetail(
-        **base.model_dump(),
+        **base_dict,
         swimming_pools=b.swimming_pools,
         car_parks=b.car_parks,
         elevators=b.elevators,

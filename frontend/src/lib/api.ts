@@ -811,7 +811,10 @@ export async function getDashboardData(): Promise<DashboardDataResponse> {
 export async function getDldBuildings(opts?: {
   area?: string;
   project?: string;
+  master_project?: string;
+  q?: string;
   prop_sub_type?: string;
+  building_type?: 'tower' | 'complex' | 'villa_community' | 'under_construction';
   min_rents?: number;
   sort_by?: 'rent_count' | 'rent_per_sqft' | 'avg_rent' | 'occupancy';
   limit?: number;
@@ -820,7 +823,10 @@ export async function getDldBuildings(opts?: {
   const params = new URLSearchParams();
   if (opts?.area) params.set('area', opts.area);
   if (opts?.project) params.set('project', opts.project);
+  if (opts?.master_project) params.set('master_project', opts.master_project);
+  if (opts?.q) params.set('q', opts.q);
   if (opts?.prop_sub_type) params.set('prop_sub_type', opts.prop_sub_type);
+  if (opts?.building_type) params.set('building_type', opts.building_type);
   if (opts?.min_rents != null) params.set('min_rents', String(opts.min_rents));
   if (opts?.sort_by) params.set('sort_by', opts.sort_by);
   if (opts?.limit) params.set('limit', String(opts.limit));

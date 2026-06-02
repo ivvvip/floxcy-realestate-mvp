@@ -722,6 +722,9 @@ export interface DldStatsResponse extends DldAttribution {
   total_rent_benchmark_cells: number;
 }
 
+export type BuildingType = 'tower' | 'complex' | 'villa_community' | 'under_construction';
+export type DemandSignal = 'very_high' | 'high' | 'moderate' | 'low';
+
 export interface DldBuildingItem {
   id: string;
   project_name: string | null;
@@ -735,10 +738,22 @@ export interface DldBuildingItem {
   active_rent_count: number;
   occupancy_proxy_pct: number | null;
   is_freehold: boolean | null;
+  is_offplan: boolean | null;
+  creation_date: string | null;
   // Derived
   total_annual_income: number | null;
   income_range_label: string | null;
   confidence: 'low' | 'medium' | 'high' | null;
+  building_type: BuildingType | null;
+  building_type_label: string | null;
+  building_type_emoji: string | null;
+  is_community_aggregate: boolean;
+  siblings_in_master_project: number | null;
+  age_years: number | null;
+  rent_psf_vs_area_delta: number | null;
+  rent_psf_vs_area_pct: number | null;
+  area_median_rent_psf: number | null;
+  demand_signal: DemandSignal | null;
 }
 
 export interface DldBuildingsResponse extends DldAttribution {
