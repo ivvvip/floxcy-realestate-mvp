@@ -49,6 +49,20 @@ from _dld_category import (  # noqa: E402
     normalize_subtype,
     residential_amount_cap,
 )
+from _building_classifier import (  # noqa: E402
+    IDENTIFIABLE_TYPES,
+    classify_building_name,
+)
+import re  # noqa: E402
+
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slug(name: str) -> str:
+    s = name.strip().lower()
+    s = _SLUG_RE.sub("-", s)
+    return s.strip("-")[:255]
 
 csv.field_size_limit(sys.maxsize)
 
@@ -106,11 +120,13 @@ class StreamedRow:
     __slots__ = (
         "category", "area_norm", "year", "is_renew", "annual", "rent_psf",
         "size_sqm", "is_person", "is_bulk", "project_number", "project_name",
+        "master_project", "area_display",
         "sub_type_normalized", "end_month",
     )
 
     def __init__(self, category, area_norm, year, is_renew, annual, rent_psf,
                  size_sqm, is_person, is_bulk, project_number, project_name,
+                 master_project, area_display,
                  sub_type_normalized, end_month):
         self.category = category
         self.area_norm = area_norm
@@ -123,6 +139,8 @@ class StreamedRow:
         self.is_bulk = is_bulk
         self.project_number = project_number
         self.project_name = project_name
+        self.master_project = master_project
+        self.area_display = area_display
         self.sub_type_normalized = sub_type_normalized
         self.end_month = end_month  # 'YYYY-MM' or None
 
@@ -208,6 +226,8 @@ def stream_classified_rents(path: Path, progress_every: int):
 
             project_number = (row.get("project_number") or "").strip() or None
             project_name = (row.get("project_name_en") or "").strip() or None
+            master_project = (row.get("master_project_en") or "").strip() or None
+            area_display = (row.get("area_name_en") or "").strip() or None
 
             sub_type_normalized = normalize_subtype(
                 row.get("ejari_property_sub_type_en")
@@ -230,6 +250,8 @@ def stream_classified_rents(path: Path, progress_every: int):
                 is_bulk=is_bulk,
                 project_number=project_number,
                 project_name=project_name,
+                master_project=master_project,
+                area_display=area_display,
                 sub_type_normalized=sub_type_normalized,
                 end_month=end_month,
             )
@@ -320,6 +342,36 @@ class LaborCampAgg:
         self.count += 1
 
 
+class DerivedBuildingAgg:
+    """One synthetic building entity, keyed (project_name_lower, area_norm).
+    Only fed by rows whose classifier verdict is in IDENTIFIABLE_TYPES."""
+    __slots__ = (
+        "project_name", "master_project", "area_norm", "area_display",
+        "annuals", "first_year", "last_year",
+    )
+
+    def __init__(self, project_name: str, master_project: Optional[str],
+                 area_norm: str, area_display: Optional[str]) -> None:
+        self.project_name = project_name
+        self.master_project = master_project
+        self.area_norm = area_norm
+        self.area_display = area_display
+        self.annuals: list[float] = []
+        self.first_year = 9999
+        self.last_year = 0
+
+    def add(self, annual: float, year: int) -> None:
+        self.annuals.append(annual)
+        if year < self.first_year:
+            self.first_year = year
+        if year > self.last_year:
+            self.last_year = year
+
+    @property
+    def count(self) -> int:
+        return len(self.annuals)
+
+
 class ExpiryAgg:
     __slots__ = ("annuals", "renew_count", "new_count")
 
@@ -361,6 +413,12 @@ def aggregate(path: Path, progress_every: int):
     expiry_aggs: dict[
         tuple[str, Optional[str], str, str], ExpiryAgg
     ] = collections.defaultdict(ExpiryAgg)
+    # Derived buildings: key = (lower(project_name), area_norm). Only fed by
+    # rows whose classifier verdict is real_building or sub_project so the
+    # synthetic dim doesn't double-count area / developer / master-project
+    # labels that masquerade as building names.
+    derived_aggs: dict[tuple[str, str], DerivedBuildingAgg] = {}
+    derived_skipped: collections.Counter = collections.Counter()
 
     for r in stream_classified_rents(path, progress_every):
         # ---- Residential apartment/villa/hotel_apt ----
@@ -380,6 +438,31 @@ def aggregate(path: Path, progress_every: int):
                 if pkey not in bldg_meta:
                     bldg_meta[pkey] = (r.project_number, r.project_name, r.area_norm)
 
+            # ---- Derived buildings ----
+            # Classify project_name once per row. Only feed rows whose name
+            # classifier flags as a real building / sub-project — keeps area
+            # names, developer names, master-project labels out of the
+            # synthetic dim. Person-only so the derived avg_rent matches the
+            # rent_history headline (not skewed by Authority leases).
+            if r.is_person and r.project_name:
+                _bn_clean, bn_type = classify_building_name(
+                    r.project_name, r.master_project, r.area_display
+                )
+                if bn_type in IDENTIFIABLE_TYPES:
+                    dkey = (r.project_name.strip().lower(), r.area_norm)
+                    agg = derived_aggs.get(dkey)
+                    if agg is None:
+                        agg = DerivedBuildingAgg(
+                            project_name=r.project_name.strip(),
+                            master_project=r.master_project,
+                            area_norm=r.area_norm,
+                            area_display=r.area_display,
+                        )
+                        derived_aggs[dkey] = agg
+                    agg.add(r.annual, r.year)
+                else:
+                    derived_skipped[bn_type] += 1
+
             # Lease expiry: Person residential only, end_month in the future.
             if r.is_person and r.end_month and r.end_month >= SNAPSHOT_MONTH:
                 expiry_aggs[
@@ -398,6 +481,13 @@ def aggregate(path: Path, progress_every: int):
             continue
         # whole_building / other → counted only (in cat_counter); not stored.
 
+    if derived_skipped:
+        print(
+            "  derived buildings — rows skipped by classifier: "
+            + ", ".join(f"{k}={v:,}" for k, v in derived_skipped.most_common()),
+            flush=True,
+        )
+
     return {
         "area": area_aggs,
         "building": bldg_aggs,
@@ -405,6 +495,7 @@ def aggregate(path: Path, progress_every: int):
         "labor": labor_aggs,
         "comm": comm_aggs,
         "expiry": expiry_aggs,
+        "derived": derived_aggs,
     }
 
 
@@ -507,6 +598,31 @@ def build_commercial_rows(
     return rows
 
 
+def build_derived_building_rows(
+    aggs: dict[tuple[str, str], DerivedBuildingAgg],
+) -> list[dict]:
+    """Convert the per-(project_name, area) accumulator into rows ready for
+    dld_buildings_derived. Only emit entities with at least one Person
+    residential contract — the agg already enforces this by construction."""
+    rows: list[dict] = []
+    for (pname_lower, area_norm), a in aggs.items():
+        if a.count == 0:
+            continue
+        rows.append({
+            "project_name_en": a.project_name,
+            "project_name_slug": _slug(a.project_name) or "unknown",
+            "master_project_en": a.master_project,
+            "area_name_norm": a.area_norm,
+            "area_name_en": a.area_display,
+            "contract_count": a.count,
+            "avg_annual_rent": round(statistics.fmean(a.annuals), 2),
+            "first_seen_year": a.first_year,
+            "last_seen_year": a.last_year,
+            "_lookup_key": (pname_lower, area_norm),
+        })
+    return rows
+
+
 def build_expiry_rows(
     aggs: dict[tuple[str, Optional[str], str, str], ExpiryAgg],
 ) -> list[dict]:
@@ -556,6 +672,7 @@ YIELD_CAP_PCT = 20.0
 def write_rent_history_and_derive_yields(
     rent_rows: list[dict],
     building_rows: list[dict],
+    derived_rows: list[dict],
     labor_rows: list[dict],
     commercial_rows: list[dict],
     expiry_rows: list[dict],
@@ -575,12 +692,11 @@ def write_rent_history_and_derive_yields(
             area_ids = {n: i for n, i in cur.fetchall()}
             print(f"  {len(area_ids):,} known dld_areas", flush=True)
 
-            # Building lookup: match by (LOWER(TRIM(project_name)), area_id)
-            # against buildings the name classifier flagged is_identifiable —
-            # i.e. real_building / sub_project types only. The other types
-            # (area_name / developer_name / master_project / no_name) don't
-            # represent specific towers, so attributing rent history to them
-            # would be misleading.
+            # Official-building lookup (kept for back-compat): match by
+            # (LOWER(TRIM(project_name)), area_id) against is_identifiable
+            # rows in dld_buildings. Capped at 47 distinct keys in the
+            # published buildings CSV — see the dld_buildings_derived
+            # alternative below for the synthetic dim built from rents.
             cur.execute(
                 "SELECT id, project_name, dld_area_id "
                 "FROM dld_buildings "
@@ -589,12 +705,53 @@ def write_rent_history_and_derive_yields(
             by_pname_area: dict[tuple[str, str], str] = {}
             for bid, pname, daid in cur.fetchall():
                 if pname and daid:
-                    # Last-write-wins is fine — every winner is interchangeable
-                    # for purposes of "which building row owns this rent history".
                     by_pname_area[(pname.strip().lower(), str(daid))] = bid
             print(
-                f"  building lookup (identifiable only): {len(by_pname_area):,} "
+                f"  official building lookup (identifiable only): {len(by_pname_area):,} "
                 f"by (project_name, area)",
+                flush=True,
+            )
+
+            # 1a) Idempotent rebuild of dld_buildings_derived from rents.
+            # The lookup dict returned here is the canonical source of
+            # building UUIDs for new dld_building_rent_history rows.
+            cur.execute("DELETE FROM dld_buildings_derived")
+            derived_inserts = []
+            derived_lookup: dict[tuple[str, str], str] = {}
+            for r in derived_rows:
+                area_id = area_ids.get(r["area_name_norm"])
+                derived_id = str(uuid.uuid4())
+                pname_lower, area_norm = r["_lookup_key"]
+                derived_lookup[(pname_lower, area_norm)] = derived_id
+                derived_inserts.append((
+                    derived_id,
+                    r["project_name_en"],
+                    r["project_name_slug"],
+                    r["master_project_en"],
+                    area_id,
+                    r["area_name_en"],
+                    r["contract_count"],
+                    r["avg_annual_rent"],
+                    r["first_seen_year"],
+                    r["last_seen_year"],
+                    "ejari_derived",
+                ))
+            if derived_inserts:
+                psycopg2.extras.execute_values(
+                    cur,
+                    """
+                    INSERT INTO dld_buildings_derived (
+                        id, project_name_en, project_name_slug, master_project_en,
+                        dld_area_id, area_name_en, contract_count, avg_annual_rent,
+                        first_seen_year, last_seen_year, data_source
+                    ) VALUES %s
+                    """,
+                    derived_inserts,
+                    page_size=2000,
+                )
+            print(
+                f"  inserted {len(derived_inserts):,} derived buildings "
+                f"(synthetic dim from rent stream)",
                 flush=True,
             )
 
@@ -634,24 +791,35 @@ def write_rent_history_and_derive_yields(
             )
             print(f"  inserted {len(rh_rows):,} rent-history rows", flush=True)
 
-            # 1b) Idempotent rebuild of building_rent_history
+            # 1b) Idempotent rebuild of building_rent_history. Each row gets
+            # two FK candidates: dld_building_id (legacy 47-row table) and
+            # dld_buildings_derived_id (synthetic dim). The derived link is
+            # the one frontends should join on going forward.
             cur.execute("DELETE FROM dld_building_rent_history")
             brh_rows = []
-            matched = 0
+            matched_official = 0
+            matched_derived = 0
             unmatched = 0
             for r in building_rows:
                 area_id = area_ids.get(r["area_name_norm"])
+                pname_lower = (r["project_name"] or "").strip().lower() or None
                 bid = None
-                if r["project_name"] and area_id is not None:
-                    key = (r["project_name"].strip().lower(), str(area_id))
-                    bid = by_pname_area.get(key)
+                if pname_lower and area_id is not None:
+                    bid = by_pname_area.get((pname_lower, str(area_id)))
                 if bid:
-                    matched += 1
-                else:
+                    matched_official += 1
+                # Derived lookup uses (project_name_lower, area_name_norm).
+                d_id = None
+                if pname_lower:
+                    d_id = derived_lookup.get((pname_lower, r["area_name_norm"]))
+                if d_id:
+                    matched_derived += 1
+                if not bid and not d_id:
                     unmatched += 1
                 brh_rows.append((
                     str(uuid.uuid4()),
                     bid,
+                    d_id,
                     area_id,
                     r["project_number"],
                     r["project_name"],
@@ -671,7 +839,7 @@ def write_rent_history_and_derive_yields(
                 cur,
                 """
                 INSERT INTO dld_building_rent_history (
-                    id, dld_building_id, dld_area_id,
+                    id, dld_building_id, dld_buildings_derived_id, dld_area_id,
                     project_number, project_name, area_name_norm, year,
                     avg_annual_rent, median_annual_rent,
                     avg_rent_per_sqft, median_rent_per_sqft,
@@ -684,8 +852,8 @@ def write_rent_history_and_derive_yields(
             )
             print(
                 f"  inserted {len(brh_rows):,} building rent-history rows · "
-                f"matched: {matched:,} by (project_name, area), "
-                f"{unmatched:,} unmatched (kept for area-level analysis)",
+                f"matched: official={matched_official:,}, "
+                f"derived={matched_derived:,}, unmatched={unmatched:,}",
                 flush=True,
             )
 
@@ -853,6 +1021,7 @@ def write_rent_history_and_derive_yields(
             "rent_rows": len(rh_rows),
             "yield_rows": yield_rows_total,
             "building_rows": len(brh_rows),
+            "derived_buildings": len(derived_inserts),
             "labor_rows": len(lc_rows),
             "commercial_rows": len(cm_rows),
             "expiry_rows": len(le_rows),
@@ -929,24 +1098,27 @@ def main() -> int:
     bundle = aggregate(path, progress_every=args.progress_every)
     rows = build_rent_rows(bundle["area"])
     bldg_rows = build_building_rent_rows(bundle["building"], bundle["bldg_meta"])
+    derived_rows = build_derived_building_rows(bundle["derived"])
     labor_rows = build_labor_camp_rows(bundle["labor"])
     commercial_rows = build_commercial_rows(bundle["comm"])
     expiry_rows = build_expiry_rows(bundle["expiry"])
 
     print(f"\nDistinct (area, year) residential rent groups: {len(rows):,}", flush=True)
     print(f"Distinct (building, year) residential rent groups: {len(bldg_rows):,}", flush=True)
+    print(f"Synthetic buildings derived from rents: {len(derived_rows):,}", flush=True)
     print(f"Distinct (area, year) labor-camp groups: {len(labor_rows):,}", flush=True)
     print(f"Distinct (area, category, year) commercial groups: {len(commercial_rows):,}", flush=True)
     print(f"Distinct (area, project, sub_type, expiry_month) expiry groups: {len(expiry_rows):,}", flush=True)
 
     if args.to_db:
         summary = write_rent_history_and_derive_yields(
-            rows, bldg_rows, labor_rows, commercial_rows, expiry_rows
+            rows, bldg_rows, derived_rows, labor_rows, commercial_rows, expiry_rows
         )
         print(
             f"\nSummary: {summary['rent_rows']:,} rent rows, "
             f"{summary['yield_rows']:,} yield rows, "
             f"{summary['building_rows']:,} building-rent rows, "
+            f"{summary['derived_buildings']:,} derived buildings, "
             f"{summary['labor_rows']:,} labor-camp rows, "
             f"{summary['commercial_rows']:,} commercial rows, "
             f"{summary['expiry_rows']:,} expiry rows, "

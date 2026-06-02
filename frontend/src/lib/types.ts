@@ -822,6 +822,10 @@ export interface DldBuildingItem {
     | null;
   display_name?: string | null;
   is_identifiable?: boolean;
+  // Provenance — 'dld_official' (the 47-row published buildings CSV) or
+  // 'ejari_derived' (synthetic per-tower entity extracted from the rent
+  // stream itself). Defaults to 'dld_official' on legacy responses.
+  data_source?: 'dld_official' | 'ejari_derived';
 }
 
 export interface DldBuildingsResponse extends DldAttribution {

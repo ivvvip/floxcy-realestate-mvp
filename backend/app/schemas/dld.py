@@ -273,6 +273,10 @@ class DldBuildingItem(BaseModel):
     building_name_type: Optional[str] = None
     display_name: Optional[str] = None
     is_identifiable: bool = False
+    # Provenance — 'dld_official' for rows from the published buildings CSV,
+    # 'ejari_derived' for synthetic per-(project, area) entities built from
+    # the rent stream. Frontend renders different badges per source.
+    data_source: Literal["dld_official", "ejari_derived"] = "dld_official"
     # When project_name equals master_project the row is a community-wide
     # aggregate rather than a single tower. We surface a count of how many
     # records share the same (master_project, area) for the "5 towers in

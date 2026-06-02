@@ -23,6 +23,7 @@ from app.models.dld import (
     DldAreaAppreciation,
     DldAreaMetrics,
     DldBuilding,
+    DldBuildingDerived,
     DldBuildingRentHistory,
     DldCanonicalArea,
     DldLeaseExpiryForecast,
@@ -3413,3 +3414,134 @@ async def building_lease_expiry(
         total_expiring=sum(m.contract_count for m in months),
         total_estimated_available=sum(m.estimated_available for m in months),
     )
+
+
+# ---------------------------------------------------------------------------
+# Derived buildings (synthetic dim built from the rent stream itself)
+# ---------------------------------------------------------------------------
+
+def _build_derived_building_item(
+    d: DldBuildingDerived,
+    area_name_display: Optional[str],
+) -> DldBuildingItem:
+    """Adapt the dld_buildings_derived row to DldBuildingItem so the
+    frontend can render it through the same card component as the official
+    rows. Physical-attribute fields stay None — the derived dim only has
+    rent-stream signal."""
+    avg = float(d.avg_annual_rent) if d.avg_annual_rent is not None else None
+    return DldBuildingItem(
+        id=d.id,
+        project_name=d.project_name_en,
+        master_project=d.master_project_en,
+        area_name=area_name_display or d.area_name_en,
+        prop_sub_type=None,
+        flats=None,
+        floors=None,
+        avg_annual_rent=avg,
+        avg_rent_per_sqft=None,
+        active_rent_count=int(d.contract_count or 0),
+        occupancy_proxy_pct=None,
+        is_freehold=None,
+        is_offplan=None,
+        creation_date=None,
+        total_annual_income=(avg * int(d.contract_count or 0)) if avg is not None else None,
+        income_range_label=_income_range_label(
+            (avg * int(d.contract_count or 0)) if avg is not None else None
+        ),
+        confidence=confidence_for(int(d.contract_count or 0)),
+        building_type="tower",
+        building_type_label="Ejari-derived building",
+        building_type_emoji="🏢",
+        is_community_aggregate=False,
+        siblings_in_master_project=None,
+        age_years=None,
+        rent_psf_vs_area_delta=None,
+        rent_psf_vs_area_pct=None,
+        area_median_rent_psf=None,
+        demand_signal=_demand_signal(int(d.contract_count or 0)),
+        building_name_clean=d.project_name_en,
+        building_name_type="real_building",
+        display_name=d.project_name_en,
+        is_identifiable=True,
+        data_source="ejari_derived",
+    )
+
+
+@router.get("/buildings-derived", response_model=DldBuildingsResponse)
+async def list_buildings_derived(
+    db: AsyncSession = Depends(get_db),
+    area: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+):
+    """List Ejari-derived buildings — the synthetic dim built from
+    rents_2021_2026.csv. Use this in addition to /dld/buildings to surface
+    real per-tower entities (SIRAJ TOWER, ORBIT RESIDENCES, etc) that the
+    47-row official dld_buildings table doesn't carry.
+    """
+    base = (
+        select(DldBuildingDerived, DldArea.name_display)
+        .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
+    )
+    if area:
+        norm_area = area.strip().lower()
+        base = base.where(
+            func.lower(DldArea.name_norm) == norm_area
+        )
+    total = (
+        await db.scalar(
+            select(func.count()).select_from(DldBuildingDerived)
+            .where(*([func.lower(DldArea.name_norm) == area.strip().lower()] if area else []))
+        )
+        if not area else
+        await db.scalar(
+            select(func.count(DldBuildingDerived.id))
+            .join(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
+            .where(func.lower(DldArea.name_norm) == area.strip().lower())
+        )
+    )
+    rows = (
+        await db.execute(
+            base.order_by(DldBuildingDerived.contract_count.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).all()
+    items = [_build_derived_building_item(d, name) for d, name in rows]
+    return DldBuildingsResponse(
+        count=len(items), total_available=int(total or 0), items=items
+    )
+
+
+@router.get("/buildings-derived/{building_id}", response_model=DldBuildingDetailResponse)
+async def get_building_derived(
+    building_id: UUID, db: AsyncSession = Depends(get_db),
+):
+    row = (
+        await db.execute(
+            select(DldBuildingDerived, DldArea.name_display)
+            .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
+            .where(DldBuildingDerived.id == building_id)
+        )
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Derived building not found")
+    d, area_name = row
+    area_ctx = await _load_area_context(db, d.dld_area_id) if d.dld_area_id else None
+    base = _build_derived_building_item(d, area_name)
+    base_dict = base.model_dump()
+    for k in ("is_offplan",):
+        base_dict.pop(k, None)
+    detail = DldBuildingDetail(
+        **base_dict,
+        swimming_pools=None,
+        car_parks=None,
+        elevators=None,
+        bld_levels=None,
+        is_offplan=None,
+        implied_yield_pct=None,
+        estimated_unit_size_sqft=None,
+        estimated_unit_price=None,
+        area_context=area_ctx,
+    )
+    return DldBuildingDetailResponse(building=detail)

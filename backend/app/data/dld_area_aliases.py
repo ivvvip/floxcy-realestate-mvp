@@ -74,6 +74,13 @@ COMMUNITY_TO_ADMIN_SECTORS: dict[str, list[str]] = {
     "jumeirah village triangle": ["al barshaa south third"],
     "jvt": ["al barshaa south third"],
 
+    # Arjan — overlaps with JVT in Al Barshaa South Third (confirmed via the
+    # SIRAJ TOWER sample: filed there with master_project = Arjan). Both
+    # communities legitimately share the admin sector, so attributing
+    # 3,506 contracts to each isn't double-counting — they both physically
+    # encompass the same buildings.
+    "arjan": ["al barshaa south third"],
+
     # MBR City — Sobha Hartland, District One, Meydan
     "mbr city": ["hadaeq sheikh mohammed bin rashid"],
     "mohammed bin rashid city": ["hadaeq sheikh mohammed bin rashid"],

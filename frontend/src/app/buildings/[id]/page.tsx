@@ -20,6 +20,7 @@ import {
   ApiError,
   getDldBuilding,
   getDldBuildingComparable,
+  getDldBuildingDerived,
   getDldBuildingLeaseExpiry,
   getDldBuildingRentHistory,
 } from '@/lib/api';
@@ -33,13 +34,29 @@ interface PageProps {
   params: { id: string };
 }
 
+// IDs from /dld/buildings (official, 47-row CSV) and /dld/buildings-derived
+// (synthetic dim from rent stream) are both UUIDs — same URL space. The
+// route handler tries the official endpoint first and falls back to the
+// derived endpoint on 404, so a /buildings/<uuid> URL works regardless of
+// source.
+async function fetchBuildingDetail(id: string) {
+  try {
+    return await getDldBuilding(id);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      return await getDldBuildingDerived(id);
+    }
+    throw e;
+  }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
-    const res = await getDldBuilding(params.id);
+    const res = await fetchBuildingDetail(params.id);
     const b = res.building;
     return {
-      title: `${b.project_name ?? 'Building'} — X-Ray`,
-      description: `Per-building rent intelligence for ${b.project_name ?? 'this building'} (${b.area_name ?? 'Dubai'}). Total annual income, occupancy proxy, implied yield. Source: DLD Ejari.`,
+      title: `${b.display_name ?? b.project_name ?? 'Building'} — X-Ray`,
+      description: `Per-building rent intelligence for ${b.display_name ?? b.project_name ?? 'this building'} (${b.area_name ?? 'Dubai'}). Total annual income, occupancy proxy, implied yield. Source: DLD Ejari.`,
     };
   } catch {
     return { title: 'Building X-Ray' };
@@ -50,7 +67,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
   let detailRes;
   let comparable = null;
   try {
-    detailRes = await getDldBuilding(params.id);
+    detailRes = await fetchBuildingDetail(params.id);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;

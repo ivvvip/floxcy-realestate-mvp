@@ -876,6 +876,31 @@ export async function getDldBuilding(id: string): Promise<DldBuildingDetailRespo
   );
 }
 
+export async function getDldBuildingsDerived(opts?: {
+  area?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<DldBuildingsResponse> {
+  const params = new URLSearchParams();
+  if (opts?.area) params.set('area', opts.area);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.page_size) params.set('page_size', String(opts.page_size));
+  const q = params.toString();
+  return request<DldBuildingsResponse>(
+    `/api/v1/dld/buildings-derived${q ? `?${q}` : ''}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function getDldBuildingDerived(
+  id: string
+): Promise<DldBuildingDetailResponse> {
+  return request<DldBuildingDetailResponse>(
+    `/api/v1/dld/buildings-derived/${encodeURIComponent(id)}`,
+    { revalidate: 600 }
+  );
+}
+
 export async function getDldBuildingComparable(
   id: string,
   k = 5

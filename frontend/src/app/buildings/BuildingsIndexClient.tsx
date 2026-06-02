@@ -324,6 +324,22 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
             {b.is_identifiable === false && (
               <span className="ml-1 text-fg-subtle">· area-level</span>
             )}
+            {b.data_source === 'ejari_derived' && (
+              <span
+                className="ml-1 rounded bg-accent/15 px-1 text-accent"
+                title="Built from the Ejari rent registry, not the DLD buildings CSV"
+              >
+                · Ejari ✅
+              </span>
+            )}
+            {b.data_source === 'dld_official' && (
+              <span
+                className="ml-1 rounded bg-positive/15 px-1 text-positive"
+                title="Registered in the official DLD buildings dataset"
+              >
+                · DLD ✅
+              </span>
+            )}
           </div>
         </div>
         {b.is_freehold === true && (

@@ -258,18 +258,56 @@ class DldRentHistory(Base):
     )
 
 
+class DldBuildingDerived(Base):
+    """Synthetic per-(project_name_en, area) building entity extracted from
+    the Ejari rent registry. Necessary because dld_buildings (the official
+    DLD-published table) only carries 47 distinct identities — the rent
+    stream itself has thousands of real per-tower project_name_en values
+    (e.g. "SIRAJ TOWER", "ORBIT RESIDENCES BY JEWEL 2"). data_source is
+    always 'ejari_derived' so frontends can badge the row correctly.
+    """
+    __tablename__ = "dld_buildings_derived"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    project_name_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_name_slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    master_project_en: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_en: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contract_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    avg_annual_rent: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    data_source: Mapped[str] = mapped_column(String(32), nullable=False, default="ejari_derived")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_name_en", "dld_area_id",
+            name="uq_dld_buildings_derived_name_area",
+        ),
+    )
+
+
 class DldBuildingRentHistory(Base):
     """Per-(building, year) Ejari rent aggregates from 2021–2026 export.
 
-    Matched to dld_buildings via project_number when present, falling back to
-    (project_name, area_name_norm). Populated by etl_dld_rent_history.py
-    alongside the area-level rent history.
+    Matched to dld_buildings_derived via (project_name, area_id) — the
+    synthetic dim built from the rent stream itself. dld_building_id is
+    kept for back-compat with the 47-row dld_buildings table but is
+    largely empty on new rows.
     """
     __tablename__ = "dld_building_rent_history"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     dld_building_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("dld_buildings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    dld_buildings_derived_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_buildings_derived.id", ondelete="SET NULL"),
+        nullable=True, index=True,
     )
     dld_area_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
