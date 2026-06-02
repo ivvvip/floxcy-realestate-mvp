@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { ArrowRight, Users, ShieldCheck } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getCanonicalAreas, getTopCompanies } from '@/lib/api';
+import {
+  getDldStats, getCanonicalAreas, getTopCompanies, getBrokerNationalityStats,
+} from '@/lib/api';
 import { BrokersDirectoryClient } from './BrokersDirectoryClient';
+import { BrokerCommunityCard } from './BrokerCommunityCard';
 
 export const metadata: Metadata = {
   title: 'RERA Broker Directory — DLD-verified Dubai brokers',
@@ -18,10 +21,11 @@ export default async function BrokersDirectoryPage() {
   // Canonical areas as single source of truth (min_occurrences=5 hides
   // ~26 noise areas). The wizard's "preferred area" picker is optional, so
   // we drop the rent_count weighting and just show every viable area.
-  const [stats, canon, top] = await Promise.all([
+  const [stats, canon, top, nationality] = await Promise.all([
     getDldStats().catch(() => null),
     getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
     getTopCompanies(10).catch(() => null),
+    getBrokerNationalityStats().catch(() => null),
   ]);
 
   const areaOptions = (canon?.items ?? [])
@@ -97,7 +101,8 @@ export default async function BrokersDirectoryPage() {
       )}
 
       <Container>
-        <div className="py-4 sm:py-6">
+        <div className="py-4 sm:py-6 space-y-6">
+          {nationality && <BrokerCommunityCard stats={nationality} />}
           <BrokersDirectoryClient
             areaOptions={areaOptions}
             topCompanies={top?.items ?? []}

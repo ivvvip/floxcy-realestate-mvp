@@ -807,12 +807,30 @@ export interface DldBrokerItem {
   phone: string | null;
   webpage: string | null;
   real_estate_name: string | null;
+  // Estimated nationality from name patterns. NEVER verified — DLD does
+  // not publish broker nationality. UI must label results "Estimated".
+  detected_nationality: string | null;
+  detected_language: string | null;
+  nationality_flag: string | null;
 }
 
 export interface DldBrokersResponse extends DldAttribution {
   count: number;
   total_available: number;
   items: DldBrokerItem[];
+}
+
+export interface BrokerNationalityBucket {
+  nationality: string;
+  flag: string;
+  count: number;
+  language: string;
+}
+
+export interface BrokerNationalityStats extends DldAttribution {
+  total: number;
+  estimated_disclaimer: string;
+  buckets: BrokerNationalityBucket[];
 }
 
 export type SizeCategory = 'studio' | '1br' | '2br' | '3br' | '4br';
@@ -865,6 +883,7 @@ export type LangPref =
   | 'russian'
   | 'chinese'
   | 'hindi'
+  | 'filipino'
   | 'other';
 
 export interface BrokerMatchRequest {
@@ -885,6 +904,8 @@ export interface BrokerMatchItem {
   license_end_date: string | null;
   is_active: boolean;
   detected_language: string;
+  detected_nationality: string | null;
+  nationality_flag: string | null;
   company_size_active_brokers: number;
   license_status: 'active' | 'expiring_soon' | 'expired';
   days_until_expiry: number | null;

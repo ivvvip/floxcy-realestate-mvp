@@ -60,6 +60,7 @@ export function BrokersDirectoryClient({
   const [firm, setFirm] = useState('');
   const [active, setActive] = useState<'active' | 'expiring' | 'all'>('active');
   const [gender, setGender] = useState<'all' | 'male' | 'female'>('all');
+  const [nationality, setNationality] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'firm'>('name');
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<DldBrokerItem[]>([]);
@@ -84,6 +85,7 @@ export function BrokersDirectoryClient({
           firm: firm.trim() || undefined,
           active: active === 'all' ? undefined : true,
           gender: gender === 'all' ? undefined : gender,
+          nationality: nationality === 'all' ? undefined : nationality,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
         });
@@ -97,11 +99,11 @@ export function BrokersDirectoryClient({
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [q, firm, active, gender, page]);
+  }, [q, firm, active, gender, nationality, page]);
 
   useEffect(() => {
     setPage(0);
-  }, [q, firm, active, gender, sortBy]);
+  }, [q, firm, active, gender, nationality, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -143,6 +145,8 @@ export function BrokersDirectoryClient({
         setActive={setActive}
         gender={gender}
         setGender={setGender}
+        nationality={nationality}
+        setNationality={setNationality}
         sortBy={sortBy}
         setSortBy={setSortBy}
       />
@@ -184,6 +188,7 @@ const LANGS: { key: LangPref; label: string; flag: string }[] = [
   { key: 'russian', label: 'Russian', flag: '🇷🇺' },
   { key: 'chinese', label: 'Chinese', flag: '🇨🇳' },
   { key: 'hindi', label: 'Hindi/Urdu', flag: '🇮🇳' },
+  { key: 'filipino', label: 'Tagalog', flag: '🇵🇭' },
   { key: 'other', label: 'Other', flag: '🌐' },
 ];
 
@@ -595,8 +600,16 @@ function BrokerCard({
     <div className="card p-4 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-fg truncate">
-            {broker.full_name}
+          <div className="text-sm font-semibold text-fg truncate flex items-center gap-1.5">
+            {broker.nationality_flag && (
+              <span
+                title={`Estimated ${broker.detected_nationality ?? 'nationality'} — from name pattern, not DLD-verified`}
+                className="text-base leading-none shrink-0"
+              >
+                {broker.nationality_flag}
+              </span>
+            )}
+            <span className="truncate">{broker.full_name}</span>
           </div>
           {broker.real_estate_name && (
             <div className="mt-0.5 text-[11px] text-fg-muted truncate">
@@ -608,6 +621,16 @@ function BrokerCard({
         </div>
         {licenseBadge(broker.license_status, broker.days_until_expiry)}
       </div>
+      {broker.detected_nationality && broker.detected_nationality !== 'Other' && (
+        <div className="mt-1.5">
+          <span
+            className="text-[10px] inline-flex items-center gap-1 rounded-full border border-border bg-bg-elev/40 px-2 py-0.5 text-fg-muted"
+            title="Estimated from broker name — DLD does not publish broker nationality"
+          >
+            {broker.nationality_flag} Estimated {broker.detected_nationality} broker
+          </span>
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-subtle">
         {broker.gender && (
           <span className="inline-flex items-center gap-1">
@@ -674,8 +697,16 @@ function SimpleBrokerCard({
     <div className="card p-4 flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-fg truncate">
-            {broker.full_name}
+          <div className="text-sm font-semibold text-fg truncate flex items-center gap-1.5">
+            {broker.nationality_flag && (
+              <span
+                title={`Estimated ${broker.detected_nationality ?? 'nationality'} — from name, not DLD-verified`}
+                className="text-base leading-none shrink-0"
+              >
+                {broker.nationality_flag}
+              </span>
+            )}
+            <span className="truncate">{broker.full_name}</span>
           </div>
           {broker.real_estate_name && (
             <div className="mt-0.5 text-[11px] text-fg-muted truncate">
@@ -685,9 +716,25 @@ function SimpleBrokerCard({
         </div>
         {licenseBadge(status.s, status.d)}
       </div>
+      {broker.detected_nationality && broker.detected_nationality !== 'Other' && (
+        <div className="mt-1.5">
+          <span
+            className="text-[10px] inline-flex items-center gap-1 rounded-full border border-border bg-bg-elev/40 px-2 py-0.5 text-fg-muted"
+            title="Estimated from broker name — DLD does not publish broker nationality"
+          >
+            {broker.nationality_flag} Estimated {broker.detected_nationality} broker
+          </span>
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-subtle">
         {broker.gender && <span>👤 {broker.gender}</span>}
         {start && <span>Since {start}</span>}
+        {broker.detected_language && (
+          <span className="inline-flex items-center gap-1">
+            <Languages className="h-3 w-3" strokeWidth={2.5} />
+            {broker.detected_language}
+          </span>
+        )}
         {broker.phone && (
           <span className="inline-flex items-center gap-1">
             <Phone className="h-3 w-3" strokeWidth={2.5} />
@@ -802,6 +849,8 @@ function BrowseFilters({
   setActive,
   gender,
   setGender,
+  nationality,
+  setNationality,
   sortBy,
   setSortBy,
 }: {
@@ -813,6 +862,8 @@ function BrowseFilters({
   setActive: (v: 'active' | 'expiring' | 'all') => void;
   gender: 'all' | 'male' | 'female';
   setGender: (v: 'all' | 'male' | 'female') => void;
+  nationality: string;
+  setNationality: (v: string) => void;
   sortBy: 'name' | 'firm';
   setSortBy: (v: 'name' | 'firm') => void;
 }) {
@@ -830,7 +881,7 @@ function BrowseFilters({
         </button>
       </div>
 
-      <div className={cn('mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4', !open && 'hidden sm:grid')}>
+      <div className={cn('mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5', !open && 'hidden sm:grid')}>
         <div>
           <label
             htmlFor="filter_q"
@@ -882,6 +933,32 @@ function BrowseFilters({
           >
             <option value="active">Active</option>
             <option value="all">All (incl. expired)</option>
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor="filter_nationality"
+            className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
+            title="Estimated from broker name — DLD does not publish nationality"
+          >
+            Nationality (est.)
+          </label>
+          <select
+            id="filter_nationality"
+            value={nationality}
+            onChange={(e) => setNationality(e.target.value)}
+            className="input-field mt-1 min-h-[40px]"
+          >
+            <option value="all">All</option>
+            <option value="Emirati">🇦🇪 Emirati</option>
+            <option value="Arab">🌍 Arab</option>
+            <option value="Indian">🇮🇳 Indian</option>
+            <option value="Pakistani">🇵🇰 Pakistani</option>
+            <option value="Russian">🇷🇺 Russian</option>
+            <option value="British">🇬🇧 British</option>
+            <option value="Filipino">🇵🇭 Filipino</option>
+            <option value="Chinese">🇨🇳 Chinese</option>
+            <option value="Egyptian">🇪🇬 Egyptian</option>
           </select>
         </div>
         <div>

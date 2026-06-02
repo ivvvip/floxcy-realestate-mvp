@@ -62,6 +62,7 @@ import type {
   DldBuildingDetailResponse,
   DldBuildingsComparableResponse,
   DldAreaTopBuildingsResponse,
+  BrokerNationalityStats,
   DldBrokersResponse,
   DldBrokerItem,
   RentCheckRequest,
@@ -871,6 +872,7 @@ export async function getDldBrokers(opts?: {
   firm?: string;
   active?: boolean;
   gender?: 'male' | 'female';
+  nationality?: string;
   limit?: number;
   offset?: number;
 }): Promise<DldBrokersResponse> {
@@ -879,12 +881,20 @@ export async function getDldBrokers(opts?: {
   if (opts?.firm) params.set('firm', opts.firm);
   if (opts?.active != null) params.set('active', String(opts.active));
   if (opts?.gender) params.set('gender', opts.gender);
+  if (opts?.nationality) params.set('nationality', opts.nationality);
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.offset) params.set('offset', String(opts.offset));
   const q = params.toString();
   return request<DldBrokersResponse>(`/api/v1/dld/brokers${q ? `?${q}` : ''}`, {
     revalidate: 600,
   });
+}
+
+export async function getBrokerNationalityStats(): Promise<BrokerNationalityStats> {
+  return request<BrokerNationalityStats>(
+    '/api/v1/dld/broker-nationality-stats',
+    { revalidate: 3600 }
+  );
 }
 
 export async function getDldBroker(brokerNumber: string): Promise<DldBrokerItem> {

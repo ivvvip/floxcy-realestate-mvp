@@ -412,7 +412,7 @@ class RentAlertOut(Attribution):
 
 GoalType = Literal["buy", "rent", "sell", "invest"]
 BudgetBand = Literal["under_500k", "500k_1m", "1m_3m", "3m_5m", "5m_plus"]
-LangPref = Literal["arabic", "english", "russian", "chinese", "hindi", "other"]
+LangPref = Literal["arabic", "english", "russian", "chinese", "hindi", "filipino", "other"]
 
 
 class BrokerMatchRequest(BaseModel):
@@ -435,6 +435,10 @@ class BrokerMatchItem(BaseModel):
     license_end_date: Optional[date] = None
     is_active: bool
     detected_language: str
+    # Estimated nationality from name patterns. NEVER verified — DLD does
+    # not publish broker nationality data. UI must label this honestly.
+    detected_nationality: Optional[str] = None
+    nationality_flag: Optional[str] = None
     company_size_active_brokers: int
     license_status: str  # active | expiring_soon | expired
     days_until_expiry: Optional[int] = None
@@ -497,12 +501,33 @@ class DldBrokerItem(BaseModel):
     phone: Optional[str] = None
     webpage: Optional[str] = None
     real_estate_name: Optional[str] = None
+    # Estimated nationality from name patterns — never verified.
+    detected_nationality: Optional[str] = None
+    detected_language: Optional[str] = None
+    nationality_flag: Optional[str] = None
 
 
 class DldBrokersResponse(Attribution):
     count: int
     total_available: int
     items: List[DldBrokerItem]
+
+
+class BrokerNationalityBucket(BaseModel):
+    nationality: str
+    flag: str
+    count: int
+    language: str
+
+
+class BrokerNationalityStats(Attribution):
+    """Distribution of detected nationality across active brokers. Every
+    bucket is an estimate from name patterns — UI must display the
+    disclaimer alongside.
+    """
+    total: int
+    estimated_disclaimer: str
+    buckets: List[BrokerNationalityBucket]
 
 
 # ---------------------------------------------------------------------------

@@ -73,6 +73,8 @@ from app.schemas.dld import (
     BrokerMatchItem,
     BrokerMatchRequest,
     BrokerMatchResponse,
+    BrokerNationalityBucket,
+    BrokerNationalityStats,
     DldAreaDetail,
     DldAreaDetailResponse,
     DldAreaListItem,
@@ -1676,6 +1678,12 @@ async def list_brokers(
     firm: Optional[str] = Query(None, description="search by real_estate_name"),
     active: Optional[bool] = Query(True, description="True = active only, False = expired, None = all"),
     gender: Optional[str] = Query(None, pattern="^(male|female)$"),
+    nationality: Optional[str] = Query(
+        None,
+        description="Filter by estimated nationality (Emirati / Arab / Indian / "
+                    "Pakistani / Russian / British / Filipino / Chinese / Egyptian / Other). "
+                    "Estimated from broker name — never verified.",
+    ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -1689,6 +1697,8 @@ async def list_brokers(
         conds.append(DldReraBroker.is_active.is_(active))
     if gender:
         conds.append(DldReraBroker.gender == gender)
+    if nationality:
+        conds.append(DldReraBroker.detected_nationality == nationality)
     if conds:
         stmt = stmt.where(and_(*conds))
 
@@ -1813,21 +1823,24 @@ async def broker_match(
     req: BrokerMatchRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Wizard input → top 5 brokers ranked by (firm size desc, name asc).
+    """Wizard input → top 5 brokers ranked by language match → license validity
+    → firm size.
 
-    Filters: active license only. Language is detected from each broker's
-    full name (Arabic / Russian / Hindi / Chinese / English heuristics) and
-    used only when the caller specified a language preference.
+    Language matching: when the caller supplies `language`, candidates whose
+    `detected_language` matches sort to the top. Nationality + language are
+    estimated from name patterns and never verified — DLD does not publish
+    broker nationality data.
     """
-    # Pull a generous pool, then filter in Python to apply language detection
-    # without paying a SQL roundtrip per candidate. The firm-size dictionary
-    # is computed once and joined back to each candidate.
+    # Pull a much larger pool when language is set so the filter has enough
+    # candidates to find quality matches. Without language, 2000 was already
+    # enough to find well-staffed firms.
+    pool_size = 4000 if req.language else 2000
     pool = (
         await db.execute(
             select(DldReraBroker)
             .where(DldReraBroker.is_active.is_(True))
             .order_by(DldReraBroker.real_estate_name)
-            .limit(2000)
+            .limit(pool_size)
         )
     ).scalars().all()
 
@@ -1849,21 +1862,31 @@ async def broker_match(
 
     candidates = []
     for b in pool:
-        lang = _detect_language(b.full_name)
-        if req.language and lang != req.language:
-            continue
+        # Prefer the stored detected_language (computed at ETL time against
+        # the full pattern set); fall back to live detection for brokers
+        # whose columns haven't been populated yet.
+        lang_code = _broker_language_code(b)
         status_str, days = _license_status(b.license_end_date)
         if status_str == "expired":
             continue
-        candidates.append((b, lang, status_str, days))
+        candidates.append((b, lang_code, status_str, days))
 
-    # Rank by firm size (desc), then license recency (longer expiry = better)
-    candidates.sort(
-        key=lambda t: (
-            -firm_size.get(t[0].real_estate_name or "", 0),
-            -(t[3] or 0),
+    # Rank: language match first → license recency → firm size desc
+    def sort_key(t: tuple) -> tuple:
+        b, lang_code, _status, days = t
+        lang_match = 0 if (req.language and lang_code == req.language) else 1
+        return (
+            lang_match,
+            -firm_size.get(b.real_estate_name or "", 0),
+            -(days or 0),
         )
-    )
+    candidates.sort(key=sort_key)
+
+    # When language is set, drop candidates that don't match before slicing
+    # so the response is strictly language-filtered (matching the user's
+    # explicit preference).
+    if req.language:
+        candidates = [t for t in candidates if t[1] == req.language]
     top = candidates[:5]
 
     items = [
@@ -1877,14 +1900,88 @@ async def broker_match(
             license_start_date=b.license_start_date,
             license_end_date=b.license_end_date,
             is_active=b.is_active,
-            detected_language=lang,
+            detected_language=lang_code,
+            detected_nationality=b.detected_nationality,
+            nationality_flag=b.nationality_flag,
             company_size_active_brokers=firm_size.get(b.real_estate_name or "", 0),
             license_status=status_str,
             days_until_expiry=days,
         )
-        for (b, lang, status_str, days) in top
+        for (b, lang_code, status_str, days) in top
     ]
     return BrokerMatchResponse(count=len(items), items=items)
+
+
+def _broker_language_code(b: DldReraBroker) -> str:
+    """Resolve a broker's language code, preferring the populated column."""
+    from app.services.broker_nationality import detect_language_code
+    stored = (b.detected_language or "").strip()
+    if stored:
+        return _LANGUAGE_FROM_HUMAN.get(stored, "english")
+    return detect_language_code(b.full_name or "")
+
+
+# Human-readable language → API enum code mapping (mirrors the
+# NATIONALITY_META table in app.services.broker_nationality).
+_LANGUAGE_FROM_HUMAN: dict[str, str] = {
+    "Arabic":     "arabic",
+    "Russian":    "russian",
+    "Mandarin":   "chinese",
+    "Hindi/Urdu": "hindi",
+    "Tagalog":    "filipino",
+    "English":    "english",
+}
+
+
+# ---------------------------------------------------------------------------
+# Broker nationality stats — distribution across active brokers
+# ---------------------------------------------------------------------------
+
+@router.get("/broker-nationality-stats", response_model=BrokerNationalityStats)
+async def brokers_nationality_stats(db: AsyncSession = Depends(get_db)):
+    """Active-broker distribution by estimated nationality.
+
+    Always returns an "estimated_disclaimer" string the client should
+    surface alongside — these counts are heuristic, not DLD-verified.
+    """
+    from app.services.broker_nationality import NATIONALITY_META
+
+    rows = (await db.execute(
+        select(
+            DldReraBroker.detected_nationality,
+            DldReraBroker.nationality_flag,
+            DldReraBroker.detected_language,
+            func.count(),
+        )
+        .where(
+            DldReraBroker.is_active.is_(True),
+            DldReraBroker.detected_nationality.is_not(None),
+        )
+        .group_by(
+            DldReraBroker.detected_nationality,
+            DldReraBroker.nationality_flag,
+            DldReraBroker.detected_language,
+        )
+        .order_by(func.count().desc())
+    )).all()
+    total = sum(int(c) for _n, _f, _l, c in rows)
+    buckets = [
+        BrokerNationalityBucket(
+            nationality=nat or "Other",
+            flag=flag or NATIONALITY_META.get(nat or "Other", ("🌐", ""))[0],
+            language=lang or NATIONALITY_META.get(nat or "Other", ("", "English"))[1],
+            count=int(c),
+        )
+        for nat, flag, lang, c in rows
+    ]
+    return BrokerNationalityStats(
+        total=total,
+        estimated_disclaimer=(
+            "Nationality is estimated from broker names and may not be "
+            "accurate. DLD does not publish broker nationality data."
+        ),
+        buckets=buckets,
+    )
 
 
 # ---------------------------------------------------------------------------

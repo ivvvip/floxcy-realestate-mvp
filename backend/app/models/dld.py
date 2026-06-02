@@ -118,6 +118,14 @@ class DldReraBroker(Base):
     fax: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     real_estate_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     real_estate_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Nationality/language detection from name patterns. Always "estimated";
+    # DLD does not publish broker nationality. Populated by
+    # scripts/populate_broker_nationality.py at deploy time.
+    detected_nationality: Mapped[Optional[str]] = mapped_column(
+        String(32), nullable=True, index=True
+    )
+    detected_language: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    nationality_flag: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
