@@ -456,7 +456,14 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
             if not r.get("_is_person"):
                 continue
             area = norm(r.get("area_name_en"))
-            pst = (r.get("ejari_property_sub_type_en") or "").strip()
+            # prop_sub_type semantics match the OLD pipeline: it's the
+            # property sub-type (Flat / Studio / Villa / Hotel apartments)
+            # — the same value the /dld/rent-check endpoint passes from
+            # the user's UI choice. The NEW historical CSV puts that string
+            # in ejari_property_type_en; ejari_property_sub_type_en holds
+            # bedroom-count granularity ("1 bed rooms+hall") which would
+            # explode the cell count and break rent-check lookups.
+            pst = (r.get("ejari_property_type_en") or "").strip()
             if not area or not pst:
                 continue
             amt = parse_float(r.get("annual_amount"))
