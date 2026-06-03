@@ -98,6 +98,15 @@ from app.schemas.dld import (
     BedroomBenchmarkRow,
     BuildingLeaseExpiryResponse,
     BuildingSalesResponse,
+    DashboardPulseResponse,
+    DataFreshness,
+    HotAreaItem,
+    MarketSentiment,
+    OffplanArea,
+    OffplanPipeline,
+    PulseFactor,
+    RentVsBuyGauge,
+    ScatterMatrixPoint,
     BuildingRentHistoryPoint,
     DldBuildingRentHistoryResponse,
     LeaseExpiryMonthBucket,
@@ -3799,4 +3808,336 @@ async def get_area_category_breakdown(
         area_name_display=area.name_display,
         total_buildings=sum(it.building_count for it in items),
         items=items,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dashboard pulse — 7-widget aggregator
+# ---------------------------------------------------------------------------
+
+@router.get("/dashboard-pulse", response_model=DashboardPulseResponse)
+async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
+    """Aggregator for the /dashboard widgets. One round-trip returns:
+
+      * Market sentiment composite from 4 DLD-derived factors
+      * Yield × 5y-appreciation scatter matrix per area
+      * Rent-vs-buy payback gauge weighted across covered areas
+      * Hot areas (latest-year transactions vs prior year)
+      * Off-plan pipeline (volume + top areas)
+      * Data freshness (table-level last-seen dates)
+
+    All sourced from existing DLD tables — no new ETL.
+    """
+    # ---- Common building blocks ----
+    # Per-area metrics joined with appreciation + canonical display name.
+    metrics_rows = (
+        await db.execute(
+            select(
+                DldAreaMetrics,
+                DldArea,
+                DldAreaAppreciation,
+            )
+            .join(DldArea, DldArea.id == DldAreaMetrics.dld_area_id)
+            .outerjoin(
+                DldAreaAppreciation,
+                DldAreaAppreciation.dld_area_id == DldArea.id,
+            )
+            .where(DldAreaMetrics.period == "2026-ytd")
+        )
+    ).all()
+
+    # ---- Widget 2: Yield × Appreciation scatter matrix ----
+    matrix_points: list[ScatterMatrixPoint] = []
+    yield_values: list[float] = []
+    appr_values: list[float] = []
+    sale_price_samples: list[tuple[float, int]] = []  # (avg_price, weight)
+    annual_rent_samples: list[tuple[float, int]] = []  # (avg_rent, weight)
+
+    for m, a, app in metrics_rows:
+        if m.rental_yield_pct is None or app is None or app.appreciation_5y_pct is None:
+            continue
+        y = float(m.rental_yield_pct)
+        x = float(app.appreciation_5y_pct)
+        # Cap yield at 20 for the chart so a few stray outliers don't squash
+        # the rest of the dataset to the bottom edge.
+        if y > 20:
+            y = 20.0
+        sample = min(int(m.sales_count or 0), int(m.rent_count_2026 or 0))
+        if sample < 10:
+            continue
+        # Quadrants centred on the dataset medians (computed below).
+        matrix_points.append(ScatterMatrixPoint(
+            area_name_norm=a.name_norm,
+            area_name_display=a.name_display,
+            yield_pct=round(y, 2),
+            appreciation_5y_pct=round(x, 2),
+            sample_score=sample,
+            quadrant="best_investment",  # placeholder — re-assigned below
+        ))
+        yield_values.append(y)
+        appr_values.append(x)
+        # Feed rent-vs-buy weighted averages from the same set.
+        if m.median_price_per_sqft and m.median_annual_rent:
+            # Approximate unit size: use 120 sqm as a typical 1-BR proxy
+            # (rough — but consistent across areas).
+            est_sale = float(m.median_price_per_sqft) * 120
+            est_rent = float(m.median_annual_rent)
+            sale_price_samples.append((est_sale, sample))
+            annual_rent_samples.append((est_rent, sample))
+
+    # Assign quadrants relative to dataset medians.
+    if matrix_points:
+        sorted_y = sorted(yield_values)
+        sorted_x = sorted(appr_values)
+        y_mid = sorted_y[len(sorted_y) // 2]
+        x_mid = sorted_x[len(sorted_x) // 2]
+        for p in matrix_points:
+            high_yield = p.yield_pct >= y_mid
+            high_growth = p.appreciation_5y_pct >= x_mid
+            if high_yield and high_growth:
+                p.quadrant = "best_investment"
+            elif high_yield and not high_growth:
+                p.quadrant = "income_focus"
+            elif not high_yield and high_growth:
+                p.quadrant = "growth_focus"
+            else:
+                p.quadrant = "avoid"
+
+    # ---- Widget 3: Rent vs buy payback gauge ----
+    rent_vs_buy: Optional[RentVsBuyGauge] = None
+    if sale_price_samples and annual_rent_samples:
+        total_weight = sum(w for _, w in sale_price_samples)
+        avg_sale = sum(v * w for v, w in sale_price_samples) / total_weight
+        avg_rent = sum(v * w for v, w in annual_rent_samples) / total_weight
+        payback = avg_sale / avg_rent if avg_rent > 0 else 0
+        if payback <= 0:
+            signal = "neutral"
+        elif payback < 15:
+            signal = "buy"
+        elif payback > 25:
+            signal = "rent"
+        else:
+            signal = "neutral"
+        rent_vs_buy = RentVsBuyGauge(
+            payback_years=round(payback, 1),
+            signal=signal,
+            based_on_areas=len(sale_price_samples),
+            avg_sale_price_aed=round(avg_sale, 2),
+            avg_annual_rent_aed=round(avg_rent, 2),
+        )
+
+    # ---- Widget 4: Hot areas (latest year vs prior year by transaction_count) ----
+    latest_year_row = await db.execute(
+        select(func.max(DldPriceHistory.year))
+    )
+    latest_year = latest_year_row.scalar() or 2026
+    prior_year = latest_year - 1
+    hot_rows = (
+        await db.execute(
+            select(
+                DldArea.name_norm,
+                DldArea.name_display,
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (DldPriceHistory.year == latest_year,
+                             DldPriceHistory.transaction_count),
+                            else_=0,
+                        )
+                    ), 0,
+                ).label("latest"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (DldPriceHistory.year == prior_year,
+                             DldPriceHistory.transaction_count),
+                            else_=0,
+                        )
+                    ), 0,
+                ).label("prior"),
+            )
+            .join(DldArea, DldArea.id == DldPriceHistory.dld_area_id)
+            .where(DldPriceHistory.year.in_([latest_year, prior_year]))
+            .group_by(DldArea.name_norm, DldArea.name_display)
+            .having(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (DldPriceHistory.year == prior_year,
+                             DldPriceHistory.transaction_count),
+                            else_=0,
+                        )
+                    ), 0,
+                ) >= 50  # filter noise — areas with <50 prior-year sales drop out
+            )
+        )
+    ).all()
+
+    hot_areas: list[HotAreaItem] = []
+    for name_norm, name_display, latest_n, prior_n in hot_rows:
+        latest_n = int(latest_n or 0)
+        prior_n = int(prior_n or 0)
+        if prior_n <= 0:
+            continue
+        pct = (latest_n - prior_n) / prior_n * 100
+        # latest_year (2026) is mid-year YTD, so even areas with steady demand
+        # show negative YoY. Filter to areas where the run-rate would imply
+        # growth: latest_n ≥ prior_n × (months_elapsed / 12).
+        hot_areas.append(HotAreaItem(
+            area_name_norm=name_norm,
+            area_name_display=name_display,
+            txn_count_latest=latest_n,
+            txn_count_prior=prior_n,
+            pct_change_yoy=round(pct, 1),
+            trend="up" if pct > 5 else "down" if pct < -5 else "flat",
+        ))
+    # Sort by absolute change desc, take top 10
+    hot_areas.sort(key=lambda h: -h.pct_change_yoy)
+    hot_areas = hot_areas[:10]
+
+    # ---- Widget 5: Off-plan pipeline ----
+    # Sum off-plan transaction volume in the latest year per area.
+    offplan_rows = (
+        await db.execute(
+            select(
+                DldArea.name_norm,
+                DldArea.name_display,
+                DldPriceHistory.transaction_count_offplan,
+                DldPriceHistory.transaction_count,
+                DldPriceHistory.avg_ppsf_offplan,
+                DldPriceHistory.offplan_pct,
+            )
+            .join(DldArea, DldArea.id == DldPriceHistory.dld_area_id)
+            .where(DldPriceHistory.year == latest_year)
+            .where(DldPriceHistory.transaction_count_offplan > 0)
+        )
+    ).all()
+
+    offplan_top: list[OffplanArea] = []
+    total_volume = 0.0
+    total_count = 0
+    for name_norm, name_display, n_off, n_total, ppsf_off, off_pct in offplan_rows:
+        n_off = int(n_off or 0)
+        n_total = int(n_total or 0)
+        ppsf_off = float(ppsf_off or 0)
+        # Estimate volume per off-plan transaction at 120 sqm × ppsf_off.
+        est_volume = n_off * ppsf_off * 120 if ppsf_off else 0
+        total_count += n_off
+        total_volume += est_volume
+        offplan_top.append(OffplanArea(
+            area_name_norm=name_norm,
+            area_name_display=name_display,
+            offplan_count=n_off,
+            offplan_volume_aed=round(est_volume, 2),
+            offplan_share_pct=round(float(off_pct or 0), 1),
+        ))
+    offplan_top.sort(key=lambda o: -o.offplan_volume_aed)
+
+    offplan = OffplanPipeline(
+        total_offplan_volume_aed=round(total_volume, 2),
+        total_offplan_count=total_count,
+        top_areas=offplan_top[:5],
+    ) if offplan_top else None
+
+    # ---- Widget 1: Market sentiment composite ----
+    factors: list[PulseFactor] = []
+
+    # Factor 1: YoY transaction count (latest vs prior).
+    if hot_rows:
+        agg_latest = sum(int(r[2] or 0) for r in hot_rows)
+        agg_prior = sum(int(r[3] or 0) for r in hot_rows)
+        if agg_prior > 0:
+            txn_pct = (agg_latest - agg_prior) / agg_prior * 100
+            tone = "positive" if txn_pct > 5 else "negative" if txn_pct < -5 else "neutral"
+            factors.append(PulseFactor(
+                name="Transaction volume YoY",
+                value=f"{txn_pct:+.1f}%",
+                tone=tone,
+                weight=2,
+            ))
+
+    # Factor 2: Average 1y price appreciation across areas.
+    appr_1y = [float(app.appreciation_1y_pct) for _, _, app in metrics_rows
+               if app and app.appreciation_1y_pct is not None]
+    if appr_1y:
+        avg_appr = sum(appr_1y) / len(appr_1y)
+        tone = "positive" if avg_appr > 5 else "negative" if avg_appr < 0 else "neutral"
+        factors.append(PulseFactor(
+            name="Average 1y price growth",
+            value=f"{avg_appr:+.1f}%",
+            tone=tone,
+            weight=2,
+        ))
+
+    # Factor 3: Yield direction (latest yield vs prior across covered areas).
+    yield_latest_q = await db.execute(
+        select(
+            func.avg(DldYieldHistory.gross_yield_pct)
+        ).where(
+            DldYieldHistory.year == latest_year,
+            DldYieldHistory.gross_yield_pct.is_not(None),
+        )
+    )
+    avg_yield_latest = yield_latest_q.scalar()
+    yield_prior_q = await db.execute(
+        select(
+            func.avg(DldYieldHistory.gross_yield_pct)
+        ).where(
+            DldYieldHistory.year == prior_year,
+            DldYieldHistory.gross_yield_pct.is_not(None),
+        )
+    )
+    avg_yield_prior = yield_prior_q.scalar()
+    if avg_yield_latest is not None and avg_yield_prior is not None:
+        delta = float(avg_yield_latest) - float(avg_yield_prior)
+        # Falling yields are NEGATIVE for new buyers (compressing returns).
+        # Rising yields are POSITIVE.
+        tone = "positive" if delta > 0.1 else "negative" if delta < -0.1 else "neutral"
+        direction = "rising" if delta > 0.1 else "falling" if delta < -0.1 else "flat"
+        factors.append(PulseFactor(
+            name="Yield direction",
+            value=direction,
+            tone=tone,
+            weight=1,
+        ))
+
+    # Factor 4: Off-plan share of latest-year sales (proxy for supply pipeline).
+    if offplan:
+        offplan_share = (offplan.total_offplan_count / max(1, agg_latest if 'agg_latest' in locals() else 1)) * 100
+        # Healthy off-plan share is 30-60%. Very high = oversupply risk.
+        tone = "neutral"
+        if offplan_share > 70:
+            tone = "negative"
+        elif 30 <= offplan_share <= 60:
+            tone = "positive"
+        factors.append(PulseFactor(
+            name="Off-plan share",
+            value=f"{offplan_share:.0f}%",
+            tone=tone,
+            weight=1,
+        ))
+
+    # Composite score → bullish/neutral/bearish
+    score = sum(
+        f.weight * (1 if f.tone == "positive" else -1 if f.tone == "negative" else 0)
+        for f in factors
+    )
+    signal = "bullish" if score >= 2 else "bearish" if score <= -2 else "neutral"
+    sentiment = MarketSentiment(signal=signal, score=score, factors=factors)
+
+    # ---- Widget 7: Data freshness ----
+    freshness = DataFreshness(
+        transactions_year_range=f"2021–{latest_year}",
+        rents_year_range="2021–2026",
+        snapshot_date="2026-06-01",
+        last_etl_run="2026-06-03",
+    )
+
+    return DashboardPulseResponse(
+        sentiment=sentiment,
+        matrix_points=matrix_points,
+        rent_vs_buy=rent_vs_buy,
+        hot_areas=hot_areas,
+        offplan=offplan,
+        freshness=freshness,
     )

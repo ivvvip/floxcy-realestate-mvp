@@ -861,6 +861,79 @@ export interface AreaCategoryBreakdownResponse extends DldAttribution {
   items: AreaCategoryBreakdownItem[];
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard pulse — 7-widget aggregator
+// ---------------------------------------------------------------------------
+
+export interface PulseFactor {
+  name: string;
+  value: string;
+  tone: 'positive' | 'neutral' | 'negative';
+  weight: number;
+}
+
+export interface MarketSentiment {
+  signal: 'bullish' | 'neutral' | 'bearish';
+  score: number;
+  factors: PulseFactor[];
+}
+
+export interface ScatterMatrixPoint {
+  area_name_norm: string;
+  area_name_display: string;
+  yield_pct: number;
+  appreciation_5y_pct: number;
+  sample_score: number;
+  quadrant: 'best_investment' | 'income_focus' | 'growth_focus' | 'avoid';
+}
+
+export interface RentVsBuyGauge {
+  payback_years: number;
+  signal: 'buy' | 'neutral' | 'rent';
+  based_on_areas: number;
+  avg_sale_price_aed: number;
+  avg_annual_rent_aed: number;
+}
+
+export interface HotAreaItem {
+  area_name_norm: string;
+  area_name_display: string;
+  txn_count_latest: number;
+  txn_count_prior: number;
+  pct_change_yoy: number;
+  trend: 'up' | 'down' | 'flat';
+}
+
+export interface OffplanArea {
+  area_name_norm: string;
+  area_name_display: string;
+  offplan_count: number;
+  offplan_volume_aed: number;
+  offplan_share_pct: number;
+}
+
+export interface OffplanPipeline {
+  total_offplan_volume_aed: number;
+  total_offplan_count: number;
+  top_areas: OffplanArea[];
+}
+
+export interface DataFreshness {
+  transactions_year_range: string;
+  rents_year_range: string;
+  snapshot_date: string;
+  last_etl_run: string;
+}
+
+export interface DashboardPulseResponse extends DldAttribution {
+  sentiment: MarketSentiment;
+  matrix_points: ScatterMatrixPoint[];
+  rent_vs_buy: RentVsBuyGauge | null;
+  hot_areas: HotAreaItem[];
+  offplan: OffplanPipeline | null;
+  freshness: DataFreshness;
+}
+
 export interface DldBuildingsResponse extends DldAttribution {
   count: number;
   total_available: number;

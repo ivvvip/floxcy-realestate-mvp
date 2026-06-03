@@ -1094,3 +1094,77 @@ class BuildingSalesResponse(Attribution):
     last_transaction_date: Optional[date] = None
     parking_pct: Optional[float] = None
     bulk_transaction_count: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Dashboard pulse — single-call aggregator for the dashboard widgets
+# ---------------------------------------------------------------------------
+
+class PulseFactor(BaseModel):
+    """One signal that feeds the market-sentiment headline."""
+    name: str
+    value: str        # display form, e.g. "+8.2%", "rising", "1,245 sales"
+    tone: Literal["positive", "neutral", "negative"]
+    weight: int = 1   # tone * weight feeds the sentiment score
+
+
+class MarketSentiment(BaseModel):
+    signal: Literal["bullish", "neutral", "bearish"]
+    score: int        # signed integer = positive_weight - negative_weight
+    factors: List[PulseFactor]
+
+
+class ScatterMatrixPoint(BaseModel):
+    area_name_norm: str
+    area_name_display: str
+    yield_pct: float                  # Y axis
+    appreciation_5y_pct: float        # X axis
+    sample_score: int                 # min(sales, contracts) — used for dot size
+    quadrant: Literal["best_investment", "income_focus", "growth_focus", "avoid"]
+
+
+class RentVsBuyGauge(BaseModel):
+    payback_years: float
+    signal: Literal["buy", "neutral", "rent"]
+    based_on_areas: int
+    avg_sale_price_aed: float
+    avg_annual_rent_aed: float
+
+
+class HotAreaItem(BaseModel):
+    area_name_norm: str
+    area_name_display: str
+    txn_count_latest: int
+    txn_count_prior: int
+    pct_change_yoy: float
+    trend: Literal["up", "down", "flat"]
+
+
+class OffplanArea(BaseModel):
+    area_name_norm: str
+    area_name_display: str
+    offplan_count: int
+    offplan_volume_aed: float
+    offplan_share_pct: float           # offplan_count / total_count in area
+
+
+class OffplanPipeline(BaseModel):
+    total_offplan_volume_aed: float
+    total_offplan_count: int
+    top_areas: List[OffplanArea]
+
+
+class DataFreshness(BaseModel):
+    transactions_year_range: str        # "2021–2026"
+    rents_year_range: str
+    snapshot_date: str
+    last_etl_run: str
+
+
+class DashboardPulseResponse(Attribution):
+    sentiment: MarketSentiment
+    matrix_points: List[ScatterMatrixPoint]
+    rent_vs_buy: Optional[RentVsBuyGauge] = None
+    hot_areas: List[HotAreaItem]
+    offplan: Optional[OffplanPipeline] = None
+    freshness: DataFreshness

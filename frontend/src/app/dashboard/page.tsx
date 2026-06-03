@@ -2,8 +2,9 @@ import { LayoutDashboard } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { DashboardClient } from './DashboardClient';
-import { getDashboardData } from '@/lib/api';
-import type { DashboardDataResponse } from '@/lib/types';
+import { DashboardPulse } from './DashboardPulse';
+import { getDashboardData, getDldDashboardPulse } from '@/lib/api';
+import type { DashboardDataResponse, DashboardPulseResponse } from '@/lib/types';
 
 export const revalidate = 300;
 export const metadata = {
@@ -13,20 +14,30 @@ export const metadata = {
     + 'rental yields, off-plan share, broker activity, supply pipeline.',
 };
 
-async function loadData(): Promise<{ data: DashboardDataResponse | null; error: string | null }> {
+async function loadData(): Promise<{
+  data: DashboardDataResponse | null;
+  pulse: DashboardPulseResponse | null;
+  error: string | null;
+}> {
   try {
-    const data = await getDashboardData();
-    return { data, error: null };
+    // Pulse soft-fails so the legacy dashboard still renders if the new
+    // endpoint is briefly unavailable mid-deploy.
+    const [data, pulse] = await Promise.all([
+      getDashboardData(),
+      getDldDashboardPulse().catch(() => null),
+    ]);
+    return { data, pulse, error: null };
   } catch (e) {
     return {
       data: null,
+      pulse: null,
       error: e instanceof Error ? e.message : 'Dashboard data unavailable',
     };
   }
 }
 
 export default async function DashboardPage() {
-  const { data, error } = await loadData();
+  const { data, pulse, error } = await loadData();
 
   return (
     <div className="bg-bg min-h-screen">
@@ -58,7 +69,10 @@ export default async function DashboardPage() {
       </div>
 
       <Container>
-        <div className="pt-5">
+        <div className="pt-5 space-y-6">
+          {/* 7-widget pulse block on top — soft-fail if endpoint is
+              briefly unavailable. */}
+          {pulse && <DashboardPulse pulse={pulse} />}
           {error || !data ? (
             <DashboardError message={error ?? 'Unknown error'} />
           ) : (

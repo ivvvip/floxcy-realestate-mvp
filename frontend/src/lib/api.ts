@@ -47,6 +47,7 @@ import type {
   DldPriceHistoryResponse,
   AreaCategoryBreakdownResponse,
   AreaLifestyleScoreResponse,
+  DashboardPulseResponse,
   BuildingLeaseExpiryResponse,
   DldBuildingRentHistoryResponse,
   DldRentHistoryResponse,
@@ -917,6 +918,13 @@ export async function getDldAreaCategoryBreakdown(
   return request<AreaCategoryBreakdownResponse>(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/category-breakdown`,
     { revalidate: 3600 }
+  );
+}
+
+export async function getDldDashboardPulse(): Promise<DashboardPulseResponse> {
+  return request<DashboardPulseResponse>(
+    '/api/v1/dld/dashboard-pulse',
+    { revalidate: 600 }
   );
 }
 
