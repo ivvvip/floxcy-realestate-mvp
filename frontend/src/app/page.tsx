@@ -275,31 +275,36 @@ export default async function HomePage() {
                 official DLD records. The only platform with{' '}
                 <span className="text-fg font-medium">building-level income intelligence</span>.
               </p>
-              <div className="mt-5 flex items-center gap-2 flex-wrap">
+              {/* 3 primary CTAs — full-width stacked on mobile, side-by-side
+                  from sm. min-h-[44px] keeps each tap target accessible. */}
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <Link
                   href="/rent-check"
-                  className="inline-flex h-10 items-center gap-1.5 rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors"
+                  className="flex h-11 items-center justify-center gap-1.5 rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors"
                 >
                   🔍 Is My Rent Fair?
                 </Link>
                 <Link
                   href="/opportunities"
-                  className="inline-flex h-10 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
+                  className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
                 >
                   📊 Explore Investment Areas
                 </Link>
                 <Link
                   href="/buildings"
-                  className="inline-flex h-10 items-center gap-1.5 rounded-md border border-border bg-bg-card px-4 text-sm font-medium text-fg hover:border-accent/40 transition-colors"
+                  className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-bg-card px-4 text-sm font-medium text-fg hover:border-accent/40 transition-colors"
                 >
                   🏢 Building X-Ray
                 </Link>
               </div>
-              {/* Trust bar */}
-              <div className="mt-4 inline-flex items-center gap-2 text-[11px] text-fg-subtle">
-                <ShieldCheck className="h-3.5 w-3.5 text-positive" strokeWidth={2} />
-                Powered by Dubai Land Department · Official Data ·
-                Updated {market?.last_updated ?? 'June 2026'}
+              {/* Trust bar — flex-wrap so the attribution line breaks
+                  cleanly on narrow screens instead of overflowing. */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg-subtle">
+                <ShieldCheck className="h-3.5 w-3.5 text-positive shrink-0" strokeWidth={2} />
+                <span>
+                  Powered by Dubai Land Department · Official Data ·
+                  Updated {market?.last_updated ?? 'June 2026'}
+                </span>
               </div>
               {/* Market signals strip */}
               <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
@@ -502,41 +507,48 @@ export default async function HomePage() {
                   See all buildings →
                 </Link>
               </div>
+              {/* Mobile (default): row stacks rank+name on top, then
+                  contracts+income on a second line. From sm everything
+                  collapses to a single row. */}
               <ul className="mt-4 grid gap-px bg-border border border-border rounded-lg overflow-hidden">
                 {topIncomeBuildings.map((b, i) => (
                   <li
                     key={b.id}
-                    className="bg-bg-card px-4 py-3 flex items-center gap-3 hover:bg-bg-elev/40"
+                    className="bg-bg-card px-3 sm:px-4 py-3 hover:bg-bg-elev/40 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
                   >
-                    <span className="w-6 text-right text-fg-subtle tabular text-sm">
-                      {i + 1}
-                    </span>
-                    <Link
-                      href={`/buildings/${b.id}`}
-                      className="flex-1 min-w-0 text-fg font-medium truncate hover:text-accent transition-colors"
-                    >
-                      {b.display_name ?? b.project_name ?? '—'}
-                      {b.area_name && (
-                        <span className="ml-2 text-[11px] text-fg-subtle">
-                          · {b.area_name}
-                        </span>
-                      )}
-                    </Link>
-                    <span className="text-[11px] text-fg-muted tabular w-24 text-right">
-                      {formatNumber(b.active_rent_count)} contracts
-                    </span>
-                    <span
-                      className="font-mono text-fg text-sm w-28 text-right"
-                      title={
-                        b.total_annual_income != null
-                          ? formatAEDFull(b.total_annual_income)
-                          : undefined
-                      }
-                    >
-                      {b.total_annual_income != null
-                        ? formatLargeAED(b.total_annual_income)
-                        : '—'}
-                    </span>
+                    <div className="flex items-center gap-2 sm:gap-3 sm:flex-1 min-w-0">
+                      <span className="w-5 text-right text-fg-subtle tabular text-sm shrink-0">
+                        {i + 1}
+                      </span>
+                      <Link
+                        href={`/buildings/${b.id}`}
+                        className="flex-1 min-w-0 text-fg font-medium truncate hover:text-accent transition-colors"
+                      >
+                        {b.display_name ?? b.project_name ?? '—'}
+                        {b.area_name && (
+                          <span className="ml-2 text-[11px] text-fg-subtle">
+                            · {b.area_name}
+                          </span>
+                        )}
+                      </Link>
+                    </div>
+                    <div className="flex items-baseline justify-between sm:justify-end gap-3 sm:gap-3 pl-7 sm:pl-0">
+                      <span className="text-[11px] text-fg-muted tabular sm:w-24 sm:text-right">
+                        {formatNumber(b.active_rent_count)} contracts
+                      </span>
+                      <span
+                        className="font-mono text-fg text-sm sm:w-28 sm:text-right tabular-nums"
+                        title={
+                          b.total_annual_income != null
+                            ? formatAEDFull(b.total_annual_income)
+                            : undefined
+                        }
+                      >
+                        {b.total_annual_income != null
+                          ? formatLargeAED(b.total_annual_income)
+                          : '—'}
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>
