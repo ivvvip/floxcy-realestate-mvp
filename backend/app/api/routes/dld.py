@@ -944,23 +944,34 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
 async def dld_top_appreciation(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(5, ge=1, le=50),
-    min_years: int = Query(5, ge=1, le=10, description="Require at least N years of history"),
+    min_years: int = Query(5, ge=1, le=18, description="Require at least N years of history"),
+    window: str = Query(
+        "5y", pattern="^(5y|10y)$",
+        description="Sort window. '5y' (default) or '10y' for long-term performance.",
+    ),
 ):
-    """Top-N areas by 5-year price appreciation (registered Sales-of-Unit).
+    """Top-N areas by price appreciation over the selected window.
 
-    Powers the homepage "Fastest Growing Areas" widget. Requires a full
-    `min_years` series so we don't surface noisy 1-2 year jumps. Pulls the
+    Powers the homepage "Fastest Growing Areas" widget when window='5y',
+    and the "18-Year Track Record" widget when window='10y'. Requires a
+    full `min_years` series so we don't surface noisy 1-2 year jumps;
+    when window='10y' the caller should set min_years=10. Pulls the
     latest avg PPSF alongside so the widget can show 'AED 16,752/sqft'
     context without another round-trip.
     """
+    if window == "10y":
+        sort_col = DldAreaAppreciation.appreciation_10y_pct
+    else:
+        sort_col = DldAreaAppreciation.appreciation_5y_pct
     stmt = (
         select(DldAreaAppreciation, DldArea.name_display)
         .outerjoin(DldArea, DldArea.name_norm == DldAreaAppreciation.area_name_norm)
         .where(
+            sort_col.isnot(None),
             DldAreaAppreciation.appreciation_5y_pct.isnot(None),
             DldAreaAppreciation.years_of_data >= min_years,
         )
-        .order_by(DldAreaAppreciation.appreciation_5y_pct.desc())
+        .order_by(sort_col.desc())
         .limit(limit)
     )
     rows = (await db.execute(stmt)).all()
@@ -989,7 +1000,9 @@ async def dld_top_appreciation(
             area_name_norm=a.area_name_norm,
             area_name_display=display or a.area_name_norm.title(),
             appreciation_5y_pct=float(a.appreciation_5y_pct),
+            appreciation_10y_pct=float(a.appreciation_10y_pct) if a.appreciation_10y_pct is not None else None,
             cagr_5y_pct=float(a.cagr_5y_pct) if a.cagr_5y_pct is not None else None,
+            cagr_10y_pct=float(a.cagr_10y_pct) if a.cagr_10y_pct is not None else None,
             appreciation_1y_pct=float(a.appreciation_1y_pct) if a.appreciation_1y_pct is not None else None,
             latest_avg_ppsf=latest_ppsf.get(a.area_name_norm),
             years_of_data=int(a.years_of_data or 0),

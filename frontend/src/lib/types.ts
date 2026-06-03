@@ -288,7 +288,9 @@ export interface TopAppreciationItem {
   area_name_norm: string;
   area_name_display: string;
   appreciation_5y_pct: number;
+  appreciation_10y_pct?: number | null;
   cagr_5y_pct: number | null;
+  cagr_10y_pct?: number | null;
   appreciation_1y_pct: number | null;
   latest_avg_ppsf: number | null;
   years_of_data: number;

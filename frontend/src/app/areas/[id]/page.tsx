@@ -631,7 +631,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           const firstYear = priceHistory.points[0].year;
           const lastYear = priceHistory.points[priceHistory.points.length - 1].year;
           const rangeLabel = `${firstYear}–${lastYear}`;
-          const arrowLabel = `${firstYear} → ${lastYear}`;
+          const yearsCovered = lastYear - firstYear + 1;
           const has10y = priceHistory.appreciation_10y_pct != null;
           return (
           <section
@@ -641,7 +641,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             <div className="chart-header">
               <span className="chart-header-label inline-flex items-center gap-1.5">
                 <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
-                Price History · {priceHistory.area_name_display} · {rangeLabel}
+                {yearsCovered}-Year Price History · {priceHistory.area_name_display} · {rangeLabel}
               </span>
               <span className="text-[11px] text-fg-subtle">
                 {priceHistory.years_of_history} years · DLD Sales-of-Unit

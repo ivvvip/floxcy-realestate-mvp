@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
-  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import {
   ActivitySquare, ArrowDownRight, ArrowRight, ArrowUpRight, Building2,
@@ -92,8 +92,8 @@ export function DashboardClient({ data }: Props) {
       </div>
 
       <Section
-        title="Dubai average price per sqft"
-        subtitle="Volume-weighted, off-plan vs ready"
+        title="Full Market History (2009–2026)"
+        subtitle="Dubai-wide avg AED/sqft per year · volume-weighted · ready vs off-plan · key events annotated"
         source="DLD Price History"
       >
         <PriceHistoryChart series={data.price_history} />
@@ -480,12 +480,26 @@ function ActivityChart({ activity }: { activity: ActivityPoint[] }) {
 // 5. Price history line chart (ready vs off-plan)
 // ===========================================================================
 
+// Key Dubai real-estate events to annotate on the full-history chart. Each
+// reference line is drawn only when the corresponding year appears in the
+// series, so the chart stays correct if the ETL window ever changes.
+const MARKET_EVENTS: { year: number; label: string; tone: 'positive' | 'negative' | 'neutral' }[] = [
+  { year: 2009, label: 'Post-GFC base', tone: 'neutral' },
+  { year: 2014, label: 'Market peak', tone: 'positive' },
+  { year: 2016, label: 'Correction bottom', tone: 'negative' },
+  { year: 2020, label: 'COVID dip', tone: 'negative' },
+  { year: 2021, label: 'Boom begins', tone: 'positive' },
+  { year: 2026, label: 'Current', tone: 'neutral' },
+];
+
 function PriceHistoryChart({ series }: { series: DashboardPriceHistoryPoint[] }) {
   if (!series.length) return <Empty label="No price history" />;
+  const seriesYears = new Set(series.map((p) => p.year));
+  const events = MARKET_EVENTS.filter((e) => seriesYears.has(e.year));
   return (
-    <div className="h-80">
+    <div className="h-96">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={series} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+        <LineChart data={series} margin={{ top: 24, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={GRID_COLOR} vertical={false} />
           <XAxis dataKey="year" stroke={AXIS_COLOR} tick={{ fontSize: 11, fill: AXIS_COLOR }} />
           <YAxis
@@ -505,6 +519,28 @@ function PriceHistoryChart({ series }: { series: DashboardPriceHistoryPoint[] })
             wrapperStyle={{ fontSize: 11, color: AXIS_COLOR, paddingTop: 6 }}
             iconType="line"
           />
+          {events.map((e) => (
+            <ReferenceLine
+              key={e.year}
+              x={e.year}
+              stroke={
+                e.tone === 'positive'
+                  ? POSITIVE
+                  : e.tone === 'negative'
+                    ? NEGATIVE
+                    : GREY
+              }
+              strokeDasharray="3 3"
+              strokeOpacity={0.55}
+              label={{
+                value: `${e.year}: ${e.label}`,
+                position: 'top',
+                fill: AXIS_COLOR,
+                fontSize: 10,
+                offset: 4,
+              }}
+            />
+          ))}
           <Line type="monotone" dataKey="avg_ppsf_ready" name="Ready" stroke={TEAL} strokeWidth={2.5} dot={{ r: 4, fill: TEAL }} />
           <Line type="monotone" dataKey="avg_ppsf_offplan" name="Off-plan" stroke={GREY} strokeWidth={2} dot={{ r: 3, fill: GREY }} strokeDasharray="4 3" />
         </LineChart>

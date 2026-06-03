@@ -809,10 +809,11 @@ export async function getCanonicalAreas(opts?: {
 
 export async function getTopAppreciation(
   limit = 5,
-  minYears = 5
+  minYears = 5,
+  window: '5y' | '10y' = '5y',
 ): Promise<TopAppreciationResponse> {
   return request<TopAppreciationResponse>(
-    `/api/v1/dld/areas/top-appreciation?limit=${limit}&min_years=${minYears}`,
+    `/api/v1/dld/areas/top-appreciation?limit=${limit}&min_years=${minYears}&window=${window}`,
     { revalidate: 3600 }
   );
 }

@@ -33,6 +33,7 @@ import { cn } from '@/lib/cn';
 import { RoiMiniWidget } from './RoiMiniWidget';
 import { HomeOpportunities } from './HomeOpportunities';
 import { HomeFastestGrowing } from './HomeFastestGrowing';
+import { HomeLongTermPerformance } from './HomeLongTermPerformance';
 import { HomeFeaturedDevelopers } from './HomeFeaturedDevelopers';
 
 export const revalidate = 300;
@@ -485,6 +486,9 @@ export default async function HomePage() {
 
       {/* Featured Developers — top 5 by DLD sales volume */}
       <HomeFeaturedDevelopers />
+
+      {/* Long-term track record — 18-year DLD history */}
+      <HomeLongTermPerformance />
 
       {/* Fastest Growing Areas — DLD historical appreciation widget */}
       <HomeFastestGrowing />

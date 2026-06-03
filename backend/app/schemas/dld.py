@@ -134,7 +134,9 @@ class TopAppreciationItem(BaseModel):
     area_name_norm: str
     area_name_display: str
     appreciation_5y_pct: float
+    appreciation_10y_pct: Optional[float] = None
     cagr_5y_pct: Optional[float] = None
+    cagr_10y_pct: Optional[float] = None
     appreciation_1y_pct: Optional[float] = None
     latest_avg_ppsf: Optional[float] = None
     years_of_data: int
