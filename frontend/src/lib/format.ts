@@ -1,11 +1,49 @@
 export function formatAED(value: number, opts?: { compact?: boolean }) {
   if (!Number.isFinite(value)) return '—';
-  if (opts?.compact && Math.abs(value) >= 1_000_000) {
-    return `AED ${(value / 1_000_000).toFixed(2)}M`;
-  }
-  if (opts?.compact && Math.abs(value) >= 1_000) {
-    return `AED ${(value / 1_000).toFixed(1)}K`;
-  }
+  if (opts?.compact) return formatLargeAED(value);
+  return new Intl.NumberFormat('en-AE', {
+    style: 'currency',
+    currency: 'AED',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/**
+ * Smart magnitude formatter for AED values. Picks K / M / B / T based on
+ * the size so 1.14 trillion renders as "AED 1.14T" instead of the old
+ * compact path's "AED 1140358.19M".
+ *
+ *   12  → "AED 12"
+ *   850 → "AED 850"
+ *   1_200 → "AED 1.2K"
+ *   21_000_000 → "AED 21M"
+ *   131_000_000_000 → "AED 131B"
+ *   1_140_358_190_000 → "AED 1.14T"
+ *
+ * Pair with `formatAEDFull` for a `title=` tooltip so users can hover to
+ * see the unabbreviated number.
+ */
+export function formatLargeAED(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  const abs = Math.abs(value);
+  // Strip trailing zeros so 131.00B → 131B and 1.20T → 1.2T. Keeps signal
+  // density high without sacrificing precision when it matters
+  // (e.g. 1.14T stays at 1.14T, not 1T).
+  const trim = (n: number, digits: number) =>
+    n.toFixed(digits).replace(/\.?0+$/, '');
+  if (abs >= 1_000_000_000_000) return `AED ${trim(value / 1_000_000_000_000, 2)}T`;
+  if (abs >= 1_000_000_000) return `AED ${trim(value / 1_000_000_000, 2)}B`;
+  if (abs >= 1_000_000) return `AED ${trim(value / 1_000_000, 2)}M`;
+  if (abs >= 1_000) return `AED ${trim(value / 1_000, 1)}K`;
+  return `AED ${value.toFixed(0)}`;
+}
+
+/**
+ * Full comma-form for hover tooltips. "AED 131,000,000,000" — pairs with
+ * `formatLargeAED` via the title attribute.
+ */
+export function formatAEDFull(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
   return new Intl.NumberFormat('en-AE', {
     style: 'currency',
     currency: 'AED',

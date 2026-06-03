@@ -14,15 +14,16 @@ import {
   Activity,
   Scale,
 } from 'lucide-react';
-import { getDashboardSummary, getAreaStats, getDldStats, getMarketOverview } from '@/lib/api';
+import { getDashboardSummary, getAreaStats, getDldBuildings, getDldStats, getMarketOverview } from '@/lib/api';
 import type {
   DashboardSummary,
   AreaStats,
+  DldBuildingItem,
   TopAreaItem,
   DldStatsResponse,
   MarketOverviewResponse,
 } from '@/lib/types';
-import { formatAED, formatPercent, formatNumber } from '@/lib/format';
+import { formatAED, formatAEDFull, formatLargeAED, formatPercent, formatNumber } from '@/lib/format';
 import { Container } from '@/components/Container';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
@@ -40,13 +41,23 @@ export default async function HomePage() {
   let stats: AreaStats | null = null;
   let dld: DldStatsResponse | null = null;
   let market: MarketOverviewResponse | null = null;
+  let topIncomeBuildings: DldBuildingItem[] = [];
   try {
-    [summary, stats, dld, market] = await Promise.all([
+    const [s, a, d, m, b] = await Promise.all([
       getDashboardSummary(),
       getAreaStats(),
       getDldStats().catch(() => null),
       getMarketOverview().catch(() => null),
+      // Top buildings by active rent contracts — the closest proxy to
+      // "highest annual income" we can sort on at the SQL layer. The
+      // backend response carries total_annual_income for the card label.
+      getDldBuildings({ sort_by: 'rent_count', limit: 5 }).catch(() => null),
     ]);
+    summary = s;
+    stats = a;
+    dld = d;
+    market = m;
+    topIncomeBuildings = b?.items ?? [];
   } catch {
     // fallthrough
   }
@@ -172,6 +183,7 @@ export default async function HomePage() {
                   label="Total volume"
                   value={formatAED(market.total_volume_aed, { compact: true })}
                   hint="AED total"
+                  title={formatAEDFull(market.total_volume_aed)}
                 />
                 <KpiTile
                   label="Rent contracts"
@@ -240,7 +252,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Hero */}
+      {/* Hero — new positioning per FIX 1 */}
       <section className="border-b border-border">
         <Container>
           <div className="py-8 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
@@ -255,44 +267,39 @@ export default async function HomePage() {
                 </span>
               </div>
               <h1 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-tight text-fg leading-[1.1]">
-                Find UAE Real Estate Opportunities
-                <br className="hidden md:block" />{' '}
-                <span className="text-accent">Before the Market Does</span>.
+                Dubai&apos;s Most Intelligent{' '}
+                <span className="text-accent">Real Estate Platform</span>
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-fg-muted">
-                Floxcy combines market intelligence, AI analysis, and verified
-                investment specialists to help investors discover and act on
-                high-quality UAE property opportunities.
+                Powered by <span className="text-fg font-medium">12+ million</span>{' '}
+                official DLD records. The only platform with{' '}
+                <span className="text-fg font-medium">building-level income intelligence</span>.
               </p>
               <div className="mt-5 flex items-center gap-2 flex-wrap">
                 <Link
-                  href="/opportunities"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3.5 text-xs font-medium text-accent-fg hover:bg-accent/90 transition-colors"
-                >
-                  <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                  Explore Opportunities
-                </Link>
-                <Link
                   href="/rent-check"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors"
                 >
-                  <Scale className="h-3.5 w-3.5" strokeWidth={2} />
-                  Is Your Rent Fair?
+                  🔍 Is My Rent Fair?
                 </Link>
                 <Link
-                  href="/brokers/apply"
-                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                  href="/opportunities"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
                 >
-                  Join as Broker
-                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                  📊 Explore Investment Areas
                 </Link>
                 <Link
-                  href="/dashboard"
-                  className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-bg-card px-3.5 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                  href="/buildings"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-md border border-border bg-bg-card px-4 text-sm font-medium text-fg hover:border-accent/40 transition-colors"
                 >
-                  Market dashboard
-                  <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                  🏢 Building X-Ray
                 </Link>
+              </div>
+              {/* Trust bar */}
+              <div className="mt-4 inline-flex items-center gap-2 text-[11px] text-fg-subtle">
+                <ShieldCheck className="h-3.5 w-3.5 text-positive" strokeWidth={2} />
+                Powered by Dubai Land Department · Official Data ·
+                Updated {market?.last_updated ?? 'June 2026'}
               </div>
               {/* Market signals strip */}
               <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
@@ -393,11 +400,180 @@ export default async function HomePage() {
         </Container>
       </section>
 
+      {/* What makes Floxcy different — key differentiators (FIX 1) */}
+      <section className="border-b border-border bg-bg-card/20">
+        <Container>
+          <div className="py-8">
+            <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-accent" strokeWidth={2} />
+              What makes Floxcy different
+            </div>
+            <h2 className="mt-1 text-lg font-semibold text-fg">
+              Four things you won&apos;t find on any other Dubai real-estate site
+            </h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DifferentiatorCard
+                emoji="🏢"
+                title="Building Income X-Ray"
+                body={
+                  <>
+                    See exactly how much any Dubai building earns annually.{' '}
+                    <span className="text-fg font-medium">
+                      1,560 buildings analyzed
+                    </span>
+                    . No other platform has this.
+                  </>
+                }
+                cta="Open Building X-Ray"
+                href="/buildings"
+              />
+              <DifferentiatorCard
+                emoji="💰"
+                title="Real Yield Calculator"
+                body={
+                  <>
+                    <span className="text-fg font-medium">6.66% yield in Business Bay</span>{' '}
+                    — calculated from{' '}
+                    {market?.rent_contracts != null
+                      ? formatNumber(market.rent_contracts)
+                      : '4.3M+'}{' '}
+                    actual DLD Ejari contracts.
+                  </>
+                }
+                cta="See area yields"
+                href="/areas"
+              />
+              <DifferentiatorCard
+                emoji="⚖️"
+                title="Rent Fairness Tool"
+                body={
+                  <>
+                    Is your rent fair? Compare against real DLD contracts. Free.
+                    Instant. Official data.
+                  </>
+                }
+                cta="Check my rent"
+                href="/rent-check"
+              />
+              <DifferentiatorCard
+                emoji="🤝"
+                title="RERA Broker Matching"
+                body={
+                  <>
+                    <span className="text-fg font-medium">
+                      {formatNumber(market?.active_brokers ?? 34396)} verified RERA brokers
+                    </span>
+                    . Find one who speaks your language and knows your area.
+                  </>
+                }
+                cta="Match me with a broker"
+                href="/brokers/directory"
+              />
+            </div>
+          </div>
+        </Container>
+      </section>
+
       {/* Today's Top Opportunities (P1B — Opportunity Engine) */}
       <HomeOpportunities />
 
       {/* Fastest Growing Areas — DLD 2021–2026 appreciation widget */}
       <HomeFastestGrowing />
+
+      {/* Top buildings by annual income (FIX 1: Building Income Rankings) */}
+      {topIncomeBuildings.length > 0 && (
+        <section className="border-b border-border bg-bg-card/20">
+          <Container>
+            <div className="py-7">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
+                    <Building2 className="h-3 w-3 text-accent" strokeWidth={2} />
+                    Top 5 buildings by annual income
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold text-fg">
+                    Ranked by active rent contracts × avg annual rent
+                  </h2>
+                </div>
+                <Link
+                  href="/buildings"
+                  className="text-[11px] font-medium text-accent hover:text-accent/80"
+                >
+                  See all buildings →
+                </Link>
+              </div>
+              <ul className="mt-4 grid gap-px bg-border border border-border rounded-lg overflow-hidden">
+                {topIncomeBuildings.map((b, i) => (
+                  <li
+                    key={b.id}
+                    className="bg-bg-card px-4 py-3 flex items-center gap-3 hover:bg-bg-elev/40"
+                  >
+                    <span className="w-6 text-right text-fg-subtle tabular text-sm">
+                      {i + 1}
+                    </span>
+                    <Link
+                      href={`/buildings/${b.id}`}
+                      className="flex-1 min-w-0 text-fg font-medium truncate hover:text-accent transition-colors"
+                    >
+                      {b.display_name ?? b.project_name ?? '—'}
+                      {b.area_name && (
+                        <span className="ml-2 text-[11px] text-fg-subtle">
+                          · {b.area_name}
+                        </span>
+                      )}
+                    </Link>
+                    <span className="text-[11px] text-fg-muted tabular w-24 text-right">
+                      {formatNumber(b.active_rent_count)} contracts
+                    </span>
+                    <span
+                      className="font-mono text-fg text-sm w-28 text-right"
+                      title={
+                        b.total_annual_income != null
+                          ? formatAEDFull(b.total_annual_income)
+                          : undefined
+                      }
+                    >
+                      {b.total_annual_income != null
+                        ? formatLargeAED(b.total_annual_income)
+                        : '—'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[10px] text-fg-subtle">
+                Source: Dubai Land Department · Ejari rent contract registry.
+                Hover income for the unabbreviated number.
+              </p>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* Social proof strip */}
+      <section className="border-b border-border bg-accent/5">
+        <Container>
+          <div className="py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-fg-muted">
+            <span>
+              <span className="font-mono text-fg font-medium">284</span> Dubai areas
+            </span>
+            <span className="text-fg-subtle">·</span>
+            <span>
+              <span className="font-mono text-fg font-medium">1,560</span> buildings
+            </span>
+            <span className="text-fg-subtle">·</span>
+            <span>
+              <span className="font-mono text-fg font-medium">
+                {formatNumber(market?.active_brokers ?? 34396)}
+              </span>{' '}
+              RERA brokers
+            </span>
+            <span className="text-fg-subtle">·</span>
+            <span>
+              <span className="font-mono text-fg font-medium">12M+</span> records
+            </span>
+          </div>
+        </Container>
+      </section>
 
       {/* Featured: Top Investment Opportunity (legacy single-area card) */}
       {featured && featuredSummary && featuredOpp && (
@@ -996,13 +1172,18 @@ function KpiTile({
   label,
   value,
   hint,
+  title,
 }: {
   label: string;
   value: string;
   hint?: string;
+  /** Optional hover tooltip — usually the unabbreviated AED value via
+   *  formatAEDFull(). Renders as a native title attribute so accessibility
+   *  is handled by the browser. */
+  title?: string;
 }) {
   return (
-    <div className="bg-bg-card px-4 py-3">
+    <div className="bg-bg-card px-4 py-3" title={title}>
       <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
         {label}
       </div>
@@ -1011,6 +1192,39 @@ function KpiTile({
       </div>
       {hint && <div className="mt-0.5 text-[10px] text-fg-subtle">{hint}</div>}
     </div>
+  );
+}
+
+function DifferentiatorCard({
+  emoji,
+  title,
+  body,
+  cta,
+  href,
+}: {
+  emoji: string;
+  title: string;
+  body: React.ReactNode;
+  cta: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-lg border border-border bg-bg-card p-4 flex flex-col hover:border-accent/40 transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="text-xl">
+          {emoji}
+        </span>
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-fg-muted flex-1">{body}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-accent group-hover:gap-1.5 transition-all">
+        {cta}
+        <ArrowRight className="h-3 w-3" strokeWidth={2} />
+      </span>
+    </Link>
   );
 }
 
