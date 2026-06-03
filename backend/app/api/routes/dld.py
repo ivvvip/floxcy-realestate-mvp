@@ -4547,9 +4547,13 @@ async def map_buildings(
     Pulled from dld_buildings_derived where osm_verified=TRUE. category
     feeds the marker color; area_slug links each marker into /areas/[slug]."""
     # Containment filter setup. When the caller passes ?area=slug we resolve
-    # the canonical row + polygon + bbox once, then test each building.
+    # the canonical row + polygon once. Bbox fallback intentionally removed:
+    # many canonical bboxes are stored as ~50m point-bboxes (Marsa Dubai,
+    # Burj Khalifa, Al Warsan First etc.) and using them as the
+    # containment box drops every real building. Two-step chain only:
+    # polygon (best) → area_name match (fallback for the 124 areas with
+    # no polygon).
     area_polygon: dict | None = None
-    area_bbox: tuple[float, float, float, float] | None = None
     area_canon_name: str | None = None
     if area:
         canon = (await db.execute(
@@ -4559,15 +4563,6 @@ async def map_buildings(
         if not canon:
             return MapBuildingsResponse(count=0, buildings=[])
         area_polygon = canon.polygon if canon.polygon else None
-        if (
-            canon.bbox_north is not None and canon.bbox_south is not None
-            and canon.bbox_east is not None and canon.bbox_west is not None
-            and canon.bbox_north != canon.bbox_south
-        ):
-            area_bbox = (
-                float(canon.bbox_south), float(canon.bbox_north),
-                float(canon.bbox_west), float(canon.bbox_east),
-            )
         area_canon_name = canon.area_name
     rows = (await db.execute(
         select(
@@ -4597,14 +4592,8 @@ async def map_buildings(
     for bid, name, lat, lon, cat, cnt, rent, area_name, area_slug in rows:
         latf, lonf = float(lat), float(lon)
         if area:
-            # Containment chain: polygon (best) → bbox (decent) → name match
-            # (fallback for the 124 areas with neither polygon nor real bbox).
             if area_polygon is not None:
                 if not _point_in_geojson(lonf, latf, area_polygon):
-                    continue
-            elif area_bbox is not None:
-                lo_lat, hi_lat, lo_lon, hi_lon = area_bbox
-                if not (lo_lat <= latf <= hi_lat and lo_lon <= lonf <= hi_lon):
                     continue
             else:
                 if not (area_name and area_canon_name
