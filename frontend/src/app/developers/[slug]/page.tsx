@@ -32,8 +32,9 @@ export default async function DeveloperDetailPage({ params }: Props) {
   }
 
   const { summary, projects, name } = detail;
-  const offplan = projects.filter((p) => p.is_offplan);
-  const ready = projects.filter((p) => !p.is_offplan);
+  const active = projects.filter((p) => p.status_key === 'active');
+  const completed = projects.filter((p) => p.status_key === 'completed');
+  const comingSoon = projects.filter((p) => p.status_key === 'coming_soon');
 
   return (
     <div className="bg-bg">
@@ -97,20 +98,28 @@ export default async function DeveloperDetailPage({ params }: Props) {
             </section>
           )}
 
-          {/* Off-plan projects */}
-          {offplan.length > 0 && (
+          {/* Active off-plan projects — selling now */}
+          {active.length > 0 && (
             <ProjectsList
-              title={`Active off-plan projects (${offplan.length})`}
-              rows={offplan}
+              title={`Active projects · under construction (${active.length})`}
+              rows={active}
               accent
             />
           )}
 
-          {/* Ready projects */}
-          {ready.length > 0 && (
+          {/* Completed projects — done, now trading as ready */}
+          {completed.length > 0 && (
             <ProjectsList
-              title={`Completed / ready projects (${ready.length})`}
-              rows={ready}
+              title={`Completed projects (${completed.length})`}
+              rows={completed}
+            />
+          )}
+
+          {/* Coming Soon — registered, no sales yet */}
+          {comingSoon.length > 0 && (
+            <ProjectsList
+              title={`Coming Soon (${comingSoon.length})`}
+              rows={comingSoon}
             />
           )}
 

@@ -141,6 +141,10 @@ class DeveloperProjectRow(BaseModel):
     earliest_year: Optional[int]
     latest_year: Optional[int]
     avg_ppsf: Optional[float]
+    # Lightweight status classification — coarser than offplan.py's
+    # derivation because we don't track per-side years on the dev side.
+    status_key: str = "active"          # active | completed | coming_soon
+    status_label: str = "Active"
 
 
 class DeveloperDetail(BaseModel):
@@ -485,9 +489,22 @@ async def get_developer(
         if cdate:
             entry["years"].append(cdate.year)
 
+    SNAPSHOT_YEAR = 2026
+
+    def _classify(e: dict) -> tuple[str, str]:
+        latest = max(e["years"]) if e["years"] else None
+        if not e["is_offplan"] and (e["total_units"] > 0 or latest):
+            return ("completed", "Completed")
+        if e["is_offplan"]:
+            if latest and latest >= SNAPSHOT_YEAR - 1:
+                return ("active", "Active off-plan")
+            return ("completed", "Completed · was off-plan")
+        return ("coming_soon", "Coming Soon")
+
     projects: list[DeveloperProjectRow] = []
     for proj_key, e in by_proj.items():
         avg_ppsf = (e["avg_ppsf_sum"] / e["avg_ppsf_n"]) if e["avg_ppsf_n"] else None
+        status_key, status_label = _classify(e)
         projects.append(DeveloperProjectRow(
             project_slug=_slugify(proj_key),
             master_project=proj_key,
@@ -498,9 +515,13 @@ async def get_developer(
             earliest_year=min(e["years"]) if e["years"] else None,
             latest_year=max(e["years"]) if e["years"] else None,
             avg_ppsf=avg_ppsf,
+            status_key=status_key,
+            status_label=status_label,
         ))
 
-    projects.sort(key=lambda p: (not p.is_offplan, -p.total_units))
+    # Active first, then completed, then coming soon. Within each: by units.
+    _order = {"active": 0, "completed": 1, "coming_soon": 2}
+    projects.sort(key=lambda p: (_order.get(p.status_key, 3), -p.total_units))
     return DeveloperDetail(
         slug=slug,
         name=stats["name"],

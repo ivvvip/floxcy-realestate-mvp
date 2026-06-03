@@ -1072,6 +1072,8 @@ export async function getOffplanProjects(opts?: {
   prop_sub_type?: string;
   min_units?: number;
   sort?: 'units' | 'newest' | 'oldest' | 'name';
+  status?: 'active' | 'completed' | 'coming_soon' | 'all';
+  include_completed?: boolean;
   limit?: number;
 }): Promise<OffplanListResponse> {
   const p = new URLSearchParams();
@@ -1080,6 +1082,8 @@ export async function getOffplanProjects(opts?: {
   if (opts?.prop_sub_type) p.set('prop_sub_type', opts.prop_sub_type);
   if (opts?.min_units) p.set('min_units', String(opts.min_units));
   if (opts?.sort) p.set('sort', opts.sort);
+  if (opts?.status) p.set('status', opts.status);
+  if (opts?.include_completed) p.set('include_completed', 'true');
   if (opts?.limit) p.set('limit', String(opts.limit));
   const qs = p.toString();
   return request<OffplanListResponse>(

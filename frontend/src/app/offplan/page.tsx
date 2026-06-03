@@ -14,8 +14,11 @@ export const metadata = {
 };
 
 export default async function OffplanPage() {
+  // Fetch with status=all so the client can split by tab without a
+  // round-trip per filter change. The counts breakdown sits in the
+  // response and feeds the tab badges.
   const [projects, developers] = await Promise.all([
-    getOffplanProjects({ sort: 'units', limit: 120 }).catch(() => null),
+    getOffplanProjects({ sort: 'units', limit: 200, status: 'all' }).catch(() => null),
     getDevelopers({ sort: 'projects', limit: 60 }).catch(() => null),
   ]);
 
@@ -32,13 +35,13 @@ export default async function OffplanPage() {
                   Off-Plan Projects
                 </h1>
                 <span className="pill pill-accent">
-                  {projects?.total ?? 0} active
+                  {projects?.counts?.active ?? 0} active
                 </span>
               </div>
               <p className="mt-1 text-xs text-fg-muted max-w-2xl">
-                Projects with at least one building registered as under
-                construction in the DLD buildings dataset. Filter by
-                developer or area to find what matches your strategy.
+                Projects with at least one off-plan transaction on
+                record. Switch tabs to see what&apos;s active, what has
+                already completed, and what&apos;s coming soon.
               </p>
             </div>
           </div>
@@ -52,6 +55,7 @@ export default async function OffplanPage() {
               initialProjects={projects?.items ?? []}
               developers={developers?.items ?? []}
               dataSource={projects?.data_source ?? ''}
+              counts={projects?.counts ?? {}}
             />
           </Suspense>
         </div>

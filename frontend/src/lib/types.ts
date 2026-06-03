@@ -1811,6 +1811,8 @@ export interface DeveloperProjectRow {
   earliest_year: number | null;
   latest_year: number | null;
   avg_ppsf: number | null;
+  status_key: OffplanStatusKey;
+  status_label: string;
 }
 
 export interface DeveloperDetail {
@@ -1820,6 +1822,8 @@ export interface DeveloperDetail {
   projects: DeveloperProjectRow[];
   data_source: string;
 }
+
+export type OffplanStatusKey = 'active' | 'completed' | 'coming_soon';
 
 export interface OffplanProjectCard {
   slug: string;
@@ -1834,12 +1838,20 @@ export interface OffplanProjectCard {
   latest_year: number | null;
   offplan_buildings: number;
   ready_buildings: number;
+  status_key: OffplanStatusKey;
+  status_label: string;
+  latest_offplan_year: number | null;
+  latest_ready_year: number | null;
+  offplan_ppsf: number | null;
+  ready_ppsf: number | null;
+  price_gain_pct: number | null;
 }
 
 export interface OffplanListResponse {
   total: number;
   items: OffplanProjectCard[];
   data_source: string;
+  counts?: Record<string, number>;
 }
 
 export interface OffplanPriceContext {
@@ -1855,6 +1867,7 @@ export interface OffplanProjectDetail extends OffplanProjectCard {
   price_context: OffplanPriceContext;
   data_source: string;
 }
+
 
 export interface RegisterInterestRequest {
   project_slug: string;

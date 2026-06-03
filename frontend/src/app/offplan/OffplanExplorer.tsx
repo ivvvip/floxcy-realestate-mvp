@@ -4,23 +4,35 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Filter as FilterIcon } from 'lucide-react';
 import { formatNumber } from '@/lib/format';
-import type { OffplanProjectCard, DeveloperCard } from '@/lib/types';
+import { cn } from '@/lib/cn';
+import type { OffplanProjectCard, DeveloperCard, OffplanStatusKey } from '@/lib/types';
 
 interface Props {
   initialProjects: OffplanProjectCard[];
   developers: DeveloperCard[];
   dataSource: string;
+  counts: Record<string, number>;
 }
 
 type SortKey = 'units' | 'newest' | 'oldest' | 'name';
+type StatusTab = OffplanStatusKey | 'all';
 
-export function OffplanExplorer({ initialProjects, developers, dataSource }: Props) {
+const STATUS_TABS: { key: StatusTab; label: string }[] = [
+  { key: 'active',      label: 'Under Construction' },
+  { key: 'completed',   label: 'Completed' },
+  { key: 'coming_soon', label: 'Coming Soon' },
+  { key: 'all',         label: 'All' },
+];
+
+export function OffplanExplorer({ initialProjects, developers, dataSource, counts }: Props) {
   const [devFilter, setDevFilter] = useState<string>('');
   const [sort, setSort] = useState<SortKey>('units');
   const [search, setSearch] = useState('');
+  const [statusTab, setStatusTab] = useState<StatusTab>('active');
 
   const filtered = useMemo(() => {
     let rows = initialProjects;
+    if (statusTab !== 'all') rows = rows.filter((p) => p.status_key === statusTab);
     if (devFilter) rows = rows.filter((p) => p.developer_slug === devFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -39,10 +51,40 @@ export function OffplanExplorer({ initialProjects, developers, dataSource }: Pro
       return a.master_project.localeCompare(b.master_project);
     });
     return out;
-  }, [initialProjects, devFilter, sort, search]);
+  }, [initialProjects, devFilter, sort, search, statusTab]);
 
   return (
     <div className="space-y-4">
+      {/* Status tabs */}
+      <div className="flex items-center gap-1 flex-wrap border-b border-border pb-2">
+        {STATUS_TABS.map((t) => {
+          const n = counts[t.key] ?? 0;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setStatusTab(t.key)}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                statusTab === t.key
+                  ? 'bg-accent text-bg'
+                  : 'text-fg-muted hover:text-fg hover:bg-bg-elev/40'
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  'tabular text-[10px]',
+                  statusTab === t.key ? 'text-bg/70' : 'text-fg-subtle'
+                )}
+              >
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="surface-card p-3 flex flex-wrap items-center gap-2">
         <FilterIcon className="h-3.5 w-3.5 text-fg-subtle" strokeWidth={2} />
         <input
@@ -96,6 +138,18 @@ export function OffplanExplorer({ initialProjects, developers, dataSource }: Pro
   );
 }
 
+function statusEmoji(s: OffplanStatusKey): string {
+  if (s === 'completed') return '✅';
+  if (s === 'coming_soon') return '📋';
+  return '🏗️';
+}
+
+function statusPillClass(s: OffplanStatusKey): string {
+  if (s === 'completed') return 'border-positive/40 text-positive bg-positive/5';
+  if (s === 'coming_soon') return 'border-accent/40 text-accent bg-accent/5';
+  return 'pill-accent';
+}
+
 function ProjectCard({ p }: { p: OffplanProjectCard }) {
   return (
     <Link
@@ -111,10 +165,32 @@ function ProjectCard({ p }: { p: OffplanProjectCard }) {
             {p.area_name ?? '—'} · {p.developer_name}
           </div>
         </div>
-        {p.offplan_buildings > 0 && (
-          <span className="pill pill-accent shrink-0">🏗️ Under construction</span>
-        )}
+        <span
+          className={cn(
+            'shrink-0 inline-flex items-center gap-1 text-[10px] tabular border rounded px-1.5 py-0.5',
+            statusPillClass(p.status_key)
+          )}
+          title={p.status_label}
+        >
+          {statusEmoji(p.status_key)}{' '}
+          {p.status_key === 'completed'
+            ? 'Completed'
+            : p.status_key === 'coming_soon'
+            ? 'Coming Soon'
+            : 'Under construction'}
+        </span>
       </div>
+
+      <div className="mt-2 text-[11px] text-fg-muted">{p.status_label}</div>
+
+      {p.status_key === 'completed' && p.price_gain_pct != null && p.offplan_ppsf && p.ready_ppsf && (
+        <div className="mt-2 rounded border border-positive/30 bg-positive/5 px-2 py-1.5 text-[11px] tabular text-positive">
+          Bought off-plan at {formatNumber(p.offplan_ppsf, 0)} AED/sqft → ready market {formatNumber(p.ready_ppsf, 0)} AED/sqft
+          <span className="ml-1 font-semibold">
+            {p.price_gain_pct >= 0 ? '+' : ''}{p.price_gain_pct.toFixed(1)}%
+          </span>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
         <Stat label="Buildings" value={formatNumber(p.buildings_count)} />
@@ -132,7 +208,8 @@ function ProjectCard({ p }: { p: OffplanProjectCard }) {
       </div>
 
       <div className="mt-3 flex items-center gap-1 text-[11px] text-accent">
-        View details <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
+        {p.status_key === 'completed' ? 'See ready market' : 'View details'}{' '}
+        <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
       </div>
     </Link>
   );

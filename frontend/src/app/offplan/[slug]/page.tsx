@@ -47,14 +47,24 @@ export default async function OffplanDetailPage({ params }: Props) {
             />
             <div className="mt-2 flex items-end justify-between gap-3 flex-wrap">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <HardHat className="h-4 w-4 text-fg-muted" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight truncate">
                     {detail.master_project}
                   </h1>
-                  {detail.offplan_buildings > 0 && (
-                    <span className="pill pill-accent">🏗️ Under construction</span>
-                  )}
+                  <span
+                    className={`pill ${
+                      detail.status_key === 'completed'
+                        ? 'border-positive/40 text-positive bg-positive/5'
+                        : detail.status_key === 'coming_soon'
+                        ? 'border-accent/40 text-accent bg-accent/5'
+                        : 'pill-accent'
+                    }`}
+                  >
+                    {detail.status_key === 'completed' && '✅ Completed'}
+                    {detail.status_key === 'coming_soon' && '📋 Coming Soon'}
+                    {detail.status_key === 'active' && '🏗️ Under construction'}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted">
                   {detail.area_name ?? '—'} ·{' '}
@@ -64,6 +74,8 @@ export default async function OffplanDetailPage({ params }: Props) {
                   >
                     {detail.developer_name}
                   </Link>
+                  {' · '}
+                  <span className="text-fg-subtle">{detail.status_label}</span>
                 </p>
               </div>
             </div>
@@ -80,6 +92,58 @@ export default async function OffplanDetailPage({ params }: Props) {
               <KpiCard label="Off-plan" value={formatNumber(detail.offplan_buildings)} />
               <KpiCard label="Ready" value={formatNumber(detail.ready_buildings)} />
             </section>
+
+            {/* Completed-project highlight: "bought off-plan at X, now Y, +Z%" */}
+            {detail.status_key === 'completed' && detail.price_gain_pct != null && (
+              <section className="rounded-lg border border-positive/40 bg-positive/5 p-4">
+                <div className="text-sm font-semibold text-positive">
+                  ✅ This project has completed — now trades as ready
+                </div>
+                <div className="mt-2 text-xs text-fg tabular space-y-1">
+                  {detail.offplan_ppsf != null && (
+                    <div>
+                      Bought off-plan at{' '}
+                      <span className="font-semibold text-fg">
+                        {formatNumber(detail.offplan_ppsf, 0)} AED/sqft
+                      </span>
+                      {detail.latest_offplan_year && ` (through ${detail.latest_offplan_year})`}
+                    </div>
+                  )}
+                  {detail.ready_ppsf != null && (
+                    <div>
+                      Current ready market:{' '}
+                      <span className="font-semibold text-fg">
+                        {formatNumber(detail.ready_ppsf, 0)} AED/sqft
+                      </span>
+                      {detail.latest_ready_year && ` (through ${detail.latest_ready_year})`}
+                    </div>
+                  )}
+                  <div className="pt-1">
+                    Gain for early buyers:{' '}
+                    <span className="font-semibold text-positive">
+                      {detail.price_gain_pct >= 0 ? '+' : ''}
+                      {detail.price_gain_pct.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+                {detail.area_slug && (
+                  <Link
+                    href={`/areas/${detail.area_slug}`}
+                    className="mt-3 inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                  >
+                    Buy as ready property → see {detail.area_name ?? 'area'} page
+                  </Link>
+                )}
+              </section>
+            )}
+
+            {detail.status_key === 'coming_soon' && (
+              <section className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-xs text-fg">
+                📋 <span className="font-semibold">Coming Soon.</span>{' '}
+                Registered on the DLD buildings dataset but no sales on
+                record yet — register interest below to be notified.
+              </section>
+            )}
 
             <section className="surface-card overflow-hidden">
               <div className="border-b border-border px-4 py-3 flex items-center gap-2">
