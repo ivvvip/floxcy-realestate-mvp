@@ -11,6 +11,7 @@ import { ArrowRight, TrendingUp } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { getTopAppreciation } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
+import { toAreaSlug } from '@/lib/slugs';
 import { cn } from '@/lib/cn';
 
 export async function HomeFastestGrowing() {
@@ -60,7 +61,7 @@ export async function HomeFastestGrowing() {
               return (
                 <li key={it.area_name_norm}>
                   <Link
-                    href={`/areas/${encodeURIComponent(it.area_name_norm.replace(/ /g, '-'))}`}
+                    href={`/areas/${toAreaSlug(it.area_name_norm)}`}
                     className="grid grid-cols-[28px_1fr_auto_auto] sm:grid-cols-[28px_1fr_120px_140px_120px] items-center gap-3 px-4 py-3 text-sm hover:bg-bg-elev/40"
                   >
                     <span className="text-fg-subtle tabular text-right font-mono">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { DashboardPulseResponse } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { MetricTooltip } from '@/components/MetricTooltip';
+import { toAreaSlug } from '@/lib/slugs';
 
 const QUADRANT_TONE = {
   best_investment: 'positive',
@@ -54,8 +55,7 @@ export function YieldVsAppreciationMatrix({
   const yMid = sortedY[Math.floor(sortedY.length / 2)];
 
   const hover = hoverIdx != null ? points[hoverIdx] : null;
-  const slugFor = (nameNorm: string) =>
-    encodeURIComponent(nameNorm.replace(/ /g, '-'));
+  const slugFor = (nameNorm: string) => toAreaSlug(nameNorm);
 
   return (
     <section className="card p-4">

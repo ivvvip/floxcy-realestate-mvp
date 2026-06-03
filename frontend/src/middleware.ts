@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toAreaSlug } from '@/lib/slugs';
 
 const AUTH_COOKIE = 'floxcy_session';
 
@@ -39,8 +40,20 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // ---------- Area slug canonicalisation ----------
+  // Any /areas/{slug}/... that isn't already in the canonical form
+  // (lowercase + hyphens + no extraneous chars) is 308-redirected to the
+  // canonical URL. This is what stops Next.js's [slug] router from 404'ing
+  // on /areas/al%20raffa, /areas/Al-Raffa, /areas/al_raffa, etc. — there's
+  // exactly one URL per area, every variant funnels into it. The peeled
+  // path also handles /en/areas/... and /ar/areas/... cleanly because
+  // localeFromPath strips the prefix below.
+  const peeled = localeFromPath(pathname);
+  const areaRedirect = canonicaliseAreaPath(req, peeled.locale, peeled.rest);
+  if (areaRedirect) return areaRedirect;
+
   // ---------- Locale prefix handling ----------
-  const { locale, rest } = localeFromPath(pathname);
+  const { locale, rest } = peeled;
   if (locale) {
     // Rewrite /ar/foo → /foo (transparent to pages) and pin the cookie
     const url = req.nextUrl.clone();
@@ -64,6 +77,35 @@ function forwardWithLocale(req: NextRequest, res: NextResponse): NextResponse {
   // Propagate the pathname header so server components can compute layout dir
   res.headers.set('x-next-pathname', req.nextUrl.pathname);
   return res;
+}
+
+/**
+ * Inspect the locale-peeled path; if it points at an /areas/{slug}/... URL
+ * whose first segment is not already the canonical area slug, return a 308
+ * redirect to the canonical form (with the locale prefix re-attached).
+ * Returns null when the URL is already canonical (or isn't an area URL).
+ */
+function canonicaliseAreaPath(
+  req: NextRequest,
+  locale: Locale | null,
+  restPath: string,
+): NextResponse | null {
+  if (!restPath.startsWith('/areas/')) return null;
+  const after = restPath.slice('/areas/'.length);
+  if (!after) return null;
+  const firstSlash = after.indexOf('/');
+  const rawSlug = firstSlash === -1 ? after : after.slice(0, firstSlash);
+  const tail = firstSlash === -1 ? '' : after.slice(firstSlash);
+  if (!rawSlug) return null;
+  const canonical = toAreaSlug(rawSlug);
+  if (!canonical) return null;
+  // Already canonical → let the request through.
+  if (rawSlug === canonical) return null;
+  const newRest = `/areas/${canonical}${tail}`;
+  const newPath = locale ? `/${locale}${newRest}` : newRest;
+  const url = req.nextUrl.clone();
+  url.pathname = newPath;
+  return NextResponse.redirect(url, 308);
 }
 
 export const config = {

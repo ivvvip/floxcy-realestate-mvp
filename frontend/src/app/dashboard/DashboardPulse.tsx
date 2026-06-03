@@ -18,6 +18,7 @@ import { formatAEDFull, formatLargeAED, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { YieldVsAppreciationMatrix } from './YieldAppreciationMatrix';
 import { MetricTooltip } from '@/components/MetricTooltip';
+import { toAreaSlug } from '@/lib/slugs';
 
 /**
  * The 7 dashboard widgets in one block, fed by /api/v1/dld/dashboard-pulse.
@@ -205,7 +206,7 @@ function HotAreasCard({ pulse }: { pulse: DashboardPulseResponse }) {
           return (
             <li key={h.area_name_norm} className="py-2 flex items-center gap-3">
               <Link
-                href={`/areas/${encodeURIComponent(h.area_name_norm.replace(/ /g, '-'))}`}
+                href={`/areas/${toAreaSlug(h.area_name_norm)}`}
                 className="flex-1 min-w-0 text-fg font-medium truncate hover:text-accent"
               >
                 {h.area_name_display}
@@ -272,7 +273,7 @@ function OffplanPipelineCard({ pulse }: { pulse: DashboardPulseResponse }) {
             <li key={a.area_name_norm}>
               <div className="flex items-baseline justify-between gap-2">
                 <Link
-                  href={`/areas/${encodeURIComponent(a.area_name_norm.replace(/ /g, '-'))}`}
+                  href={`/areas/${toAreaSlug(a.area_name_norm)}`}
                   className="text-xs text-fg font-medium truncate hover:text-accent"
                 >
                   {a.area_name_display}

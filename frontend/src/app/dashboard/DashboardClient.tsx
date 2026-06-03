@@ -18,6 +18,7 @@ import {
 import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { MetricTooltip, type MetricKey } from '@/components/MetricTooltip';
+import { toAreaSlug } from '@/lib/slugs';
 
 // Maps a backend KPI/section label to a tooltip entry. KPI tile labels match
 // the Dubai-wide dashboard entries; section titles fall through to the
@@ -540,7 +541,7 @@ function TopBarList({
                 {it.rank}
               </span>
               <Link
-                href={`/areas/${areaSlug(it.area_name)}`}
+                href={`/areas/${toAreaSlug(it.area_name)}`}
                 className="flex-1 truncate text-fg hover:text-accent transition-colors"
               >
                 {it.area_name}
@@ -565,14 +566,6 @@ function TopBarList({
   );
 }
 
-// Display name → URL slug. Backend accepts hyphens and matches against
-// DldArea.name_norm (which uses spaces), or falls through to a curated area
-// via curated_area_id. e.g. "Business Bay" → "business-bay".
-function areaSlug(displayName: string): string {
-  return encodeURIComponent(
-    displayName.trim().toLowerCase().replace(/\s+/g, '-'),
-  );
-}
 
 // ===========================================================================
 // 8. Yield trend area chart with direction badge
@@ -659,7 +652,7 @@ function SupplyPipelineList({ items }: { items: SupplyPipelineItem[] }) {
               <span className="flex items-baseline gap-1.5 flex-1 min-w-0">
                 <span className="text-fg-muted w-4 tabular text-right">{it.rank}</span>
                 <Link
-                  href={`/areas/${areaSlug(it.area_name)}`}
+                  href={`/areas/${toAreaSlug(it.area_name)}`}
                   className="text-fg truncate hover:text-accent transition-colors"
                 >
                   {it.area_name}
