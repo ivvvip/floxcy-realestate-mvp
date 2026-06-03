@@ -239,6 +239,12 @@ async def list_developers(
 
     cards: list[DeveloperCard] = []
     for stats in agg.values():
+        # Skip the catch-all bucket from the directory — it's mostly
+        # area names being recorded as master_project ("Business Bay"),
+        # not real developer projects. Detail endpoint still resolves
+        # 'other' for completeness.
+        if stats["slug"] == "other":
+            continue
         proj_count = len(stats["master_projects"])
         if proj_count == 0:
             continue
