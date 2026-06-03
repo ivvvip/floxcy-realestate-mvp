@@ -880,6 +880,12 @@ export interface DldBuildingItem {
     | 'office' | 'retail' | 'warehouse'
     | 'labor_camp' | 'whole_building' | 'other'
     | null;
+  // OSM-verified location. lat/lon populated when the building matched an
+  // OpenStreetMap building polygon; osm_verified is the flag for the
+  // "Location verified" badge. Both undefined on legacy responses.
+  lat?: number | null;
+  lon?: number | null;
+  osm_verified?: boolean;
 }
 
 export interface AreaCategoryBreakdownItem {

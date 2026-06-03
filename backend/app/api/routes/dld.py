@@ -3557,6 +3557,9 @@ def _build_derived_building_item(
         is_identifiable=True,
         data_source="ejari_derived",
         property_category=d.property_category,
+        lat=float(d.lat) if d.lat is not None else None,
+        lon=float(d.lon) if d.lon is not None else None,
+        osm_verified=bool(d.osm_verified),
     )
 
 

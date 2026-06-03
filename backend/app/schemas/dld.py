@@ -301,6 +301,13 @@ class DldBuildingItem(BaseModel):
     # Demand signal — qualitative bucket from active_rent_count.
     # Values: "very_high" | "high" | "moderate" | "low"
     demand_signal: Optional[str] = None
+    # OSM-verified location. lat/lon populated when the building matched an
+    # OpenStreetMap building polygon (see etl_osm_match.py); osm_verified is
+    # the flag the frontend uses to badge "Location verified" vs
+    # "Location approximate". For unmatched buildings both are null/false.
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    osm_verified: bool = False
 
 
 class DldBuildingsResponse(Attribution):

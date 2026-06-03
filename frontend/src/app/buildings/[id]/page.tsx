@@ -6,8 +6,10 @@ import {
   Building2,
   BadgeCheck,
   CalendarClock,
+  ExternalLink,
   Home,
   Layers,
+  MapPin,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -228,6 +230,54 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                       <CalendarClock className="h-3 w-3" strokeWidth={2.5} />
                       Off-plan
                     </span>
+                  )}
+                  {b.osm_verified ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded bg-positive/15 px-1.5 py-0.5 text-positive"
+                      title="Coordinates verified against an OpenStreetMap building polygon"
+                    >
+                      <BadgeCheck className="h-3 w-3" strokeWidth={2.5} />
+                      Location verified
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 rounded bg-fg-muted/15 px-1.5 py-0.5 text-fg-muted"
+                      title="No OpenStreetMap match found; the building exists per DLD but precise coords aren't published"
+                    >
+                      <MapPin className="h-3 w-3" strokeWidth={2.5} />
+                      Location approximate
+                    </span>
+                  )}
+                </div>
+                {/* View on Map — verified link goes to coords; unverified falls
+                    back to a search. */}
+                <div className="mt-2">
+                  {b.osm_verified && b.lat != null && b.lon != null ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                    >
+                      <MapPin className="h-3 w-3 text-positive" strokeWidth={2.5} />
+                      View on Google Maps
+                      <ExternalLink className="h-3 w-3" strokeWidth={2} />
+                    </a>
+                  ) : (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        [b.display_name ?? b.project_name, b.area_name, 'Dubai']
+                          .filter(Boolean)
+                          .join(' '),
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium text-fg-subtle hover:text-fg hover:border-border-strong transition-colors"
+                    >
+                      <MapPin className="h-3 w-3" strokeWidth={2.5} />
+                      Search on Google Maps
+                      <ExternalLink className="h-3 w-3" strokeWidth={2} />
+                    </a>
                   )}
                 </div>
               </div>

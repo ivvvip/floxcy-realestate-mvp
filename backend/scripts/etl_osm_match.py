@@ -1,0 +1,208 @@
+"""OSM Overpass → dld_building_osm_coords ETL.
+
+Reads ~/dld-data/osm_buildings.json (produced by the Overpass query
+documented at the top of this script), normalises building names on both
+sides, and writes:
+
+  - dld_building_osm_coords: one row per matched DLD building, with the
+    OSM name, lat/lon, osm_id, match_type ('exact' | 'fuzzy'), match_ratio,
+    floors when available.
+  - dld_buildings_derived: lat/lon/osm_verified denormalised columns
+    refreshed from the same matches.
+
+Idempotent: TRUNCATE + INSERT on dld_building_osm_coords; UPDATE on
+dld_buildings_derived clears prior coords first so removing a match from
+OSM also clears it locally.
+
+Re-fetching the source JSON:
+  curl -s -X POST 'https://overpass-api.de/api/interpreter' \\
+       -H 'User-Agent: floxcy/0.1' \\
+       -H 'Accept: application/json' \\
+       --data '[out:json][timeout:120];
+       (
+         way["building"]["name"](24.79,54.85,25.45,55.70);
+         relation["building"]["name"](24.79,54.85,25.45,55.70);
+       );
+       out center tags;'
+
+Run patterns:
+    python scripts/etl_osm_match.py            # dry-run
+    python scripts/etl_osm_match.py --to-db    # write to Postgres
+"""
+from __future__ import annotations
+
+import argparse
+import difflib
+import json
+import re
+import sys
+import uuid
+from pathlib import Path
+
+DATA_PATH = Path.home() / "dld-data" / "osm_buildings.json"
+FUZZY_CUTOFF = 0.86
+
+# Words that distort the SequenceMatcher score because they're so common
+# across Dubai building names. Stripped before normalisation so "Lake View"
+# and "Lake View Tower" rank as effectively the same string.
+STOPWORDS = {
+    "the", "by", "at", "of", "and",
+    "residence", "residences",
+    "tower", "towers",
+    "building",
+    "al", "el",
+    "dubai",
+}
+
+
+def get_sync_db_url() -> str:
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("DATABASE_URL="):
+                url = line.split("=", 1)[1].strip().strip('"').strip("'")
+                return url.replace("postgresql+asyncpg://", "postgresql://")
+    raise RuntimeError("DATABASE_URL not found in backend/.env")
+
+
+def normalize(name: str) -> str:
+    if not name:
+        return ""
+    s = name.lower()
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    tokens = [t for t in s.split() if t and t not in STOPWORDS]
+    return " ".join(tokens)
+
+
+def load_osm() -> list[dict]:
+    if not DATA_PATH.exists():
+        raise SystemExit(f"missing OSM dump: {DATA_PATH}")
+    return json.loads(DATA_PATH.read_text())
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--to-db", action="store_true")
+    args = ap.parse_args()
+
+    osm = load_osm()
+    print(f"OSM rows loaded:  {len(osm):,}", flush=True)
+
+    import psycopg2
+    import psycopg2.extras
+
+    dsn = get_sync_db_url()
+    print(f"Connecting to {dsn.split('@')[-1].split('/')[0]}...", flush=True)
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, project_name_en, master_project_en, area_name_en, contract_count
+                FROM dld_buildings_derived
+                ORDER BY contract_count DESC
+            """)
+            dld = cur.fetchall()
+        print(f"DLD buildings:    {len(dld):,}", flush=True)
+
+        osm_by_norm: dict[str, list[dict]] = {}
+        for o in osm:
+            n = normalize(o["name"])
+            if n:
+                osm_by_norm.setdefault(n, []).append(o)
+        osm_keys = list(osm_by_norm.keys())
+
+        matches: list[tuple] = []
+        exact, fuzzy = 0, 0
+        for bid, name, _master, _area, _cnt in dld:
+            n = normalize(name)
+            if not n:
+                continue
+            osm_row: dict | None = None
+            match_type: str = ""
+            ratio: float = 0.0
+            if n in osm_by_norm:
+                osm_row = osm_by_norm[n][0]
+                match_type = "exact"
+                ratio = 1.0
+                exact += 1
+            else:
+                cand = difflib.get_close_matches(n, osm_keys, n=1, cutoff=FUZZY_CUTOFF)
+                if cand:
+                    osm_row = osm_by_norm[cand[0]][0]
+                    match_type = "fuzzy"
+                    ratio = round(difflib.SequenceMatcher(None, n, cand[0]).ratio(), 3)
+                    fuzzy += 1
+            if osm_row is None:
+                continue
+            floors = None
+            f_raw = (osm_row.get("floors") or "").strip()
+            if f_raw.isdigit():
+                floors = int(f_raw)
+            matches.append((
+                str(uuid.uuid4()),
+                bid,
+                name,
+                osm_row["name"],
+                float(osm_row["lat"]),
+                float(osm_row["lon"]),
+                int(osm_row["osm_id"]),
+                osm_row.get("osm_kind"),
+                match_type,
+                ratio,
+                floors,
+                osm_row.get("type"),
+            ))
+
+        print(
+            f"\nMatched: {len(matches):,} "
+            f"(exact={exact}, fuzzy={fuzzy})  "
+            f"= {len(matches)/len(dld)*100:.1f}% of roster",
+            flush=True,
+        )
+
+        if not args.to_db:
+            print("\nDry-run only. Re-run with --to-db to write.", flush=True)
+            return 0
+
+        with conn.cursor() as cur:
+            # Reset denorm columns + match table
+            cur.execute("""
+                UPDATE dld_buildings_derived
+                SET lat = NULL, lon = NULL, osm_verified = FALSE
+            """)
+            cur.execute("TRUNCATE dld_building_osm_coords")
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO dld_building_osm_coords (
+                    id, building_id, dld_name, osm_name, lat, lon,
+                    osm_id, osm_kind, match_type, match_ratio, floors,
+                    building_type
+                ) VALUES %s
+                """,
+                matches,
+                page_size=500,
+            )
+            # Backfill the denormalised cols
+            cur.execute("""
+                UPDATE dld_buildings_derived AS b
+                SET lat = c.lat, lon = c.lon, osm_verified = TRUE
+                FROM dld_building_osm_coords AS c
+                WHERE c.building_id = b.id
+            """)
+        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM dld_building_osm_coords")
+            n_coords = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM dld_buildings_derived WHERE osm_verified")
+            n_verified = cur.fetchone()[0]
+        print(f"\nWrote {n_coords:,} osm-coords rows; "
+              f"{n_verified:,} dld_buildings_derived flagged verified.",
+              flush=True)
+    finally:
+        conn.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

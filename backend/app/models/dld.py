@@ -10,6 +10,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -291,6 +292,12 @@ class DldBuildingDerived(Base):
     # Property category from _dld_category.classify_property — drives the
     # 5-tab buildings UI (Residential / Villas / Commercial / Special).
     property_category: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    # OSM-verified coordinates (populated by etl_osm_match.py). lat/lon are
+    # nullable because OSM coverage is partial (~30% of the roster);
+    # osm_verified is the flag the frontend uses to badge "Location verified".
+    lat: Mapped[Optional[float]] = mapped_column(Numeric(10, 7), nullable=True)
+    lon: Mapped[Optional[float]] = mapped_column(Numeric(10, 7), nullable=True)
+    osm_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -299,6 +306,31 @@ class DldBuildingDerived(Base):
             name="uq_dld_buildings_derived_name_area",
         ),
     )
+
+
+class DldBuildingOsmCoords(Base):
+    """OSM Overpass match for a DldBuildingDerived row. One row per matched
+    building; floors + building_type come straight from the OSM way/relation
+    when present. match_type is 'exact' or 'fuzzy'; match_ratio is the
+    SequenceMatcher score (1.0 for exact, ≥0.86 for fuzzy)."""
+    __tablename__ = "dld_building_osm_coords"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    building_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dld_buildings_derived.id", ondelete="CASCADE"),
+        nullable=False, unique=True, index=True,
+    )
+    dld_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    osm_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    lat: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)
+    lon: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)
+    osm_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    osm_kind: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    match_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    match_ratio: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    floors: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    building_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class DldBuildingRentHistory(Base):

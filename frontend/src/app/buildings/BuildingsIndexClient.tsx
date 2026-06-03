@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BadgeCheck,
   Building2,
   Home,
   Landmark,
@@ -423,6 +424,15 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
             {b.data_source === 'ejari_derived' && (
               <span className="ml-1 rounded bg-accent/15 px-1 text-accent">
                 · Ejari ✅
+              </span>
+            )}
+            {b.osm_verified && (
+              <span
+                className="ml-1 inline-flex items-center gap-0.5 rounded bg-positive/15 px-1 text-positive"
+                title="Location verified against OpenStreetMap"
+              >
+                <BadgeCheck className="h-2.5 w-2.5" strokeWidth={2.5} />
+                Verified
               </span>
             )}
           </div>
