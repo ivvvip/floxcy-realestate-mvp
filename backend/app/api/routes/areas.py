@@ -1,4 +1,5 @@
 """Areas API endpoints."""
+import re
 from uuid import UUID
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -452,16 +453,40 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
                 select(DldArea).where(DldArea.id == maybe_uuid)
             )).scalar_one_or_none()
         if not dld_area:
-            # name_norm is stored with spaces (e.g. "business bay"); accept
-            # both hyphenated (URL-friendly) and space variants.
-            norm = slug.strip().lower()
+            # name_norm is stored with spaces (e.g. "business bay"). Accept
+            # any reasonable URL slug form: hyphens, underscores, %20-decoded
+            # spaces, mixed separators, double-hyphens. Resolution order:
+            #   1. Exact name_norm match
+            #   2. Canonical hyphen-slug → name_norm
+            #   3. Space-normalised name_norm (any separator → space)
+            norm_raw = slug.strip().lower()
             dld_area = (await db.execute(
-                select(DldArea).where(DldArea.name_norm == norm)
+                select(DldArea).where(DldArea.name_norm == norm_raw)
             )).scalar_one_or_none()
-            if not dld_area and "-" in norm:
-                dld_area = (await db.execute(
-                    select(DldArea).where(DldArea.name_norm == norm.replace("-", " "))
-                )).scalar_one_or_none()
+
+            if not dld_area:
+                # Canonical hyphen slug (e.g. "wadi-al-safa-5")
+                slug_form = re.sub(r"[\s_]+", "-", norm_raw)
+                slug_form = re.sub(r"-+", "-", slug_form).strip("-")
+                if slug_form and slug_form != norm_raw:
+                    canon = (await db.execute(
+                        select(DldCanonicalArea)
+                        .where(DldCanonicalArea.area_name_slug == slug_form)
+                    )).scalar_one_or_none()
+                    if canon:
+                        dld_area = (await db.execute(
+                            select(DldArea).where(
+                                DldArea.name_norm == canon.area_name.lower()
+                            )
+                        )).scalar_one_or_none()
+
+            if not dld_area:
+                # Final fallback: any separator → single space
+                space_form = re.sub(r"[-_\s]+", " ", norm_raw).strip()
+                if space_form and space_form != norm_raw:
+                    dld_area = (await db.execute(
+                        select(DldArea).where(DldArea.name_norm == space_form)
+                    )).scalar_one_or_none()
         if not dld_area:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
