@@ -1,15 +1,14 @@
 """Developer directory + detail.
 
 There is no published `dld_developers` table in the DLD open dataset, so
-this route derives developer entities from `dld_buildings.master_project`
-prefixes against a curated brand list (Emaar, Sobha, Damac, Nakheel,
-Meraas, Aldar, etc.). Only verifiable fields are exposed — there is no
-attempt to fabricate completion %, escrow status, or RERA approval,
-because that data is not in any table we own.
+this route derives developer entities from
+`dld_buildings_sales.master_project_en` prefixes against a curated
+brand list (Emaar, Sobha, Damac, Nakheel, Meraas, Aldar, etc.). Only
+verifiable fields are exposed — there is no attempt to fabricate
+completion %, escrow status, or RERA approval.
 
-Track-record score weights real signals only: project count, total
-units, areas served, and (where available) total AED value from
-`dld_buildings_sales`.
+Track-record score weights real signals only: project count, sale
+volume (transactions), areas served, and longevity.
 """
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
-from app.models.dld import DldArea, DldBuilding
+from app.models.dld import DldArea, DldBuildingsSales
 
 
 router = APIRouter(
@@ -35,9 +34,7 @@ router = APIRouter(
 )
 
 
-# Curated brand list. Order matters: longer/more-specific prefixes first
-# so "DUBAI PROPERTIES" beats "DUBAI" and "DAMAC HILLS" beats "DAMAC".
-# Each entry is (brand_slug, display_name, prefix_matches).
+# Order matters: longer/more-specific prefixes first.
 DEVELOPER_BRANDS: list[tuple[str, str, tuple[str, ...]]] = [
     ("emaar", "Emaar Properties", ("EMAAR",)),
     ("nakheel", "Nakheel", ("NAKHEEL",)),
@@ -56,29 +53,25 @@ DEVELOPER_BRANDS: list[tuple[str, str, tuple[str, ...]]] = [
     ("union-properties", "Union Properties", ("UNION PROPERTIES",)),
     ("samana", "Samana Developers", ("SAMANA",)),
     ("select-group", "Select Group", ("SELECT GROUP",)),
-    ("tiger-group", "Tiger Group", ("TIGER GROUP", "TIGER ")),
+    ("tiger-group", "Tiger Group", ("TIGER GROUP",)),
     ("reportage", "Reportage Properties", ("REPORTAGE",)),
-    ("g-and-co", "G&Co Properties", ("G&CO", "G & CO")),
     ("imkan", "Imkan Properties", ("IMKAN",)),
     ("mag", "MAG Property Development", ("MAG ",)),
-    ("nshama", "Nshama", ("NSHAMA",)),
-    ("dar-al-arkan", "Dar Al Arkan", ("DAR AL ARKAN",)),
+    ("nshama", "Nshama", ("NSHAMA", "TOWN SQUARE")),
     ("arada", "Arada", ("ARADA",)),
     ("seven-tides", "Seven Tides", ("SEVEN TIDES",)),
-    ("the-first-group", "The First Group", ("FIRST GROUP",)),
-    ("burj-khalifa", "Emaar Properties", ("BURJ KHALIFA", "DOWNTOWN")),  # downtown is Emaar's master
+    ("emaar-beachfront", "Emaar Properties", ("BEACHFRONT", "DOWNTOWN", "ARABIAN RANCHES", "DUBAI HILLS", "DUBAI CREEK", "EMIRATES HILLS")),
 ]
 
 
 def _detect_brand(master_project: Optional[str]) -> tuple[str, str]:
-    """Return (slug, display_name). Falls back to 'other' for anything
-    that doesn't match a known brand prefix."""
+    """Return (slug, display_name). 'other' bucket for unmatched names."""
     if not master_project:
         return ("other", "Independent / Unbranded")
     mp = master_project.strip().upper()
     for slug, name, prefixes in DEVELOPER_BRANDS:
         for p in prefixes:
-            if mp.startswith(p):
+            if p in mp:
                 return (slug, name)
     return ("other", "Independent / Unbranded")
 
@@ -108,7 +101,7 @@ class DeveloperCard(BaseModel):
 class DevelopersListResponse(BaseModel):
     total: int
     items: list[DeveloperCard]
-    data_source: str = "Derived from DLD buildings master_project clustering. Brand detection is heuristic — Floxcy never claims developer identity verification."
+    data_source: str = "Derived from dld_buildings_sales master_project_en clustering. Brand attribution is heuristic — Floxcy never sells verification badges."
     coverage_note: str = (
         "DLD does not publish a developer master list. Brand attribution is "
         "inferred from master_project prefixes against a curated brand list. "
@@ -133,7 +126,7 @@ class DeveloperDetail(BaseModel):
     name: str
     summary: DeveloperCard
     projects: list[DeveloperProjectRow]
-    data_source: str = "Derived from dld_buildings + dld_buildings_sales."
+    data_source: str = "Derived from dld_buildings_sales."
 
 
 # ---------------------------------------------------------------------------
@@ -141,26 +134,27 @@ class DeveloperDetail(BaseModel):
 # ---------------------------------------------------------------------------
 
 async def _aggregate_developers(db: AsyncSession) -> dict[str, dict[str, Any]]:
-    """Walk dld_buildings, group by detected brand, return raw stats per
-    developer (no scoring yet)."""
+    """Walk dld_buildings_sales, group by detected brand."""
     rows = (
         await db.execute(
             select(
-                DldBuilding.master_project,
-                DldBuilding.project_number,
-                DldBuilding.project_name,
-                DldBuilding.flats,
-                DldBuilding.is_offplan,
-                DldBuilding.creation_date,
-                DldBuilding.dld_area_id,
-                DldArea.name_display,
+                DldBuildingsSales.master_project_en,
+                DldBuildingsSales.area_name_en,
+                DldBuildingsSales.dld_area_id,
+                DldBuildingsSales.total_transactions,
+                DldBuildingsSales.avg_ppsf_offplan,
+                DldBuildingsSales.avg_sale_price_offplan,
+                DldBuildingsSales.first_seen_year,
+                DldBuildingsSales.last_seen_year,
             )
-            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
         )
     ).all()
 
     agg: dict[str, dict[str, Any]] = {}
-    for mp, pnum, pname, flats, is_offplan, cdate, area_id, area_name in rows:
+    for (
+        mp, area_name, area_id, total_txn,
+        avg_ppsf_off, avg_price_off, first_year, last_year,
+    ) in rows:
         slug, name = _detect_brand(mp)
         bucket = agg.setdefault(slug, {
             "slug": slug, "name": name,
@@ -168,32 +162,30 @@ async def _aggregate_developers(db: AsyncSession) -> dict[str, dict[str, Any]]:
             "offplan_master_projects": set(),
             "areas": set(),
             "area_names": [],
-            "units": 0,
+            "units": 0,  # transaction volume proxy
             "years": [],
             "buildings": 0,
         })
         bucket["buildings"] += 1
         if mp:
-            bucket["master_projects"].add(mp.strip())
-            if is_offplan:
-                bucket["offplan_master_projects"].add(mp.strip())
-        if flats:
-            bucket["units"] += int(flats)
+            key = mp.strip()
+            bucket["master_projects"].add(key)
+            if avg_ppsf_off is not None or avg_price_off is not None:
+                bucket["offplan_master_projects"].add(key)
+        if total_txn:
+            bucket["units"] += int(total_txn)
         if area_id:
             bucket["areas"].add(area_id)
         if area_name:
             bucket["area_names"].append(area_name)
-        if cdate:
-            bucket["years"].append(cdate.year)
+        if first_year:
+            bucket["years"].append(int(first_year))
+        if last_year:
+            bucket["years"].append(int(last_year))
     return agg
 
 
 def _score(stats: dict[str, Any], max_units: int, max_projects: int) -> float:
-    """0-100 track-record score from real signals only.
-
-    Weights: 40 % project count, 30 % unit volume, 20 % area diversity,
-    10 % longevity (years of activity).
-    """
     if max_projects <= 0 or max_units <= 0:
         return 0.0
     projects = len(stats["master_projects"])
@@ -204,7 +196,6 @@ def _score(stats: dict[str, Any], max_units: int, max_projects: int) -> float:
     if years:
         span = max(years) - min(years)
         longevity = min(1.0, span / 25.0)
-    # log-scale for fairness — a few mega-developers shouldn't crush the rest.
     proj_norm = math.log1p(projects) / math.log1p(max_projects)
     units_norm = math.log1p(units) / math.log1p(max_units)
     areas_norm = min(1.0, areas / 20.0)
@@ -272,7 +263,7 @@ async def list_developers(
         cards.sort(key=lambda c: c.total_units, reverse=True)
     elif sort == "name":
         cards.sort(key=lambda c: c.name.lower())
-    else:  # score
+    else:
         cards.sort(key=lambda c: c.track_record_score, reverse=True)
 
     return DevelopersListResponse(total=len(cards), items=cards[:limit])
@@ -307,25 +298,29 @@ async def get_developer(
         top_areas=_top_areas(stats["area_names"]),
     )
 
-    # Pull per-project aggregates for this developer
     rows = (
         await db.execute(
             select(
-                DldBuilding.master_project,
-                DldArea.name_display,
-                func.count(DldBuilding.id).label("bld_count"),
-                func.coalesce(func.sum(DldBuilding.flats), 0).label("units"),
-                func.bool_or(DldBuilding.is_offplan).label("any_offplan"),
-                func.min(func.extract("year", DldBuilding.creation_date)).label("y_min"),
-                func.max(func.extract("year", DldBuilding.creation_date)).label("y_max"),
+                DldBuildingsSales.master_project_en,
+                DldBuildingsSales.area_name_en,
+                func.count(DldBuildingsSales.id).label("bld_count"),
+                func.coalesce(func.sum(DldBuildingsSales.total_transactions), 0).label("units"),
+                func.bool_or(
+                    DldBuildingsSales.avg_ppsf_offplan.is_not(None)
+                ).label("any_offplan"),
+                func.min(DldBuildingsSales.first_seen_year).label("y_min"),
+                func.max(DldBuildingsSales.last_seen_year).label("y_max"),
+                func.avg(DldBuildingsSales.avg_ppsf_ready).label("avg_ppsf"),
             )
-            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
-            .group_by(DldBuilding.master_project, DldArea.name_display)
+            .group_by(
+                DldBuildingsSales.master_project_en,
+                DldBuildingsSales.area_name_en,
+            )
         )
     ).all()
 
     projects: list[DeveloperProjectRow] = []
-    for mp, area, bld_count, units, any_offplan, y_min, y_max in rows:
+    for mp, area, bld_count, units, any_offplan, y_min, y_max, avg_ppsf in rows:
         if _detect_brand(mp)[0] != slug.lower():
             continue
         if not mp:
@@ -339,7 +334,7 @@ async def get_developer(
             is_offplan=bool(any_offplan),
             earliest_year=int(y_min) if y_min else None,
             latest_year=int(y_max) if y_max else None,
-            avg_ppsf=None,
+            avg_ppsf=float(avg_ppsf) if avg_ppsf is not None else None,
         ))
 
     projects.sort(key=lambda p: (not p.is_offplan, -p.total_units))
