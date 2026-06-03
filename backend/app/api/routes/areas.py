@@ -487,6 +487,25 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
                     dld_area = (await db.execute(
                         select(DldArea).where(DldArea.name_norm == space_form)
                     )).scalar_one_or_none()
+
+            if not dld_area:
+                # Last-resort: normalize the DB's name_norm the same way the
+                # URL is normalized (any separator → '-') and compare. Handles
+                # data quirks like name_norm = "al-mustashfa west" where the
+                # hyphen is part of the canonical name. Not indexed; only
+                # fires when every cheaper lookup has missed.
+                slug_form2 = re.sub(r"[\s_-]+", "-", norm_raw).strip("-")
+                if slug_form2:
+                    dld_area = (await db.execute(
+                        select(DldArea).where(
+                            func.regexp_replace(
+                                func.lower(DldArea.name_norm),
+                                r"[\s_-]+",
+                                "-",
+                                "g",
+                            ) == slug_form2
+                        )
+                    )).scalar_one_or_none()
         if not dld_area:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
