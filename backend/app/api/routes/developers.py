@@ -36,11 +36,23 @@ router = APIRouter(
 
 # Order matters: longer/more-specific prefixes first.
 DEVELOPER_BRANDS: list[tuple[str, str, tuple[str, ...]]] = [
-    ("emaar", "Emaar Properties", ("EMAAR",)),
-    ("nakheel", "Nakheel", ("NAKHEEL",)),
+    # Emaar must come first — many of its masterplans don't carry the
+    # word "EMAAR" (Downtown, Arabian Ranches, Dubai Hills, Dubai Creek,
+    # Emirates Hills) so we route them via their masterplan names. All
+    # variants share the same slug so the directory shows one Emaar card.
+    ("emaar", "Emaar Properties", (
+        "EMAAR",
+        "DOWNTOWN",
+        "ARABIAN RANCHES",
+        "DUBAI HILLS",
+        "DUBAI CREEK",
+        "EMIRATES HILLS",
+        "BEACHFRONT",
+    )),
+    ("nakheel", "Nakheel", ("NAKHEEL", "PALM JUMEIRAH", "PALM JEBEL")),
     ("sobha", "Sobha Realty", ("SOBHA",)),
     ("damac", "Damac Properties", ("DAMAC",)),
-    ("meraas", "Meraas", ("MERAAS",)),
+    ("meraas", "Meraas", ("MERAAS", "BLUEWATERS", "CITY WALK", "LA MER")),
     ("aldar", "Aldar Properties", ("ALDAR",)),
     ("dubai-properties", "Dubai Properties", ("DUBAI PROPERTIES",)),
     ("dubai-holding", "Dubai Holding", ("DUBAI HOLDING",)),
@@ -60,7 +72,6 @@ DEVELOPER_BRANDS: list[tuple[str, str, tuple[str, ...]]] = [
     ("nshama", "Nshama", ("NSHAMA", "TOWN SQUARE")),
     ("arada", "Arada", ("ARADA",)),
     ("seven-tides", "Seven Tides", ("SEVEN TIDES",)),
-    ("emaar-beachfront", "Emaar Properties", ("BEACHFRONT", "DOWNTOWN", "ARABIAN RANCHES", "DUBAI HILLS", "DUBAI CREEK", "EMIRATES HILLS")),
 ]
 
 
