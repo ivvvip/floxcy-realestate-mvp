@@ -142,5 +142,11 @@
     "latitude": 25.2680,
     "longitude": 55.2962,
     "notes": "Old Deira souq — historic 'horse path' market area"
+  },
+  {
+    "area_name_upper": "HADAEQ SHEIKH MOHAMMED BIN RASHID",
+    "latitude": 25.103,
+    "longitude": 55.246,
+    "notes": "Dubai Hills Estate master community — replaces the prior curated_alias centroid (25.029, 55.258) which placed the area ~10 km south of the actual community"
   }
 ]

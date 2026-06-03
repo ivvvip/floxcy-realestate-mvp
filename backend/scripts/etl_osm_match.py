@@ -42,6 +42,34 @@ from pathlib import Path
 DATA_PATH = Path.home() / "dld-data" / "osm_buildings.json"
 FUZZY_CUTOFF = 0.86
 
+# Manually-curated unverify list. Even when a (project_name, area_name)
+# pair would match an OSM entry by name, we still skip it because the
+# real building doesn't live where the OSM hit places it.
+#
+# Pattern that surfaced these: many low-confidence name collisions in
+# Business Bay (the Burj Khalifa-adjacent towers all share generic
+# names like "OPAL TOWER" / "SILVER TOWER" with unrelated buildings
+# elsewhere). Audit ran against area centroid via haversine; everything
+# here was >10 km from where the DLD-side area places it.
+#
+# Stays unverified on every re-run — Floxcy renders "Location
+# approximate" + name-only Google Maps link, which is honest.
+MANUAL_OSM_UNVERIFY: set[tuple[str, str]] = {
+    # (project_name_en exactly as in dld_buildings_derived, area_name_en)
+    ("THE 8", "Palm Jumeirah"),
+    ("PLATINUM TOWER", "Al Thanyah Fifth"),
+    ("PRIME TOWER", "Business Bay"),
+    ("Binghatti Creek", "Al Jadaf"),
+    ("AL BAHIA", "Al Safouh First"),
+    ("THE S TOWER", "Al Safouh Second"),
+    ("OPAL TOWER", "Business Bay"),
+    ("SILVER TOWER", "Business Bay"),
+    ("OXFORD TOWER", "Business Bay"),
+    ("CRYSTAL TOWER", "Business Bay"),
+    ("THE DUBAI MALL", "Burj Khalifa"),
+    ("AVANTI TOWER", "Business Bay"),
+}
+
 # Dubai-only bbox + NE-corner refinement. The Overpass query intentionally
 # pulls a slightly wider box (24.79–25.45 N, 54.85–55.70 E) so future
 # Mamzar/Mirdif edge additions land cleanly; in-script we then drop
@@ -160,9 +188,15 @@ def main() -> int:
 
         matches: list[tuple] = []
         exact, fuzzy = 0, 0
-        for bid, name, _master, _area, _cnt in dld:
+        unverify_skipped = 0
+        for bid, name, _master, area_name, _cnt in dld:
             n = normalize(name)
             if not n:
+                continue
+            # Hard-skip any (building, area) pair the audit flagged as
+            # geographically wrong even though it matches a name in OSM.
+            if name and area_name and (name, area_name) in MANUAL_OSM_UNVERIFY:
+                unverify_skipped += 1
                 continue
             osm_row: dict | None = None
             match_type: str = ""
@@ -203,7 +237,8 @@ def main() -> int:
         print(
             f"\nMatched: {len(matches):,} "
             f"(exact={exact}, fuzzy={fuzzy})  "
-            f"= {len(matches)/len(dld)*100:.1f}% of roster",
+            f"= {len(matches)/len(dld)*100:.1f}% of roster · "
+            f"manual unverify: {unverify_skipped}",
             flush=True,
         )
 
