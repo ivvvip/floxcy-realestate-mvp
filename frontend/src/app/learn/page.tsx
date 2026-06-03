@@ -116,7 +116,6 @@ const GLOSSARY = [
   ['Service charge', 'Annual building maintenance fee, paid quarterly. Range: 12–30 AED/sqft depending on amenities.'],
   ['Off-plan', 'Property sold before construction completion. Pays in installments tied to construction milestones.'],
   ['Decree 43', 'RERA rental increase law — caps annual rent increases by % bands based on how far below market your current rent sits.'],
-  ['RDSC', 'Rental Disputes Settlement Centre — the court for landlord/tenant disputes. 5% admin fee on filed disputes.'],
 ];
 
 export default function LearnPage() {

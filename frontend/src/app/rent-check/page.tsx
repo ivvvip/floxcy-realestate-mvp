@@ -118,8 +118,8 @@ function TenantRightsNotice() {
         </div>
         <div className="space-y-1.5">
           <Right>Ejari registration is mandatory — without it you have no legal recourse</Right>
-          <Right>File a dispute at the Rental Disputes Settlement Centre (RDSC)</Right>
-          <Right>5% RERA admin fee for any rental dispute filing</Right>
+          <Right>Negotiate in writing — keep records of every rent discussion</Right>
+          <Right>If you need help, consult a RERA-licensed broker who knows your area</Right>
         </div>
       </div>
       <div className="border-t border-border pt-3 grid sm:grid-cols-2 gap-2">
@@ -132,15 +132,12 @@ function TenantRightsNotice() {
           Register on Ejari
           <ExternalLink className="h-3 w-3" strokeWidth={2} />
         </a>
-        <a
-          href="https://www.dc.gov.ae/PublicServices/RentalDisputesIntroduction.aspx"
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          href="/brokers/directory"
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-accent/40"
         >
-          File a dispute (RDSC)
-          <ExternalLink className="h-3 w-3" strokeWidth={2} />
-        </a>
+          Consult a RERA-licensed broker →
+        </Link>
       </div>
       <div className="border-t border-border pt-3 text-[11px] text-fg-muted">
         <Link

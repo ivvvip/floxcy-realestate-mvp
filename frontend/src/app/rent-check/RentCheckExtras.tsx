@@ -16,6 +16,7 @@
  *  as ShareRow — it needs URL deep-link params from the form state.)
  */
 
+import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import {
   AlertTriangle,
@@ -245,18 +246,16 @@ export function RERALegalCalculator({ result }: { result: RentCheckResponse }) {
 
       {band.maxIncreasePct > 0 && (
         <div className="mt-3 rounded border border-warning/40 bg-warning/5 p-3 text-xs text-warning">
-          <div className="font-semibold">⚠️ If the landlord demands more than {formatAED(maxNewRent)}, that increase is illegal.</div>
+          <div className="font-semibold">⚠️ If the landlord demands more than {formatAED(maxNewRent)}, that increase exceeds the RERA cap.</div>
           <div className="mt-1 text-fg-muted">
-            File a complaint with the Rental Disputes Centre at{' '}
-            <a
-              href="https://rdsc.gov.ae"
-              target="_blank"
-              rel="noopener noreferrer"
+            Show your landlord the calculator above, then{' '}
+            <Link
+              href="/brokers/directory"
               className="text-accent underline"
             >
-              rdsc.gov.ae
-            </a>
-            .
+              consult a RERA-licensed broker
+            </Link>{' '}
+            if you need help negotiating.
           </div>
         </div>
       )}

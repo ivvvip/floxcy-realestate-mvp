@@ -752,8 +752,8 @@ function ReraInfoBox({ lastUpdated }: { lastUpdated?: string }) {
           <p className="mt-1 text-xs text-fg-muted leading-relaxed">
             Every broker in Dubai must hold a valid RERA license issued by the
             Dubai Land Department. All brokers shown here are verified against
-            the official DLD broker registry — the same data RDSC uses for
-            rental disputes.{' '}
+            the official DLD broker registry — the authoritative source for
+            licensed real-estate professionals in Dubai.{' '}
             <span className="text-fg-subtle">
               Last verified: {lastUpdated ?? '2026-06-01'}.
             </span>
