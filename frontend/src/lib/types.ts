@@ -117,7 +117,8 @@ export interface AreaLatestSnapshot {
 }
 
 export interface AreaDldBlock {
-  dld_area_id: string;
+  // Null for canonical-only areas (no current-snapshot row in dld_areas)
+  dld_area_id: string | null;
   dld_name: string;
   median_price_per_sqft: number | null;
   median_annual_rent: number | null;

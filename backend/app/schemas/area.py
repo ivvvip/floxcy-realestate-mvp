@@ -89,8 +89,14 @@ class AreaLatestSnapshot(BaseModel):
 
 
 class AreaDldBlock(BaseModel):
-    """DLD-sourced metrics for an area (matched via dld_areas.curated_area_id)."""
-    dld_area_id: UUID
+    """DLD-sourced metrics for an area (matched via dld_areas.curated_area_id).
+
+    `dld_area_id` is Optional to support the canonical-only fallback: when a
+    canonical historical area has no row in the current snapshot table
+    (dld_areas), we still want /areas/[slug] to render the area, just without
+    DLD live metrics.
+    """
+    dld_area_id: Optional[UUID] = None
     dld_name: str
     median_price_per_sqft: Optional[float] = None
     median_annual_rent: Optional[float] = None

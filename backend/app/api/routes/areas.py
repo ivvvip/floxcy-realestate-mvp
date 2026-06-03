@@ -452,60 +452,93 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
             dld_area = (await db.execute(
                 select(DldArea).where(DldArea.id == maybe_uuid)
             )).scalar_one_or_none()
+        # Try every reasonable spelling of the slug against DldArea (the
+        # current snapshot table). When that fully misses, we fall back to
+        # DldCanonicalArea (the historical union of all 3 CSVs) so legitimate
+        # area names from 2021–2024 history still render instead of 404'ing.
+        canon: Optional[DldCanonicalArea] = None
         if not dld_area:
-            # name_norm is stored with spaces (e.g. "business bay"). Accept
-            # any reasonable URL slug form: hyphens, underscores, %20-decoded
-            # spaces, mixed separators, double-hyphens. Resolution order:
-            #   1. Exact name_norm match
-            #   2. Canonical hyphen-slug → name_norm
-            #   3. Space-normalised name_norm (any separator → space)
             norm_raw = slug.strip().lower()
+            slug_form = re.sub(r"[\s_-]+", "-", norm_raw).strip("-")
+            space_form = re.sub(r"[\s_-]+", " ", norm_raw).strip()
+
+            # 1) Exact name_norm match
             dld_area = (await db.execute(
                 select(DldArea).where(DldArea.name_norm == norm_raw)
             )).scalar_one_or_none()
 
-            if not dld_area:
-                # Canonical hyphen slug (e.g. "wadi-al-safa-5")
-                slug_form = re.sub(r"[\s_]+", "-", norm_raw)
-                slug_form = re.sub(r"-+", "-", slug_form).strip("-")
-                if slug_form and slug_form != norm_raw:
+            # 2) Canonical hyphen slug → look up canonical, then try to map
+            #    its area_name back to a DldArea row via regex-normalised
+            #    comparison on BOTH sides (handles "Al-Bastakiyah" → DldArea
+            #    "al bastakiyah" if a snapshot row exists).
+            if not dld_area and slug_form:
+                canon = (await db.execute(
+                    select(DldCanonicalArea)
+                    .where(DldCanonicalArea.area_name_slug == slug_form)
+                )).scalar_one_or_none()
+                if canon:
+                    canon_norm = canon.area_name.lower()
+                    dld_area = (await db.execute(
+                        select(DldArea).where(
+                            DldArea.name_norm == canon_norm
+                        )
+                    )).scalar_one_or_none()
+                    if not dld_area:
+                        canon_slug_form = re.sub(r"[\s_-]+", "-", canon_norm).strip("-")
+                        dld_area = (await db.execute(
+                            select(DldArea).where(
+                                func.regexp_replace(
+                                    func.lower(DldArea.name_norm),
+                                    r"[\s_-]+", "-", "g",
+                                ) == canon_slug_form
+                            )
+                        )).scalar_one_or_none()
+
+            # 3) Any-separator-to-space DldArea match
+            if not dld_area and space_form and space_form != norm_raw:
+                dld_area = (await db.execute(
+                    select(DldArea).where(DldArea.name_norm == space_form)
+                )).scalar_one_or_none()
+
+            # 4) Regex-normalised DldArea match (handles embedded hyphens)
+            if not dld_area and slug_form:
+                dld_area = (await db.execute(
+                    select(DldArea).where(
+                        func.regexp_replace(
+                            func.lower(DldArea.name_norm),
+                            r"[\s_-]+", "-", "g",
+                        ) == slug_form
+                    )
+                )).scalar_one_or_none()
+
+        # Canonical-only fallback: the area is in the historical canonical
+        # roster but has no current snapshot row. Render a deeply-limited
+        # detail page rather than a 404.
+        if not dld_area:
+            if canon is None:
+                norm_raw = slug.strip().lower()
+                slug_form = re.sub(r"[\s_-]+", "-", norm_raw).strip("-")
+                if slug_form:
                     canon = (await db.execute(
                         select(DldCanonicalArea)
                         .where(DldCanonicalArea.area_name_slug == slug_form)
                     )).scalar_one_or_none()
-                    if canon:
-                        dld_area = (await db.execute(
-                            select(DldArea).where(
-                                DldArea.name_norm == canon.area_name.lower()
-                            )
-                        )).scalar_one_or_none()
+            if canon:
+                return AreaLimitedDetail(
+                    id=canon.id,
+                    slug=canon.area_name_slug,
+                    name=canon.area_name,
+                    coverage_tier="none",
+                    dld=AreaDldBlock(
+                        dld_area_id=None,
+                        dld_name=canon.area_name,
+                        sales_count=0,
+                        rent_count_2026=0,
+                        building_count=0,
+                        confidence="low",
+                    ),
+                )
 
-            if not dld_area:
-                # Final fallback: any separator → single space
-                space_form = re.sub(r"[-_\s]+", " ", norm_raw).strip()
-                if space_form and space_form != norm_raw:
-                    dld_area = (await db.execute(
-                        select(DldArea).where(DldArea.name_norm == space_form)
-                    )).scalar_one_or_none()
-
-            if not dld_area:
-                # Last-resort: normalize the DB's name_norm the same way the
-                # URL is normalized (any separator → '-') and compare. Handles
-                # data quirks like name_norm = "al-mustashfa west" where the
-                # hyphen is part of the canonical name. Not indexed; only
-                # fires when every cheaper lookup has missed.
-                slug_form2 = re.sub(r"[\s_-]+", "-", norm_raw).strip("-")
-                if slug_form2:
-                    dld_area = (await db.execute(
-                        select(DldArea).where(
-                            func.regexp_replace(
-                                func.lower(DldArea.name_norm),
-                                r"[\s_-]+",
-                                "-",
-                                "g",
-                            ) == slug_form2
-                        )
-                    )).scalar_one_or_none()
         if not dld_area:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
