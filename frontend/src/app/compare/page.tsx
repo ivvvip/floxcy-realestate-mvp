@@ -11,12 +11,20 @@ export const metadata = {
   description: 'Side-by-side comparison of UAE areas across price, yield, and risk.',
 };
 
+// Canonical (DLD admin) name → friendly curated name. The master DLD
+// list calls Dubai Marina "Marsa Dubai" — investors don't recognise the
+// admin name, so without this alias the curated "Dubai Marina" row gets
+// orphaned and the picker shows "Marsa Dubai" instead.
+const CANONICAL_TO_FRIENDLY_UPPER: Record<string, string> = {
+  'MARSA DUBAI': 'DUBAI MARINA',
+};
+
 async function loadAreas(): Promise<Area[]> {
   // Use canonical as the picker universe (284 areas), then fall back to
   // curated for the metadata that compare actually needs (id, type, etc).
   // For DLD-only areas (no curated row), we synthesise a minimal Area
-  // object using name_slug as the id — /compare's backend now accepts
-  // both UUIDs and slugs, so it round-trips cleanly.
+  // object using name_slug as the id — /compare's backend accepts both
+  // UUIDs and slugs, so it round-trips cleanly.
   try {
     const [curated, canon] = await Promise.all([
       getAreas().catch(() => []),
@@ -27,12 +35,18 @@ async function loadAreas(): Promise<Area[]> {
     const curatedByUpper = new Map(
       curated.map((a) => [a.name.toUpperCase(), a])
     );
+    const usedCuratedIds = new Set<string>();
     const merged: Area[] = canon.items.map((c) => {
-      const found = curatedByUpper.get(c.area_name_upper);
-      if (found) return { ...found, name: c.area_name };
-      // Synthetic Area entry for DLD-only canonical areas
+      const aliasUpper =
+        CANONICAL_TO_FRIENDLY_UPPER[c.area_name_upper] ?? c.area_name_upper;
+      const found = curatedByUpper.get(aliasUpper);
+      if (found) {
+        usedCuratedIds.add(found.id);
+        // Keep curated friendly name + UUID. Do NOT overwrite with DLD admin name.
+        return found;
+      }
       return {
-        id: c.area_name_slug,  // compare endpoint accepts name_slug now
+        id: c.area_name_slug,
         name: c.area_name,
         name_arabic: c.area_name_ar,
         city: 'Dubai',
@@ -45,6 +59,11 @@ async function loadAreas(): Promise<Area[]> {
         updated_at: '',
       };
     });
+    // Safety net: any curated row that didn't match by upper/alias still
+    // belongs in the picker so users can find it.
+    for (const a of curated) {
+      if (!usedCuratedIds.has(a.id)) merged.push(a);
+    }
     return merged;
   } catch {
     return [];
