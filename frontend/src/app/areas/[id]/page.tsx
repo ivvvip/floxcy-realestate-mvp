@@ -174,27 +174,22 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
       ).catch(() => null)
     : null;
 
-  // Mini-map data — fetch in parallel; both endpoints are 1h cached, so
-  // repeat hits across area pages reuse the same server cache.
-  const [mapAreasData, mapBuildingsData] = await Promise.all([
-    getMapAreas().catch(() => null),
-    getMapBuildings().catch(() => null),
-  ]);
+  // Mini-map data. First resolve the canonical area record so we have the
+  // slug to feed the polygon-filtered buildings endpoint; then pull only
+  // the buildings whose verified OSM coords sit INSIDE the area polygon
+  // (or bbox, if no polygon). That's what stops Sharjah-OSM-mis-coded
+  // towers from appearing on the Business Bay mini-map.
+  const mapAreasData = await getMapAreas().catch(() => null);
   const mapArea =
     mapAreasData?.areas.find(
       (a) =>
         a.name.toLowerCase() === area.name.toLowerCase() ||
         a.slug === params.id,
     ) ?? null;
-  const mapBuildings =
-    mapArea && mapBuildingsData
-      ? mapBuildingsData.buildings.filter(
-          (b) =>
-            (b.area_slug && b.area_slug === mapArea.slug) ||
-            (b.area_name &&
-              b.area_name.toLowerCase() === area.name.toLowerCase()),
-        )
-      : [];
+  const mapBuildingsData = mapArea
+    ? await getMapBuildings({ area: mapArea.slug }).catch(() => null)
+    : null;
+  const mapBuildings = mapBuildingsData?.buildings ?? [];
 
   // Name-based Google Maps URL. Prefer mapArea.google_search_name (the
   // marketing/branded label backfilled into dld_canonical_areas — e.g.

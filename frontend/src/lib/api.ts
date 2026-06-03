@@ -714,8 +714,11 @@ export async function getMapAreas(): Promise<MapAreasResponse> {
   });
 }
 
-export async function getMapBuildings(): Promise<MapBuildingsResponse> {
-  return request<MapBuildingsResponse>('/api/v1/dld/map/buildings', {
+export async function getMapBuildings(opts?: {
+  area?: string;
+}): Promise<MapBuildingsResponse> {
+  const qs = opts?.area ? `?area=${encodeURIComponent(opts.area)}` : '';
+  return request<MapBuildingsResponse>(`/api/v1/dld/map/buildings${qs}`, {
     revalidate: 3600,
   });
 }

@@ -4479,11 +4479,96 @@ async def map_areas(db: AsyncSession = Depends(get_db)):
     return MapAreasResponse(count=len(items), areas=items)
 
 
+def _point_in_ring(lon: float, lat: float, ring: list[list[float]]) -> bool:
+    """Ray-casting point-in-polygon. ring is a list of [lon, lat] pairs."""
+    inside = False
+    n = len(ring)
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i]
+        xj, yj = ring[j]
+        # Cast a horizontal ray; flip parity on each edge crossing.
+        if ((yi > lat) != (yj > lat)) and (
+            lon < (xj - xi) * (lat - yi) / (yj - yi + 1e-12) + xi
+        ):
+            inside = not inside
+        j = i
+    return inside
+
+
+def _point_in_geojson(lon: float, lat: float, geom: dict | None) -> bool:
+    """Pure-Python point-in-(Multi)Polygon. Handles GeoJSON Polygon and
+    MultiPolygon — first ring of each polygon is the outer boundary; any
+    further rings are holes. Returns False on empty/non-polygon input."""
+    if not geom:
+        return False
+    gtype = geom.get("type")
+    coords = geom.get("coordinates") or []
+    if gtype == "Polygon":
+        if not coords:
+            return False
+        if not _point_in_ring(lon, lat, coords[0]):
+            return False
+        for hole in coords[1:]:
+            if _point_in_ring(lon, lat, hole):
+                return False
+        return True
+    if gtype == "MultiPolygon":
+        for poly in coords:
+            if not poly:
+                continue
+            if _point_in_ring(lon, lat, poly[0]):
+                in_hole = False
+                for hole in poly[1:]:
+                    if _point_in_ring(lon, lat, hole):
+                        in_hole = True
+                        break
+                if not in_hole:
+                    return True
+        return False
+    return False
+
+
 @router.get("/map/buildings", response_model=MapBuildingsResponse)
-async def map_buildings(db: AsyncSession = Depends(get_db)):
+async def map_buildings(
+    area: Optional[str] = Query(
+        None,
+        description=(
+            "Optional canonical area_name_slug. When set, returns only "
+            "buildings whose verified OSM coordinates lie INSIDE the area's "
+            "polygon (or bbox if no polygon). Without this filter ~24% of "
+            "name-tagged buildings sit outside their DLD area because the "
+            "OSM match landed on a same-name building elsewhere."
+        ),
+    ),
+    db: AsyncSession = Depends(get_db),
+):
     """OSM-verified buildings (504 today) with lat/lon for marker rendering.
     Pulled from dld_buildings_derived where osm_verified=TRUE. category
     feeds the marker color; area_slug links each marker into /areas/[slug]."""
+    # Containment filter setup. When the caller passes ?area=slug we resolve
+    # the canonical row + polygon + bbox once, then test each building.
+    area_polygon: dict | None = None
+    area_bbox: tuple[float, float, float, float] | None = None
+    area_canon_name: str | None = None
+    if area:
+        canon = (await db.execute(
+            select(DldCanonicalArea)
+            .where(DldCanonicalArea.area_name_slug == area)
+        )).scalar_one_or_none()
+        if not canon:
+            return MapBuildingsResponse(count=0, buildings=[])
+        area_polygon = canon.polygon if canon.polygon else None
+        if (
+            canon.bbox_north is not None and canon.bbox_south is not None
+            and canon.bbox_east is not None and canon.bbox_west is not None
+            and canon.bbox_north != canon.bbox_south
+        ):
+            area_bbox = (
+                float(canon.bbox_south), float(canon.bbox_north),
+                float(canon.bbox_west), float(canon.bbox_east),
+            )
+        area_canon_name = canon.area_name
     rows = (await db.execute(
         select(
             DldBuildingDerived.id,
@@ -4510,11 +4595,26 @@ async def map_buildings(db: AsyncSession = Depends(get_db)):
 
     items: list[MapBuildingItem] = []
     for bid, name, lat, lon, cat, cnt, rent, area_name, area_slug in rows:
+        latf, lonf = float(lat), float(lon)
+        if area:
+            # Containment chain: polygon (best) → bbox (decent) → name match
+            # (fallback for the 124 areas with neither polygon nor real bbox).
+            if area_polygon is not None:
+                if not _point_in_geojson(lonf, latf, area_polygon):
+                    continue
+            elif area_bbox is not None:
+                lo_lat, hi_lat, lo_lon, hi_lon = area_bbox
+                if not (lo_lat <= latf <= hi_lat and lo_lon <= lonf <= hi_lon):
+                    continue
+            else:
+                if not (area_name and area_canon_name
+                        and area_name.lower() == area_canon_name.lower()):
+                    continue
         items.append(MapBuildingItem(
             id=bid,
             name=name or "Unnamed building",
-            lat=float(lat),
-            lon=float(lon),
+            lat=latf,
+            lon=lonf,
             category=cat,
             contract_count=int(cnt or 0),
             avg_annual_rent=float(rent) if rent is not None else None,
