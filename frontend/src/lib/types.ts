@@ -353,6 +353,9 @@ export interface AreaBedroomPricesResponse extends DldAttribution {
 export interface MapAreaItem {
   name: string;
   slug: string;
+  // Marketing/branded name for Google Maps search — null when the DLD
+  // admin name is already what Google knows.
+  google_search_name?: string | null;
   lat: number | null;
   lon: number | null;
   // GeoJSON Geometry (Polygon | MultiPolygon) or null.

@@ -1237,6 +1237,7 @@ class DashboardPulseResponse(Attribution):
 class MapAreaItem(BaseModel):
     name: str
     slug: str
+    google_search_name: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
     polygon: Optional[dict] = None  # GeoJSON Polygon/MultiPolygon, null when none

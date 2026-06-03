@@ -422,6 +422,10 @@ class DldCanonicalArea(Base):
     coords_confidence: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     # GeoJSON polygon shape from OSM Overpass (Polygon or MultiPolygon)
     polygon: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # Marketing/branded name used for Google Maps deep-linking when the
+    # DLD admin name differs from the public name (e.g. "Marsa Dubai" →
+    # "Dubai Marina"). Optional; frontend falls back to area_name when null.
+    google_search_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

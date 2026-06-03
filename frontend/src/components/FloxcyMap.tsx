@@ -87,9 +87,18 @@ function fmtAED(n: number | null | undefined): string {
   return `AED ${Math.round(n).toLocaleString()}`;
 }
 
-function googleMapsQuery(...parts: (string | null | undefined)[]): string {
+function googleMapsQuery(
+  parts: (string | null | undefined)[],
+  opts?: { near?: { lat: number; lon: number } },
+): string {
   const q = parts.filter(Boolean).join(' ');
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  let url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  if (opts?.near) {
+    // &near= biases Google's search toward this point — same effect as
+    // ll= for the Maps SDK and harmless if Google ignores it.
+    url += `&near=${opts.near.lat},${opts.near.lon}`;
+  }
+  return url;
 }
 
 function buildBuildingPopupHtml(
@@ -97,7 +106,13 @@ function buildBuildingPopupHtml(
   buildingHrefBase: string,
 ): string {
   const tone = categoryTone(b.category);
-  const mapsHref = googleMapsQuery(b.name, b.area_name, 'Dubai');
+  // Building popups always have lat/lon (the layer only renders verified
+  // ones) — pass them as &near= so Google ranks the specific tower above
+  // anything else with the same name in the area.
+  const mapsHref = googleMapsQuery(
+    [b.name, b.area_name, 'Dubai'],
+    { near: { lat: b.lat, lon: b.lon } },
+  );
   return `
     <div style="font-family:inherit;font-size:12px;min-width:220px;line-height:1.4;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
@@ -149,7 +164,16 @@ function buildAreaPopupHtml(
           : a.yield_pct >= 5
             ? 'Moderate yield'
             : 'Low yield';
-  const mapsHref = googleMapsQuery(a.name, 'Dubai UAE');
+  // Use the marketing alias (Marsa Dubai → Dubai Marina) when the admin
+  // name differs from what Google indexes. Areas with verified centroids
+  // pass &near= so Maps re-ranks within the area.
+  const searchName = a.google_search_name ?? a.name;
+  const mapsHref = googleMapsQuery(
+    [searchName, 'Dubai'],
+    a.lat != null && a.lon != null
+      ? { near: { lat: a.lat, lon: a.lon } }
+      : undefined,
+  );
   return `
     <div style="font-family:inherit;font-size:12px;min-width:220px;line-height:1.4;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">

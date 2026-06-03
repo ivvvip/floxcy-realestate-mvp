@@ -265,7 +265,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                       .join(' ');
                     const verified = b.osm_verified && b.lat != null && b.lon != null;
                     const href = verified
-                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nameQuery)}&ll=${b.lat},${b.lon}`
+                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nameQuery)}&near=${b.lat},${b.lon}`
                       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nameQuery)}`;
                     return (
                       <a

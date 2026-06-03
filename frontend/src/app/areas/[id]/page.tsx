@@ -196,6 +196,20 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         )
       : [];
 
+  // Name-based Google Maps URL. Prefer mapArea.google_search_name (the
+  // marketing/branded label backfilled into dld_canonical_areas — e.g.
+  // "Marsa Dubai" → "Dubai Marina") so the result page shows what users
+  // actually search for, falling back to the DLD admin name. When the
+  // area has verified coords we pass &near= so Maps re-ranks around the
+  // centroid; we deliberately do NOT pin to coords-only because OSM
+  // centroids for sprawling admin sectors (Wadi Al Safa 5, Madinat Al
+  // Mataar etc.) often land in the wrong sub-community.
+  const mapsQuery = `${mapArea?.google_search_name ?? area.name} Dubai`;
+  const mapsUrl =
+    area.latitude != null && area.longitude != null
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}&near=${area.latitude},${area.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
+
   // Per-bedroom sale benchmarks (Studio / 1BR / 2BR / …). Hidden when DLD
   // has no bedroom-tagged transactions for the area.
   const bedroomPrices = area.dld?.dld_name
@@ -226,14 +240,6 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
   const hasCoords = area.latitude != null && area.longitude != null;
-  // Name-based Google Maps URL so the result page shows the area name
-  // ("Business Bay, Dubai - Google Maps") instead of a raw lat,lon pin.
-  // When the area has verified coords we also pass &ll= so Maps re-ranks
-  // results around the precise centroid.
-  const mapsQuery = `${area.name} Dubai UAE`;
-  const mapsUrl = hasCoords
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}&ll=${area.latitude},${area.longitude}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
 
   const summary = area.latest
     ? buildInvestmentSummary(area.name, {

@@ -4437,6 +4437,7 @@ async def map_areas(db: AsyncSession = Depends(get_db)):
         select(
             DldCanonicalArea.area_name,
             DldCanonicalArea.area_name_slug,
+            DldCanonicalArea.google_search_name,
             DldCanonicalArea.latitude,
             DldCanonicalArea.longitude,
             DldCanonicalArea.polygon,
@@ -4461,12 +4462,13 @@ async def map_areas(db: AsyncSession = Depends(get_db)):
     }
 
     items: list[MapAreaItem] = []
-    for name, slug, lat, lon, poly in rows:
+    for name, slug, gsn, lat, lon, poly in rows:
         n_lower = (name or "").lower()
         y, p, s = metrics_by_name.get(n_lower, (None, None, None))
         items.append(MapAreaItem(
             name=name,
             slug=slug,
+            google_search_name=gsn,
             lat=float(lat) if lat is not None else None,
             lon=float(lon) if lon is not None else None,
             polygon=poly if poly else None,
