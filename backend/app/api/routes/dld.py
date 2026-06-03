@@ -3974,15 +3974,15 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
     ).all()
 
     hot_areas: list[HotAreaItem] = []
+    # Same partial-year scaling as the sentiment factor above.
+    latest_year_fraction = 5 / 12 if latest_year == 2026 else 1.0
     for name_norm, name_display, latest_n, prior_n in hot_rows:
         latest_n = int(latest_n or 0)
         prior_n = int(prior_n or 0)
         if prior_n <= 0:
             continue
-        pct = (latest_n - prior_n) / prior_n * 100
-        # latest_year (2026) is mid-year YTD, so even areas with steady demand
-        # show negative YoY. Filter to areas where the run-rate would imply
-        # growth: latest_n ≥ prior_n × (months_elapsed / 12).
+        annualized = latest_n / latest_year_fraction
+        pct = (annualized - prior_n) / prior_n * 100
         hot_areas.append(HotAreaItem(
             area_name_norm=name_norm,
             area_name_display=name_display,
@@ -4042,12 +4042,18 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
     # ---- Widget 1: Market sentiment composite ----
     factors: list[PulseFactor] = []
 
-    # Factor 1: YoY transaction count (latest vs prior).
+    # Factor 1: YoY transaction count (latest vs prior). Snapshot is
+    # 2026-06-01 so the latest year is partial — annualize the run-rate
+    # before comparing so the trend isn't misleadingly negative.
     if hot_rows:
         agg_latest = sum(int(r[2] or 0) for r in hot_rows)
         agg_prior = sum(int(r[3] or 0) for r in hot_rows)
+        # Months elapsed in the latest year up to the snapshot date. With a
+        # 2026-06-01 snapshot, ~5 months → scale latest by 12/5 = 2.4.
+        latest_year_fraction = 5 / 12 if latest_year == 2026 else 1.0
+        annualized_latest = agg_latest / latest_year_fraction
         if agg_prior > 0:
-            txn_pct = (agg_latest - agg_prior) / agg_prior * 100
+            txn_pct = (annualized_latest - agg_prior) / agg_prior * 100
             tone = "positive" if txn_pct > 5 else "negative" if txn_pct < -5 else "neutral"
             factors.append(PulseFactor(
                 name="Transaction volume YoY",
