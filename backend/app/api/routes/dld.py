@@ -3889,6 +3889,17 @@ def _density_tier(density: float | None) -> str | None:
     return "low"
 
 
+# Hand-curated last-resort population name aliases. Used after exact match,
+# separator-collapsed match, and difflib all fail. Keys are DldArea-style
+# slugs we know users may hit; values are the dld_area_population.area_name_norm
+# the row is stored under.
+_POPULATION_NAME_OVERRIDES: dict[str, str] = {
+    "downtown dubai": "burj khalifa",  # DLD files Downtown Dubai under Burj Khalifa
+    "the marina": "al thanyah fifth",  # Dubai Marina ≈ Marsa Dubai but Marina Walk uses 5
+    "jumeirah village circle": "al barshaa south fourth",
+}
+
+
 @router.get(
     "/areas/{name_or_norm}/community-profile",
     response_model=AreaCommunityProfile,
@@ -3899,20 +3910,48 @@ async def get_area_community_profile(
 ):
     """Digital Dubai 2024 community population profile for an area.
 
-    Joins dld_area_population on normalized area name. Returns matched=False
-    with all other fields null when the area has no population row (e.g.
-    industrial-only zones, off-plan masterplans without registered residents
-    yet, or community names not in the 2024 PDF). Density tier follows the
-    Dubai-wide thresholds documented in the area-page Community Profile.
+    Lookup order:
+      1. Exact match on dld_area_population.area_name_norm.
+      2. Separator-collapsed match (any of `[\\s_-]+` → single space).
+      3. difflib ratio ≥ 0.85 against all loaded names.
+      4. Hand-curated overrides for the awkward edge cases (e.g. "Downtown
+         Dubai" → Burj Khalifa).
+
+    Returns matched=False (cheap object, no 404) when none of those resolve.
+    The frontend then hides the section cleanly.
     """
+    import difflib
+
     norm = name_or_norm.strip().lower()
-    pop = (
-        await db.execute(
-            select(DldAreaPopulation).where(
-                DldAreaPopulation.area_name_norm == norm
+
+    async def _find(needle: str) -> DldAreaPopulation | None:
+        return (
+            await db.execute(
+                select(DldAreaPopulation).where(
+                    DldAreaPopulation.area_name_norm == needle
+                )
             )
+        ).scalar_one_or_none()
+
+    pop = await _find(norm)
+
+    if pop is None:
+        space_form = re.sub(r"[\s_-]+", " ", norm).strip()
+        if space_form and space_form != norm:
+            pop = await _find(space_form)
+
+    if pop is None:
+        all_names = list(
+            (await db.execute(select(DldAreaPopulation.area_name_norm))).scalars().all()
         )
-    ).scalar_one_or_none()
+        if all_names:
+            cand = difflib.get_close_matches(norm, all_names, n=1, cutoff=0.85)
+            if cand:
+                pop = await _find(cand[0])
+
+    if pop is None and norm in _POPULATION_NAME_OVERRIDES:
+        pop = await _find(_POPULATION_NAME_OVERRIDES[norm])
+
     if not pop:
         return AreaCommunityProfile(matched=False)
 
