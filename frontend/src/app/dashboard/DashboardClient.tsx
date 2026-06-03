@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -516,7 +517,12 @@ function TopBarList({
               <span className="text-fg-muted shrink-0 w-4 tabular text-right">
                 {it.rank}
               </span>
-              <span className="flex-1 truncate text-fg">{it.area_name}</span>
+              <Link
+                href={`/areas/${areaSlug(it.area_name)}`}
+                className="flex-1 truncate text-fg hover:text-accent transition-colors"
+              >
+                {it.area_name}
+              </Link>
               <span className="tabular font-medium" style={{ color: tone }}>
                 {valueFormat(it.value)}
               </span>
@@ -534,6 +540,15 @@ function TopBarList({
         );
       })}
     </ul>
+  );
+}
+
+// Display name → URL slug. Backend accepts hyphens and matches against
+// DldArea.name_norm (which uses spaces), or falls through to a curated area
+// via curated_area_id. e.g. "Business Bay" → "business-bay".
+function areaSlug(displayName: string): string {
+  return encodeURIComponent(
+    displayName.trim().toLowerCase().replace(/\s+/g, '-'),
   );
 }
 
@@ -621,7 +636,12 @@ function SupplyPipelineList({ items }: { items: SupplyPipelineItem[] }) {
             <div className="flex items-baseline justify-between gap-2 mb-1">
               <span className="flex items-baseline gap-1.5 flex-1 min-w-0">
                 <span className="text-fg-muted w-4 tabular text-right">{it.rank}</span>
-                <span className="text-fg truncate">{it.area_name}</span>
+                <Link
+                  href={`/areas/${areaSlug(it.area_name)}`}
+                  className="text-fg truncate hover:text-accent transition-colors"
+                >
+                  {it.area_name}
+                </Link>
               </span>
               <span className="tabular font-medium text-fg">
                 {it.project_count.toLocaleString()} projects

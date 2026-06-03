@@ -452,9 +452,16 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
                 select(DldArea).where(DldArea.id == maybe_uuid)
             )).scalar_one_or_none()
         if not dld_area:
+            # name_norm is stored with spaces (e.g. "business bay"); accept
+            # both hyphenated (URL-friendly) and space variants.
+            norm = slug.strip().lower()
             dld_area = (await db.execute(
-                select(DldArea).where(DldArea.name_norm == slug.strip().lower())
+                select(DldArea).where(DldArea.name_norm == norm)
             )).scalar_one_or_none()
+            if not dld_area and "-" in norm:
+                dld_area = (await db.execute(
+                    select(DldArea).where(DldArea.name_norm == norm.replace("-", " "))
+                )).scalar_one_or_none()
         if not dld_area:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

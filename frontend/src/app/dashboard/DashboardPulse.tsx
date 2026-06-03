@@ -16,13 +16,7 @@ import {
 import type { DashboardPulseResponse } from '@/lib/types';
 import { formatAEDFull, formatLargeAED, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
-
-const QUADRANT_LABELS = {
-  best_investment: { text: '🏆 Best Investment', tone: 'positive' },
-  income_focus:    { text: '💰 Income Focus',    tone: 'accent'   },
-  growth_focus:    { text: '📈 Growth Focus',    tone: 'accent'   },
-  avoid:           { text: '⚠️ Avoid',           tone: 'warning'  },
-} as const;
+import { YieldVsAppreciationMatrix } from './YieldAppreciationMatrix';
 
 /**
  * The 7 dashboard widgets in one block, fed by /api/v1/dld/dashboard-pulse.
@@ -100,123 +94,8 @@ function MarketOverviewCard({ pulse }: { pulse: DashboardPulseResponse }) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Yield vs Appreciation 4-quadrant scatter
+// 2. Yield × 5y appreciation 4-quadrant scatter — see YieldAppreciationMatrix.tsx
 // ---------------------------------------------------------------------------
-
-function YieldVsAppreciationMatrix({ pulse }: { pulse: DashboardPulseResponse }) {
-  const points = pulse.matrix_points;
-  if (points.length === 0) {
-    return (
-      <section className="card p-4">
-        <h3 className="text-sm font-semibold text-fg">
-          Yield × 5-year appreciation
-        </h3>
-        <p className="mt-2 text-xs text-fg-subtle">
-          No areas with full yield + appreciation history yet.
-        </p>
-      </section>
-    );
-  }
-  const W = 320;
-  const H = 280;
-  const PAD = 32;
-  const xs = points.map((p) => p.appreciation_5y_pct);
-  const ys = points.map((p) => p.yield_pct);
-  const xMin = Math.min(...xs, 0);
-  const xMax = Math.max(...xs, 50);
-  const yMin = Math.min(...ys, 0);
-  const yMax = Math.max(...ys, 12);
-  const sx = (x: number) => PAD + ((x - xMin) / (xMax - xMin || 1)) * (W - 2 * PAD);
-  const sy = (y: number) => H - PAD - ((y - yMin) / (yMax - yMin || 1)) * (H - 2 * PAD);
-  // Quadrant midlines (already computed server-side via medians)
-  const sortedX = [...xs].sort((a, b) => a - b);
-  const sortedY = [...ys].sort((a, b) => a - b);
-  const xMid = sortedX[Math.floor(sortedX.length / 2)];
-  const yMid = sortedY[Math.floor(sortedY.length / 2)];
-
-  return (
-    <section className="card p-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-fg">
-            Yield × 5-year appreciation
-          </h3>
-          <p className="mt-0.5 text-[11px] text-fg-subtle">
-            {points.length.toLocaleString()} areas · hover any dot
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full h-auto"
-          role="img"
-          aria-label="Yield vs 5y appreciation scatter"
-        >
-          {/* Quadrant background tints */}
-          <rect x={sx(xMid)} y={PAD} width={W - PAD - sx(xMid)} height={sy(yMid) - PAD}
-                fill="rgb(34,197,94)" fillOpacity="0.08" />
-          <rect x={PAD} y={PAD} width={sx(xMid) - PAD} height={sy(yMid) - PAD}
-                fill="rgb(56,189,248)" fillOpacity="0.06" />
-          <rect x={sx(xMid)} y={sy(yMid)} width={W - PAD - sx(xMid)} height={H - PAD - sy(yMid)}
-                fill="rgb(56,189,248)" fillOpacity="0.06" />
-          <rect x={PAD} y={sy(yMid)} width={sx(xMid) - PAD} height={H - PAD - sy(yMid)}
-                fill="rgb(244,63,94)" fillOpacity="0.06" />
-          {/* Midlines */}
-          <line x1={sx(xMid)} y1={PAD} x2={sx(xMid)} y2={H - PAD}
-                stroke="currentColor" strokeOpacity="0.25" strokeDasharray="2 2" />
-          <line x1={PAD} y1={sy(yMid)} x2={W - PAD} y2={sy(yMid)}
-                stroke="currentColor" strokeOpacity="0.25" strokeDasharray="2 2" />
-          {/* Axes */}
-          <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD}
-                stroke="currentColor" strokeOpacity="0.35" />
-          <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD}
-                stroke="currentColor" strokeOpacity="0.35" />
-          {/* Quadrant labels */}
-          <text x={W - PAD - 6} y={PAD + 14} textAnchor="end" fontSize="10"
-                fill="rgb(34,197,94)" fontWeight="600">🏆 Best Investment</text>
-          <text x={PAD + 6} y={PAD + 14} textAnchor="start" fontSize="10"
-                fill="rgb(56,189,248)" fontWeight="600">💰 Income</text>
-          <text x={W - PAD - 6} y={H - PAD - 6} textAnchor="end" fontSize="10"
-                fill="rgb(56,189,248)" fontWeight="600">📈 Growth</text>
-          <text x={PAD + 6} y={H - PAD - 6} textAnchor="start" fontSize="10"
-                fill="rgb(244,63,94)" fontWeight="600">⚠️ Avoid</text>
-          {/* Axis labels */}
-          <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="9"
-                fill="currentColor" opacity="0.65">5y appreciation %</text>
-          <text x={10} y={H / 2} textAnchor="middle" fontSize="9"
-                fill="currentColor" opacity="0.65"
-                transform={`rotate(-90 10 ${H / 2})`}>Yield %</text>
-          {/* Dots */}
-          {points.map((p) => {
-            const q = QUADRANT_LABELS[p.quadrant];
-            const r = Math.max(2.5, Math.min(7, Math.log10(p.sample_score + 1) * 2));
-            return (
-              <a key={p.area_name_norm} href={`/areas/${encodeURIComponent(p.area_name_norm.replace(/ /g, '-'))}`}>
-                <circle
-                  cx={sx(p.appreciation_5y_pct)}
-                  cy={sy(p.yield_pct)}
-                  r={r}
-                  className={cn(
-                    'transition-opacity hover:opacity-100',
-                    q.tone === 'positive' && 'fill-positive',
-                    q.tone === 'warning' && 'fill-negative',
-                    q.tone === 'accent' && 'fill-accent',
-                  )}
-                  fillOpacity={0.75}
-                >
-                  <title>
-                    {p.area_name_display} · Yield {p.yield_pct.toFixed(1)}% · 5y {p.appreciation_5y_pct.toFixed(0)}%
-                  </title>
-                </circle>
-              </a>
-            );
-          })}
-        </svg>
-      </div>
-    </section>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // 3. Rent vs Buy gauge
