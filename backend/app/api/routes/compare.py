@@ -1,13 +1,13 @@
 """Area comparison endpoint."""
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.area import Area
-from app.models.dld import DldArea, DldAreaMetrics
+from app.models.dld import DldArea, DldAreaMetrics, DldCanonicalArea
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.compare import (
     CompareAreaData,
@@ -68,11 +68,39 @@ async def compare_areas(
                 continue
             raise HTTPException(404, f"Area '{raw}' not found")
 
-        # Otherwise treat as DLD name_norm
+        # Otherwise treat as DLD name_norm first (e.g. "business bay"), then
+        # as a canonical-area slug (e.g. "business-bay" → matches
+        # dld_canonical_areas.area_name_slug, then mapped to dld_areas via
+        # lowercased area_name).
+        raw_lower = raw.lower()
         dld_row = (await db.execute(
-            select(DldArea).where(DldArea.name_norm == raw.lower())
+            select(DldArea).where(DldArea.name_norm == raw_lower)
         )).scalar_one_or_none()
-        if not dld_row:
+        if dld_row is None:
+            # Slug fallback: dld_canonical_areas.area_name_slug → area_name
+            # → dld_areas.name_norm. Spaces in the canonical area_name become
+            # dashes in the slug.
+            canon = (await db.execute(
+                select(DldCanonicalArea).where(
+                    DldCanonicalArea.area_name_slug == raw_lower
+                )
+            )).scalar_one_or_none()
+            if canon is not None:
+                canon_name_lower = canon.area_name.strip().lower()
+                dld_row = (await db.execute(
+                    select(DldArea).where(DldArea.name_norm == canon_name_lower)
+                )).scalar_one_or_none()
+        if dld_row is None:
+            # Dash → space fallback so community names that live in
+            # dld_areas but not dld_canonical_areas (e.g. JVC, Majan,
+            # Dubai Land Residence Complex) still resolve when the
+            # frontend sends a slug-style id.
+            dashed_to_space = raw_lower.replace("-", " ").strip()
+            if dashed_to_space and dashed_to_space != raw_lower:
+                dld_row = (await db.execute(
+                    select(DldArea).where(DldArea.name_norm == dashed_to_space)
+                )).scalar_one_or_none()
+        if dld_row is None:
             raise HTTPException(404, f"Area '{raw}' not found")
         if dld_row.curated_area_id:
             curated_ids.append(dld_row.curated_area_id)
