@@ -284,6 +284,9 @@ class DldBuildingDerived(Base):
     first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     last_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     data_source: Mapped[str] = mapped_column(String(32), nullable=False, default="ejari_derived")
+    # Property category from _dld_category.classify_property — drives the
+    # 5-tab buildings UI (Residential / Villas / Commercial / Special).
+    property_category: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (

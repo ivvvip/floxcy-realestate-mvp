@@ -43,6 +43,17 @@ const PAGE_SIZE = 24;
 
 type SourceTab = 'official' | 'derived';
 
+// Property-category tabs. Each maps to a comma-separated category set the
+// /buildings-derived endpoint accepts (no value = no filter).
+const CATEGORY_TABS = [
+  { key: 'all',         label: 'All',         categories: ''                                     },
+  { key: 'residential', label: 'Residential', categories: 'apartment,hotel_apt'                  },
+  { key: 'villas',      label: 'Villas',      categories: 'villa'                                },
+  { key: 'commercial',  label: 'Commercial',  categories: 'office,retail,warehouse'              },
+  { key: 'special',     label: 'Special',     categories: 'labor_camp,whole_building'            },
+] as const;
+type CategoryTab = (typeof CATEGORY_TABS)[number]['key'];
+
 export function BuildingsIndexClient({
   initialItems,
   initialTotal,
@@ -50,34 +61,39 @@ export function BuildingsIndexClient({
   initialDerivedTotal,
 }: Props) {
   const searchParams = useSearchParams();
-  // Open the derived tab automatically when a deep link sets either ?tab=derived
-  // or ?master_project=... (the "Part of {master_project}" links from X-Ray).
-  const urlTab = searchParams?.get('tab');
+  // Tab deep links: ?tab=residential|villas|commercial|special|all.
+  // ?master_project=... still works and lands on the default tab so the
+  // X-Ray "Part of …" link routes correctly.
+  const urlTab = (searchParams?.get('tab') ?? 'all') as CategoryTab;
   const urlMasterProject = searchParams?.get('master_project') ?? '';
-  const initialTab: SourceTab =
-    urlTab === 'derived' || urlMasterProject ? 'derived' : 'official';
+  const validTab: CategoryTab = CATEGORY_TABS.some((t) => t.key === urlTab)
+    ? urlTab
+    : 'all';
 
-  const [tab, setTab] = useState<SourceTab>(initialTab);
-  const [items, setItems] = useState<DldBuildingItem[]>(initialItems);
-  const [total, setTotal] = useState(initialTotal);
-  const [derivedTotal] = useState(initialDerivedTotal ?? 0);
+  const [tab, setTab] = useState<CategoryTab>(validTab);
+  const [items, setItems] = useState<DldBuildingItem[]>(
+    validTab === 'all' && !urlMasterProject ? initialItems : [],
+  );
+  const [total, setTotal] = useState(
+    validTab === 'all' && !urlMasterProject ? initialTotal : (initialDerivedTotal ?? 0),
+  );
   const [area, setArea] = useState<AreaOption | null>(null);
-  const [project, setProject] = useState('');
   const [masterProject, setMasterProject] = useState(urlMasterProject);
   const [qSearch, setQSearch] = useState('');
-  const [propType, setPropType] = useState<PropFilter>('');
-  const [buildingType, setBuildingType] = useState<
-    '' | 'tower' | 'complex' | 'villa_community' | 'under_construction'
-  >('');
-  const [sortBy, setSortBy] = useState<SortKey>('rent_count');
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Skip the initial fetch — server already prefilled it when the user lands
-  // on the official tab with no deep-link filter. If the deep link puts us on
-  // the derived tab, we need to fetch right away.
-  const [hydrated, setHydrated] = useState(initialTab === 'official');
+  const activeCategorySet = useMemo(
+    () => CATEGORY_TABS.find((t) => t.key === tab)?.categories ?? '',
+    [tab],
+  );
+
+  // Skip the initial fetch when we landed on the default "All" tab with no
+  // deep-link filter — the SSR pre-filled the derived list already.
+  const [hydrated, setHydrated] = useState(
+    validTab === 'all' && !urlMasterProject,
+  );
 
   useEffect(() => {
     if (!hydrated) {
@@ -88,30 +104,16 @@ export function BuildingsIndexClient({
       setLoading(true);
       setError(null);
       try {
-        if (tab === 'official') {
-          const res = await getDldBuildings({
-            area: area?.name_norm,
-            project: project.trim() || undefined,
-            q: qSearch.trim() || undefined,
-            prop_sub_type: propType || undefined,
-            building_type: buildingType || undefined,
-            sort_by: sortBy,
-            limit: PAGE_SIZE,
-            offset: page * PAGE_SIZE,
-          });
-          setItems(res.items);
-          setTotal(res.total_available);
-        } else {
-          const res = await getDldBuildingsDerived({
-            area: area?.name_norm,
-            master_project: masterProject.trim() || undefined,
-            q: qSearch.trim() || undefined,
-            page: page + 1,
-            page_size: PAGE_SIZE,
-          });
-          setItems(res.items);
-          setTotal(res.total_available);
-        }
+        const res = await getDldBuildingsDerived({
+          area: area?.name_norm,
+          category: activeCategorySet || undefined,
+          master_project: masterProject.trim() || undefined,
+          q: qSearch.trim() || undefined,
+          page: page + 1,
+          page_size: PAGE_SIZE,
+        });
+        setItems(res.items);
+        setTotal(res.total_available);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not load buildings.');
         setItems([]);
@@ -122,11 +124,11 @@ export function BuildingsIndexClient({
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, area, project, masterProject, qSearch, propType, buildingType, sortBy, page]);
+  }, [activeCategorySet, area, masterProject, qSearch, page]);
 
   useEffect(() => {
     setPage(0);
-  }, [tab, area, project, masterProject, qSearch, propType, buildingType, sortBy]);
+  }, [activeCategorySet, area, masterProject, qSearch]);
 
   const showFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const showTo = Math.min(total, (page + 1) * PAGE_SIZE);
@@ -134,47 +136,29 @@ export function BuildingsIndexClient({
 
   return (
     <div className="space-y-4">
-      {/* Source tabs: 47 official rows vs the 1,456-entity synthetic dim
-          built from the Ejari rent stream. Each tab has its own filter shape
-          (the official tab supports prop_type/building_type; the derived tab
-          uses a master_project filter instead of a project text search). */}
-      <div className="flex items-center gap-1 border-b border-border">
-        <button
-          type="button"
-          onClick={() => setTab('official')}
-          className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px',
-            tab === 'official'
-              ? 'border-accent text-fg'
-              : 'border-transparent text-fg-subtle hover:text-fg'
-          )}
-          aria-pressed={tab === 'official'}
-        >
-          DLD Official{' '}
-          <span className="text-[10px] font-mono text-fg-subtle">
-            ({initialTotal.toLocaleString()})
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('derived')}
-          className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px',
-            tab === 'derived'
-              ? 'border-accent text-fg'
-              : 'border-transparent text-fg-subtle hover:text-fg'
-          )}
-          aria-pressed={tab === 'derived'}
-        >
-          All Buildings{' '}
-          <span className="text-[10px] font-mono text-fg-subtle">
-            ({derivedTotal.toLocaleString()})
-          </span>
-        </button>
-        <span className="ml-auto text-[10px] text-fg-subtle pb-2">
-          {tab === 'official'
-            ? 'Published DLD buildings dataset (master-project granularity).'
-            : 'Synthetic per-tower dim built from Ejari rent contracts 2021–2026.'}
+      {/* Property-category tabs. Every tab filters the synthetic dim built
+          from the Ejari rent stream (dld_buildings_derived). The official
+          47-row dim is still reachable via direct /buildings/{id} URLs and
+          via /areas/[id]/top-buildings. */}
+      <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
+        {CATEGORY_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px',
+              tab === t.key
+                ? 'border-accent text-fg'
+                : 'border-transparent text-fg-subtle hover:text-fg'
+            )}
+            aria-pressed={tab === t.key}
+          >
+            {t.label}
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] text-fg-subtle pb-2 pr-1 whitespace-nowrap">
+          Built from Ejari rent contracts 2021–2026.
         </span>
       </div>
 
@@ -205,128 +189,33 @@ export function BuildingsIndexClient({
       {/* Filter bar */}
       <section className="card p-4 sm:p-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <AreaSelector value={area} onChange={setArea} options={areaOptions} />
-        {tab === 'official' ? (
-          <div>
-            <label
-              htmlFor="b_project"
-              className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
-            >
-              Project name
-            </label>
-            <div className="relative mt-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
-                strokeWidth={2}
-              />
-              <input
-                id="b_project"
-                type="search"
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
-                placeholder="e.g. Arabian Ranches"
-                className="input-field pl-9 min-h-[44px]"
-              />
-            </div>
+        <div>
+          <label
+            htmlFor="b_master"
+            className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
+          >
+            Master project
+          </label>
+          <div className="relative mt-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
+              strokeWidth={2}
+            />
+            <input
+              id="b_master"
+              type="search"
+              value={masterProject}
+              onChange={(e) => setMasterProject(e.target.value)}
+              placeholder="e.g. Dubai Land Residence Complex"
+              className="input-field pl-9 min-h-[44px]"
+            />
           </div>
-        ) : (
-          <div>
-            <label
-              htmlFor="b_master"
-              className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
-            >
-              Master project
-            </label>
-            <div className="relative mt-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
-                strokeWidth={2}
-              />
-              <input
-                id="b_master"
-                type="search"
-                value={masterProject}
-                onChange={(e) => setMasterProject(e.target.value)}
-                placeholder="e.g. Dubai Land Residence Complex"
-                className="input-field pl-9 min-h-[44px]"
-              />
-            </div>
-          </div>
-        )}
-        {tab === 'official' && (
-          <>
-            <div>
-              <label
-                htmlFor="b_type"
-                className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
-              >
-                Property type
-              </label>
-              <select
-                id="b_type"
-                value={propType}
-                onChange={(e) => setPropType(e.target.value as PropFilter)}
-                className="input-field mt-1 min-h-[44px]"
-              >
-                <option value="">All types</option>
-                {PROP_TYPES.filter(Boolean).map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="b_btype"
-                className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
-              >
-                Building type
-              </label>
-              <select
-                id="b_btype"
-                value={buildingType}
-                onChange={(e) =>
-                  setBuildingType(e.target.value as typeof buildingType)
-                }
-                className="input-field mt-1 min-h-[44px]"
-              >
-                <option value="">All types</option>
-                <option value="tower">🏢 Single Tower</option>
-                <option value="complex">🏘️ Residential Complex</option>
-                <option value="villa_community">🏡 Villa Community</option>
-                <option value="under_construction">🏗️ Under Construction</option>
-              </select>
-            </div>
-          </>
-        )}
-        {tab === 'official' ? (
-          <div>
-            <label
-              htmlFor="b_sort"
-              className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium"
-            >
-              Sort by
-            </label>
-            <select
-              id="b_sort"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="input-field mt-1 min-h-[44px]"
-            >
-              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                <option key={k} value={k}>
-                  {SORT_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-end pb-2 text-[11px] text-fg-subtle">
-            Sorted by{' '}
-            <span className="ml-1 font-medium text-fg">contract count</span>
-            <span className="ml-1">(most active first)</span>
-          </div>
-        )}
+        </div>
+        <div className="flex items-end pb-2 text-[11px] text-fg-subtle">
+          Sorted by{' '}
+          <span className="ml-1 font-medium text-fg">contract count</span>
+          <span className="ml-1">(most active first)</span>
+        </div>
       </section>
 
       {/* Count line */}

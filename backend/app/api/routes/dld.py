@@ -92,6 +92,8 @@ from app.schemas.dld import (
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
     AreaBedroomPricesResponse,
+    AreaCategoryBreakdownItem,
+    AreaCategoryBreakdownResponse,
     AreaLifestyleScoreResponse,
     BedroomBenchmarkRow,
     BuildingLeaseExpiryResponse,
@@ -3457,8 +3459,8 @@ def _build_derived_building_item(
         ),
         confidence=confidence_for(int(d.contract_count or 0)),
         building_type="tower",
-        building_type_label="Ejari-derived building",
-        building_type_emoji="🏢",
+        building_type_label=_CATEGORY_LABELS.get(d.property_category or "", "Ejari-derived building"),
+        building_type_emoji=_CATEGORY_EMOJI.get(d.property_category or "", "🏢"),
         is_community_aggregate=False,
         siblings_in_master_project=None,
         age_years=None,
@@ -3471,7 +3473,35 @@ def _build_derived_building_item(
         display_name=d.project_name_en,
         is_identifiable=True,
         data_source="ejari_derived",
+        property_category=d.property_category,
     )
+
+
+# Per-category label + emoji used when rendering derived buildings. Kept
+# alongside the route module so both the helper and the breakdown endpoint
+# stay in sync.
+_CATEGORY_LABELS: dict[str, str] = {
+    "apartment": "Apartment",
+    "villa": "Villa",
+    "hotel_apt": "Hotel Apartment",
+    "labor_camp": "Labor Camp",
+    "office": "Office",
+    "retail": "Shop / Retail",
+    "warehouse": "Warehouse",
+    "whole_building": "Whole Building",
+    "other": "Other",
+}
+_CATEGORY_EMOJI: dict[str, str] = {
+    "apartment": "🏠",
+    "villa": "🏡",
+    "hotel_apt": "🏨",
+    "labor_camp": "👷",
+    "office": "🏢",
+    "retail": "🛒",
+    "warehouse": "🏭",
+    "whole_building": "🏗️",
+    "other": "▫️",
+}
 
 
 @router.get("/buildings-derived", response_model=DldBuildingsResponse)
@@ -3479,6 +3509,7 @@ async def list_buildings_derived(
     db: AsyncSession = Depends(get_db),
     area: Optional[str] = None,
     master_project: Optional[str] = None,
+    category: Optional[str] = None,
     q: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
@@ -3491,6 +3522,9 @@ async def list_buildings_derived(
     Filters:
       area              — DLD area name_norm (exact lower-case match)
       master_project    — case-insensitive substring match on master_project_en
+      category          — comma-separated property_category list
+                          (apartment,villa,hotel_apt,office,retail,
+                          warehouse,labor_camp,whole_building,other)
       q                 — case-insensitive substring across project_name_en
                           and master_project_en
     """
@@ -3501,6 +3535,10 @@ async def list_buildings_derived(
         filters.append(
             DldBuildingDerived.master_project_en.ilike(f"%{master_project.strip()}%")
         )
+    if category:
+        cats = [c.strip() for c in category.split(",") if c.strip()]
+        if cats:
+            filters.append(DldBuildingDerived.property_category.in_(cats))
     if q:
         needle = f"%{q.strip()}%"
         filters.append(
@@ -3708,4 +3746,57 @@ async def get_building_sales_history(
         last_transaction_date=b.last_transaction_date,
         parking_pct=float(b.parking_pct) if b.parking_pct is not None else None,
         bulk_transaction_count=int(b.bulk_transaction_count or 0),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Area category breakdown — drives /areas/[id] "This area has: …" row
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/areas/{name_or_norm}/category-breakdown",
+    response_model=AreaCategoryBreakdownResponse,
+)
+async def get_area_category_breakdown(
+    name_or_norm: str, db: AsyncSession = Depends(get_db),
+):
+    """Building counts per property_category for this area, derived from
+    dld_buildings_derived. Honest empty when the area has no buildings in
+    the synthetic dim — typically because no rents are filed under its
+    name_norm (tower-density communities like Marina/Downtown that DLD
+    files under master_project_en)."""
+    norm_s = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm_s))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    rows = (
+        await db.execute(
+            select(
+                DldBuildingDerived.property_category,
+                func.count(DldBuildingDerived.id),
+            )
+            .where(DldBuildingDerived.dld_area_id == area.id)
+            .where(DldBuildingDerived.property_category.is_not(None))
+            .group_by(DldBuildingDerived.property_category)
+            .order_by(func.count(DldBuildingDerived.id).desc())
+        )
+    ).all()
+
+    items = [
+        AreaCategoryBreakdownItem(
+            property_category=cat,
+            label=_CATEGORY_LABELS.get(cat, cat.replace("_", " ").title()),
+            emoji=_CATEGORY_EMOJI.get(cat, "▫️"),
+            building_count=int(count),
+        )
+        for cat, count in rows
+    ]
+    return AreaCategoryBreakdownResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        total_buildings=sum(it.building_count for it in items),
+        items=items,
     )

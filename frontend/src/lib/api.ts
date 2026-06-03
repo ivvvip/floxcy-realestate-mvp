@@ -45,6 +45,7 @@ import type {
   DldAreaListResponse,
   DldAreaDetailResponse,
   DldPriceHistoryResponse,
+  AreaCategoryBreakdownResponse,
   AreaLifestyleScoreResponse,
   BuildingLeaseExpiryResponse,
   DldBuildingRentHistoryResponse,
@@ -889,6 +890,7 @@ export async function getDldBuilding(id: string): Promise<DldBuildingDetailRespo
 export async function getDldBuildingsDerived(opts?: {
   area?: string;
   master_project?: string;
+  category?: string;
   q?: string;
   page?: number;
   page_size?: number;
@@ -896,6 +898,7 @@ export async function getDldBuildingsDerived(opts?: {
   const params = new URLSearchParams();
   if (opts?.area) params.set('area', opts.area);
   if (opts?.master_project) params.set('master_project', opts.master_project);
+  if (opts?.category) params.set('category', opts.category);
   if (opts?.q) params.set('q', opts.q);
   if (opts?.page) params.set('page', String(opts.page));
   if (opts?.page_size) params.set('page_size', String(opts.page_size));
@@ -903,6 +906,15 @@ export async function getDldBuildingsDerived(opts?: {
   return request<DldBuildingsResponse>(
     `/api/v1/dld/buildings-derived${qs ? `?${qs}` : ''}`,
     { revalidate: 600 }
+  );
+}
+
+export async function getDldAreaCategoryBreakdown(
+  nameNorm: string
+): Promise<AreaCategoryBreakdownResponse> {
+  return request<AreaCategoryBreakdownResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/category-breakdown`,
+    { revalidate: 3600 }
   );
 }
 

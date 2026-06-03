@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
@@ -157,6 +157,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     ? await getDldAreaLifestyleScore(area.dld.dld_name.toLowerCase()).catch(
         () => null,
       )
+    : null;
+
+  // Building-category breakdown from the synthetic dim. Soft-fail when the
+  // area has no rents under its name_norm (typically tower-density
+  // communities that DLD files under master_project_en).
+  const categoryBreakdown = area.dld?.dld_name
+    ? await getDldAreaCategoryBreakdown(
+        area.dld.dld_name.toLowerCase(),
+      ).catch(() => null)
     : null;
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
@@ -726,6 +735,55 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             </section>
           );
         })()}
+
+        {/* Property-category breakdown — counts per type, links into the
+            5-tab /buildings UI pre-filtered by area + category */}
+        {categoryBreakdown && categoryBreakdown.total_buildings > 0 && (
+          <section
+            id="category-breakdown"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label">
+                This area has
+              </span>
+              <span className="text-[11px] text-fg-subtle">
+                {categoryBreakdown.total_buildings.toLocaleString()} buildings total
+              </span>
+            </div>
+            <div className="grid gap-px bg-border sm:grid-cols-3 md:grid-cols-4">
+              {categoryBreakdown.items.map((it) => (
+                <Link
+                  key={it.property_category}
+                  href={`/buildings?tab=${
+                    it.property_category === 'villa'
+                      ? 'villas'
+                      : ['apartment', 'hotel_apt'].includes(it.property_category)
+                        ? 'residential'
+                        : ['office', 'retail', 'warehouse'].includes(it.property_category)
+                          ? 'commercial'
+                          : 'special'
+                  }&area=${encodeURIComponent(area.dld?.dld_name?.toLowerCase() ?? '')}`}
+                  className="bg-bg-card p-3 hover:bg-bg-elev/40"
+                >
+                  <div className="flex items-baseline gap-2">
+                    <span aria-hidden className="text-base">{it.emoji}</span>
+                    <span className="text-2xl font-mono text-fg">
+                      {it.building_count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-fg-muted">
+                    {it.label}
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
+              Counts come from the synthetic building dim (dld_buildings_derived)
+              built from DLD Ejari rent contracts 2021–2026.
+            </div>
+          </section>
+        )}
 
         {/* Lifestyle scores — metro / mall / landmark derived from rent stream */}
         {lifestyle && lifestyle.overall_score != null && (

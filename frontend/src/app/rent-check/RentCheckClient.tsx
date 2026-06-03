@@ -91,8 +91,18 @@ const SIZE_OPTIONS: SizeOption[] = [
   },
 ];
 
-const PROP_TYPES = ['Flat', 'Villa', 'Hotel Apartment'] as const;
-type PropType = (typeof PROP_TYPES)[number];
+// Selector pairs (UI label, backend prop_sub_type sent to /dld/rent-check).
+// Commercial categories (Office / Shop) are out of scope here — our rent
+// benchmarks table is residential-only; the commercial side has its own
+// dld_commercial_benchmarks dim and a separate endpoint will surface it
+// later.
+const PROP_TYPE_PAIRS = [
+  { label: 'Apartment',       value: 'Flat' },
+  { label: 'Villa',           value: 'Villa' },
+  { label: 'Hotel Apartment', value: 'Hotel Apartment' },
+] as const;
+type PropType = (typeof PROP_TYPE_PAIRS)[number]['value'];
+const PROP_TYPES = PROP_TYPE_PAIRS.map((p) => p.value) as readonly PropType[];
 
 interface RentCheckClientProps {
   areaOptions: RentCheckAreaOption[];
@@ -262,22 +272,22 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
                 className="h-3 w-3 transition-transform group-open:rotate-180"
                 strokeWidth={2.5}
               />
-              Property type: {propType}
+              Property type: {PROP_TYPE_PAIRS.find((p) => p.value === propType)?.label}
             </summary>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              {PROP_TYPES.map((p) => (
+              {PROP_TYPE_PAIRS.map((p) => (
                 <button
                   type="button"
-                  key={p}
-                  onClick={() => setPropType(p)}
+                  key={p.value}
+                  onClick={() => setPropType(p.value)}
                   className={cn(
                     'rounded border px-2 py-1.5 text-[12px]',
-                    propType === p
+                    propType === p.value
                       ? 'border-accent bg-accent/10 text-fg'
                       : 'border-border bg-bg-card text-fg-muted hover:text-fg'
                   )}
                 >
-                  {p}
+                  {p.label}
                 </button>
               ))}
             </div>

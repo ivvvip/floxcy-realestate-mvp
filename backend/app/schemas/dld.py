@@ -277,6 +277,11 @@ class DldBuildingItem(BaseModel):
     # 'ejari_derived' for synthetic per-(project, area) entities built from
     # the rent stream. Frontend renders different badges per source.
     data_source: Literal["dld_official", "ejari_derived"] = "dld_official"
+    # Property category from the rent stream classifier — drives the 5-tab
+    # buildings UI. Values: apartment / villa / hotel_apt / labor_camp /
+    # office / retail / warehouse / whole_building / other. None when the
+    # building hasn't been classified yet.
+    property_category: Optional[str] = None
     # When project_name equals master_project the row is a community-wide
     # aggregate rather than a single tower. We surface a count of how many
     # records share the same (master_project, area) for the "5 towers in
@@ -1054,6 +1059,20 @@ class AreaBedroomPricesResponse(Attribution):
 # ---------------------------------------------------------------------------
 # Building sales history
 # ---------------------------------------------------------------------------
+
+class AreaCategoryBreakdownItem(BaseModel):
+    property_category: str
+    label: str
+    emoji: str
+    building_count: int
+
+
+class AreaCategoryBreakdownResponse(Attribution):
+    area_name_norm: str
+    area_name_display: Optional[str] = None
+    total_buildings: int
+    items: List[AreaCategoryBreakdownItem]
+
 
 class BuildingSalesResponse(Attribution):
     id: UUID

@@ -359,10 +359,13 @@ class LaborCampAgg:
 
 class DerivedBuildingAgg:
     """One synthetic building entity, keyed (project_name_lower, area_norm).
-    Only fed by rows whose classifier verdict is in IDENTIFIABLE_TYPES."""
+    Only fed by rows whose classifier verdict is in IDENTIFIABLE_TYPES.
+    Tracks per-category counts so the eventual category is resolved by
+    majority vote at write time — a single building might host both flats
+    and shops (mixed-use); we pick the dominant category."""
     __slots__ = (
         "project_name", "master_project", "area_norm", "area_display",
-        "annuals", "first_year", "last_year",
+        "annuals", "first_year", "last_year", "category_counts",
     )
 
     def __init__(self, project_name: str, master_project: Optional[str],
@@ -374,13 +377,27 @@ class DerivedBuildingAgg:
         self.annuals: list[float] = []
         self.first_year = 9999
         self.last_year = 0
+        self.category_counts: collections.Counter = collections.Counter()
 
-    def add(self, annual: float, year: int) -> None:
-        self.annuals.append(annual)
+    def add(self, annual: Optional[float], year: int,
+            category: Optional[str] = None) -> None:
+        # Only Person residential non-bulk rows contribute to the rent
+        # average. Other rows still tag the category so the building shows
+        # up correctly in the 5-tab UI.
+        if annual is not None:
+            self.annuals.append(annual)
         if year < self.first_year:
             self.first_year = year
         if year > self.last_year:
             self.last_year = year
+        if category:
+            self.category_counts[category] += 1
+
+    @property
+    def dominant_category(self) -> Optional[str]:
+        if not self.category_counts:
+            return None
+        return self.category_counts.most_common(1)[0][0]
 
     @property
     def count(self) -> int:
@@ -436,6 +453,40 @@ def aggregate(path: Path, progress_every: int):
     derived_skipped: collections.Counter = collections.Counter()
 
     for r in stream_classified_rents(path, progress_every):
+        # ---- Derived buildings (ALL categories with an identifiable name) ----
+        # Surfaces office / labor_camp / etc. buildings into the 5-tab UI
+        # without affecting the rent benchmark math below. Residential
+        # Person non-bulk rows contribute to the rent average; non-Person /
+        # non-residential / bulk rows just tag the category so the tabs UI
+        # knows what type the building is.
+        if r.project_name:
+            _bn_clean, bn_type = classify_building_name(
+                r.project_name, r.master_project, r.area_display
+            )
+            if bn_type in IDENTIFIABLE_TYPES:
+                dkey = (r.project_name.strip().lower(), r.area_norm)
+                agg = derived_aggs.get(dkey)
+                if agg is None:
+                    agg = DerivedBuildingAgg(
+                        project_name=r.project_name.strip(),
+                        master_project=r.master_project,
+                        area_norm=r.area_norm,
+                        area_display=r.area_display,
+                    )
+                    derived_aggs[dkey] = agg
+                contributes_rent = (
+                    r.category in RESIDENTIAL_CATEGORIES
+                    and r.is_person
+                    and not r.is_bulk
+                )
+                agg.add(
+                    r.annual if contributes_rent else None,
+                    r.year,
+                    r.category,
+                )
+            else:
+                derived_skipped[bn_type] += 1
+
         # ---- Residential apartment/villa/hotel_apt ----
         if r.category in RESIDENTIAL_CATEGORIES:
             # rent_history + building_rent_history skip bulk contracts so the
@@ -452,31 +503,6 @@ def aggregate(path: Path, progress_every: int):
                 )
                 if pkey not in bldg_meta:
                     bldg_meta[pkey] = (r.project_number, r.project_name, r.area_norm)
-
-            # ---- Derived buildings ----
-            # Classify project_name once per row. Only feed rows whose name
-            # classifier flags as a real building / sub-project — keeps area
-            # names, developer names, master-project labels out of the
-            # synthetic dim. Person-only so the derived avg_rent matches the
-            # rent_history headline (not skewed by Authority leases).
-            if r.is_person and r.project_name:
-                _bn_clean, bn_type = classify_building_name(
-                    r.project_name, r.master_project, r.area_display
-                )
-                if bn_type in IDENTIFIABLE_TYPES:
-                    dkey = (r.project_name.strip().lower(), r.area_norm)
-                    agg = derived_aggs.get(dkey)
-                    if agg is None:
-                        agg = DerivedBuildingAgg(
-                            project_name=r.project_name.strip(),
-                            master_project=r.master_project,
-                            area_norm=r.area_norm,
-                            area_display=r.area_display,
-                        )
-                        derived_aggs[dkey] = agg
-                    agg.add(r.annual, r.year)
-                else:
-                    derived_skipped[bn_type] += 1
 
             # Lease expiry: Person residential only, end_month in the future.
             if r.is_person and r.end_month and r.end_month >= SNAPSHOT_MONTH:
@@ -617,11 +643,16 @@ def build_derived_building_rows(
     aggs: dict[tuple[str, str], DerivedBuildingAgg],
 ) -> list[dict]:
     """Convert the per-(project_name, area) accumulator into rows ready for
-    dld_buildings_derived. Only emit entities with at least one Person
-    residential contract — the agg already enforces this by construction."""
+    dld_buildings_derived. contract_count uses the residential person rent
+    sample (a.annuals); when 0 the building still gets emitted as long as
+    the classifier saw it at least once (category_counts > 0) — that's the
+    case for office/labor_camp/etc. buildings that don't carry residential
+    rent but still belong in the 5-tab UI."""
     rows: list[dict] = []
     for (pname_lower, area_norm), a in aggs.items():
-        if a.count == 0:
+        rent_n = len(a.annuals)
+        cat_n = sum(a.category_counts.values())
+        if rent_n == 0 and cat_n == 0:
             continue
         rows.append({
             "project_name_en": a.project_name,
@@ -629,10 +660,15 @@ def build_derived_building_rows(
             "master_project_en": a.master_project,
             "area_name_norm": a.area_norm,
             "area_name_en": a.area_display,
-            "contract_count": a.count,
-            "avg_annual_rent": round(statistics.fmean(a.annuals), 2),
-            "first_seen_year": a.first_year,
-            "last_seen_year": a.last_year,
+            # contract_count keeps its existing semantics — residential
+            # rent contracts that contribute to avg_annual_rent. Non-
+            # residential buildings show contract_count=0 but appear in
+            # the dim with a category tag.
+            "contract_count": rent_n,
+            "avg_annual_rent": round(statistics.fmean(a.annuals), 2) if a.annuals else None,
+            "first_seen_year": a.first_year if a.first_year < 9999 else None,
+            "last_seen_year": a.last_year or None,
+            "property_category": a.dominant_category,
             "_lookup_key": (pname_lower, area_norm),
         })
     return rows
@@ -750,6 +786,7 @@ def write_rent_history_and_derive_yields(
                     r["first_seen_year"],
                     r["last_seen_year"],
                     "ejari_derived",
+                    r.get("property_category"),
                 ))
             if derived_inserts:
                 psycopg2.extras.execute_values(
@@ -758,7 +795,7 @@ def write_rent_history_and_derive_yields(
                     INSERT INTO dld_buildings_derived (
                         id, project_name_en, project_name_slug, master_project_en,
                         dld_area_id, area_name_en, contract_count, avg_annual_rent,
-                        first_seen_year, last_seen_year, data_source
+                        first_seen_year, last_seen_year, data_source, property_category
                     ) VALUES %s
                     """,
                     derived_inserts,

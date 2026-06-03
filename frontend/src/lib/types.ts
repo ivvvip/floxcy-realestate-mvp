@@ -839,6 +839,26 @@ export interface DldBuildingItem {
   // 'ejari_derived' (synthetic per-tower entity extracted from the rent
   // stream itself). Defaults to 'dld_official' on legacy responses.
   data_source?: 'dld_official' | 'ejari_derived';
+  // Property category for the 5-tab UI. Derived buildings only.
+  property_category?:
+    | 'apartment' | 'villa' | 'hotel_apt'
+    | 'office' | 'retail' | 'warehouse'
+    | 'labor_camp' | 'whole_building' | 'other'
+    | null;
+}
+
+export interface AreaCategoryBreakdownItem {
+  property_category: string;
+  label: string;
+  emoji: string;
+  building_count: number;
+}
+
+export interface AreaCategoryBreakdownResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string | null;
+  total_buildings: number;
+  items: AreaCategoryBreakdownItem[];
 }
 
 export interface DldBuildingsResponse extends DldAttribution {
