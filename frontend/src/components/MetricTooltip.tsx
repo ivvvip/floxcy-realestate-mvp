@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -109,12 +110,14 @@ interface Props {
   side?: 'top' | 'bottom';
 }
 
+const TOOLTIP_WIDTH = 280;
+const TOOLTIP_GAP = 10;
+
 /**
  * Contextual info icon that reveals an explanatory tooltip on hover (desktop)
- * or tap (mobile). Hidden by default — visible on demand.
- *
- * Wire next to any metric label by passing the metric name from the METRICS
- * catalog. Unknown metric names render nothing (safe no-op).
+ * or tap (mobile). The tooltip is rendered into a portal at document.body so
+ * it can never be clipped by an overflow-hidden ancestor (e.g. the dashboard
+ * section cards). Position is recomputed from the trigger's bounding rect.
  */
 export function MetricTooltip({
   metric,
@@ -126,15 +129,71 @@ export function MetricTooltip({
 }: Props) {
   const content = METRICS[metric];
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLSpanElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    arrowLeft: number;
+    placement: 'top' | 'bottom';
+  } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const half = TOOLTIP_WIDTH / 2;
+    const margin = 8;
+    let centerX = rect.left + rect.width / 2;
+    // Clamp horizontally so we never overflow the viewport
+    centerX = Math.max(margin + half, Math.min(vw - margin - half, centerX));
+    const left = centerX - half;
+    const arrowLeftAbs = rect.left + rect.width / 2;
+    const arrowLeft = arrowLeftAbs - left;
+
+    // Choose top vs bottom based on space, default to caller's hint
+    const wantTop = side === 'top';
+    const aboveSpace = rect.top;
+    const belowSpace = vh - rect.bottom;
+    const placement: 'top' | 'bottom' =
+      wantTop && aboveSpace > 80 ? 'top' : belowSpace > 80 ? 'bottom' : 'top';
+
+    const top =
+      placement === 'top'
+        ? rect.top - TOOLTIP_GAP
+        : rect.bottom + TOOLTIP_GAP;
+
+    setPos({ top, left, arrowLeft, placement });
+  }, [side]);
+
+  // Recompute on open + on scroll/resize while open
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const onScroll = () => updatePosition();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
 
   // Tap-elsewhere-to-hide for mobile.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent | TouchEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      if (triggerRef.current && triggerRef.current.contains(e.target as Node)) {
+        return;
       }
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     document.addEventListener('touchstart', handler);
@@ -150,16 +209,14 @@ export function MetricTooltip({
   const audience = target || content.for;
 
   return (
-    <span
-      ref={wrapRef}
-      className={cn('relative inline-flex items-center align-middle', className)}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <span className={cn('inline-flex items-center align-middle', className)}>
       <button
+        ref={triggerRef}
         type="button"
         aria-label={`About ${metric}`}
         aria-expanded={open}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -173,55 +230,67 @@ export function MetricTooltip({
       >
         <Info className={iconSize} strokeWidth={2} />
       </button>
-      {open && (
-        <span
-          role="tooltip"
-          className={cn(
-            'pointer-events-none absolute left-1/2 z-50 -translate-x-1/2',
-            'w-[280px] max-w-[80vw] rounded-md shadow-xl',
-            'border border-border px-3 py-2.5',
-            'text-[11px] leading-snug text-fg',
-            'transition-opacity duration-150',
-            side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2',
-          )}
-          style={{ backgroundColor: '#1a1a2e' }}
-        >
-          <div className="font-semibold text-fg mb-1.5 flex items-baseline justify-between gap-2">
-            <span className="truncate">{metric}</span>
-            {value && (
-              <span className="tabular text-accent font-mono shrink-0">{value}</span>
-            )}
-          </div>
-          <div className="space-y-1">
-            <div>
-              <span className="text-fg-subtle">What:</span>{' '}
-              <span className="text-fg-muted">{content.what}</span>
-            </div>
-            <div>
-              <span className="text-fg-subtle">For:</span>{' '}
-              <span className="text-fg-muted">{audience}</span>
-            </div>
-            <div>
-              <span className="text-fg-subtle">Good:</span>{' '}
-              <span className="text-accent font-medium">{content.good}</span>
-            </div>
-            <div className="pt-1 mt-1 border-t border-border/50 text-fg-muted italic">
-              {content.tip}
-            </div>
-          </div>
-          {/* Pointer arrow */}
-          <span
-            aria-hidden
-            className={cn(
-              'absolute left-1/2 -translate-x-1/2 h-2 w-2 rotate-45 border-border',
-              side === 'top'
-                ? 'top-full -mt-1 border-r border-b'
-                : 'bottom-full -mb-1 border-l border-t',
-            )}
-            style={{ backgroundColor: '#1a1a2e' }}
-          />
-        </span>
-      )}
+      {mounted && open && pos
+        ? createPortal(
+            <div
+              role="tooltip"
+              className={cn(
+                'fixed pointer-events-none z-[100]',
+                'rounded-md shadow-xl border border-border px-3 py-2.5',
+                'text-[11px] leading-snug text-fg',
+              )}
+              style={{
+                top: pos.top,
+                left: pos.left,
+                width: TOOLTIP_WIDTH,
+                maxWidth: '92vw',
+                backgroundColor: '#1a1a2e',
+                transform:
+                  pos.placement === 'top' ? 'translateY(-100%)' : 'none',
+              }}
+            >
+              <div className="font-semibold text-fg mb-1.5 flex items-baseline justify-between gap-2">
+                <span className="truncate">{metric}</span>
+                {value && (
+                  <span className="tabular text-accent font-mono shrink-0">
+                    {value}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1">
+                <div>
+                  <span className="text-fg-subtle">What:</span>{' '}
+                  <span className="text-fg-muted">{content.what}</span>
+                </div>
+                <div>
+                  <span className="text-fg-subtle">For:</span>{' '}
+                  <span className="text-fg-muted">{audience}</span>
+                </div>
+                <div>
+                  <span className="text-fg-subtle">Good:</span>{' '}
+                  <span className="text-accent font-medium">{content.good}</span>
+                </div>
+                <div className="pt-1 mt-1 border-t border-border/50 text-fg-muted italic">
+                  {content.tip}
+                </div>
+              </div>
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute h-2 w-2 rotate-45 border-border',
+                  pos.placement === 'top'
+                    ? 'top-full -mt-1 border-r border-b'
+                    : 'bottom-full -mb-1 border-l border-t',
+                )}
+                style={{
+                  left: Math.max(8, Math.min(TOOLTIP_WIDTH - 16, pos.arrowLeft)) - 4,
+                  backgroundColor: '#1a1a2e',
+                }}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </span>
   );
 }

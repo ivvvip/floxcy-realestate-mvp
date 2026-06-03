@@ -462,7 +462,7 @@ async def dld_market_overview(db: AsyncSession = Depends(get_db)):
 # a DLD ETL table; sections we don't have honest data for are omitted.
 # ---------------------------------------------------------------------------
 
-DASHBOARD_DATA_CACHE_KEY = "dld:dashboard-data:v1"
+DASHBOARD_DATA_CACHE_KEY = "dld:dashboard-data:v2"
 DASHBOARD_DATA_TTL_S = 3600
 
 
@@ -514,6 +514,10 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
     ) or 0)
     sales_prev = int(await db.scalar(
         select(func.coalesce(func.sum(DldPriceHistory.transaction_count), 0))
+        .where(DldPriceHistory.year == latest_year - 1)
+    ) or 0)
+    volume_prev = float(await db.scalar(
+        select(func.coalesce(func.sum(DldPriceHistory.total_value_aed), 0))
         .where(DldPriceHistory.year == latest_year - 1)
     ) or 0)
     rent_contracts = int(await db.scalar(
@@ -777,19 +781,68 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
             transaction_count=ready_count,
         ))
 
+    # ---- Same-period YoY (Jan–N latest_year vs Jan–N prev_year) ----
+    # The DLD price/rent history is yearly-aggregated only, so we approximate
+    # "same months" by prorating the prior full year on months elapsed in
+    # latest_year. If latest_year is not the current calendar year, the data
+    # is complete and no proration is needed.
+    today = _dt.utcnow().date()
+    if latest_year == today.year:
+        # ETL typically lags by ~1 month — treat data as covering full prior
+        # months only, e.g. on 2026-06-03 the latest cleared month is May (5).
+        months_elapsed = max(1, today.month - 1)
+    else:
+        months_elapsed = 12
+    MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    period_label = (
+        f"Jan–{MONTH_ABBR[months_elapsed - 1]}" if months_elapsed < 12 else "full year"
+    )
+
+    if months_elapsed < 12:
+        sales_prev_same = sales_prev * months_elapsed / 12
+        volume_prev_same = volume_prev * months_elapsed / 12
+        sales_delta_pct = (
+            (sales_latest - sales_prev_same) / sales_prev_same * 100
+            if sales_prev_same > 0 else None
+        )
+        volume_delta_pct = (
+            (volume_latest - volume_prev_same) / volume_prev_same * 100
+            if volume_prev_same > 0 else None
+        )
+        sales_delta_label = f"vs {period_label} {latest_year - 1}"
+        volume_delta_label = sales_delta_label
+    else:
+        sales_delta_pct = (
+            (sales_latest - sales_prev) / sales_prev * 100 if sales_prev else None
+        )
+        volume_delta_pct = (
+            (volume_latest - volume_prev) / volume_prev * 100 if volume_prev else None
+        )
+        sales_delta_label = f"vs {latest_year - 1}" if sales_prev else None
+        volume_delta_label = f"vs {latest_year - 1}" if volume_prev else None
+
+    sales_sublabel = (
+        f"{period_label} {latest_year}" if months_elapsed < 12 else f"{latest_year} total"
+    )
+
     # ---- KPI tiles ----
     kpis: list[DashboardKpi] = []
     kpis.append(DashboardKpi(
         label=f"Sales {latest_year} YTD",
         value=float(sales_latest),
         unit="count",
-        delta_pct=((sales_latest - sales_prev) / sales_prev * 100) if sales_prev else None,
-        delta_label=f"vs {latest_year - 1}" if sales_prev else None,
+        sublabel=sales_sublabel,
+        delta_pct=sales_delta_pct,
+        delta_label=sales_delta_label,
     ))
     kpis.append(DashboardKpi(
         label=f"Sales volume {latest_year} YTD",
         value=volume_latest,
         unit="aed",
+        sublabel=sales_sublabel,
+        delta_pct=volume_delta_pct,
+        delta_label=volume_delta_label,
     ))
     kpis.append(DashboardKpi(
         label=f"Avg yield {latest_year}",
@@ -800,7 +853,7 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
             (avg_yield_pct_f - float(avg_yield_prev)) if (avg_yield_pct_f is not None and avg_yield_prev is not None)
             else None
         ),
-        delta_label=f"vs {latest_year - 1}" if avg_yield_prev is not None else None,
+        delta_label=f"vs {latest_year - 1} annual avg" if avg_yield_prev is not None else None,
     ))
     kpis.append(DashboardKpi(
         label=f"Rent contracts {latest_year - 1}-{latest_year}",

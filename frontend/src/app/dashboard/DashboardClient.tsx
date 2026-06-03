@@ -15,7 +15,7 @@ import {
 import {
   AXIS_COLOR, GRID_COLOR, TOOLTIP_STYLE,
 } from '@/components/charts/ChartTheme';
-import { formatAED, formatAEDFull, formatNumber, formatPercent } from '@/lib/format';
+import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { MetricTooltip, type MetricKey } from '@/components/MetricTooltip';
 
@@ -314,15 +314,9 @@ function KpiTile({ kpi }: { kpi: DashboardKpi }) {
       : kpi.delta_pct >= 0
         ? 'text-positive'
         : 'text-negative';
-  // For AED tiles, show the unabbreviated number on hover so users can
-  // sanity-check the magnitude when "AED 1.14T" is displayed.
-  const fullTooltip = kpi.unit === 'aed' ? formatAEDFull(kpi.value) : undefined;
   const tooltipKey = tooltipForLabel(kpi.label);
   return (
-    <div
-      className="border border-border rounded-md bg-bg-elev/30 p-4"
-      title={fullTooltip}
-    >
+    <div className="border border-border rounded-md bg-bg-elev/30 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center">
           {kpi.label}
