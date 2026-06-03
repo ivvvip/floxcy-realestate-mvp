@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn';
 interface MetricContent {
   what: string;
   for: string;
-  good: string;
+  good?: string;
   tip: string;
 }
 
@@ -96,6 +96,40 @@ const METRICS: Record<string, MetricContent> = {
     for: 'Serious investors calculating returns',
     good: '>6% excellent | 4-6% good',
     tip: 'More accurate than gross yield',
+  },
+
+  // Dashboard KPI tile entries — Dubai-wide totals, not per-area metrics.
+  'Sales YTD': {
+    what: 'Total property sales registered Jan–May 2026',
+    for: 'Investors tracking market activity',
+    tip: 'Higher volume = more liquid market',
+  },
+  'Sales Volume': {
+    what: 'Total AED value of all sales',
+    for: 'Institutional investors & analysts',
+    tip: 'Reflects overall market size',
+  },
+  'Avg Yield': {
+    what: 'Average annual rent ÷ average sale price',
+    for: 'Income investors',
+    good: '>7% excellent | 5-7% good | <5% low',
+    tip: 'Dubai average is historically 5-8%',
+  },
+  'Rent Contracts': {
+    what: 'Ejari-registered rental contracts 2025–2026',
+    for: 'Landlords & rental investors',
+    tip: 'All Dubai rentals must register with Ejari',
+  },
+  'Active RERA Brokers': {
+    what: 'Currently licensed real estate agents',
+    for: 'Buyers & renters verifying agents',
+    tip: 'Always verify broker RERA license before dealing',
+  },
+  'Off-Plan Share': {
+    what: '% of sales that are off-plan (under construction)',
+    for: 'Market trend analysts',
+    good: '>70% shows strong investor confidence',
+    tip: "Dubai has one of world's highest off-plan ratios",
   },
 };
 
@@ -266,10 +300,12 @@ export function MetricTooltip({
                   <span className="text-fg-subtle">For:</span>{' '}
                   <span className="text-fg-muted">{audience}</span>
                 </div>
-                <div>
-                  <span className="text-fg-subtle">Good:</span>{' '}
-                  <span className="text-accent font-medium">{content.good}</span>
-                </div>
+                {content.good && (
+                  <div>
+                    <span className="text-fg-subtle">Good:</span>{' '}
+                    <span className="text-accent font-medium">{content.good}</span>
+                  </div>
+                )}
                 <div className="pt-1 mt-1 border-t border-border/50 text-fg-muted italic">
                   {content.tip}
                 </div>

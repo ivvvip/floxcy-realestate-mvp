@@ -19,16 +19,23 @@ import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { MetricTooltip, type MetricKey } from '@/components/MetricTooltip';
 
-// Maps a backend KPI/section label to a tooltip entry. Returns null when the
-// label has no corresponding contextual help.
+// Maps a backend KPI/section label to a tooltip entry. KPI tile labels match
+// the Dubai-wide dashboard entries; section titles fall through to the
+// per-area metric vocabulary.
 function tooltipForLabel(label: string): MetricKey | null {
   const l = label.toLowerCase();
+  // KPI tiles (Dubai-wide totals)
+  if (l.includes('off-plan share') || l.includes('offplan share')) return 'Off-Plan Share';
+  if (l.includes('avg yield')) return 'Avg Yield';
+  if (l.includes('rent contracts')) return 'Rent Contracts';
+  if (l.includes('rera')) return 'Active RERA Brokers';
+  if (l.includes('sales volume')) return 'Sales Volume';
+  if (l.startsWith('sales ') || l === 'sales') return 'Sales YTD';
+  // Section titles (per-area)
   if (l.includes('off-plan') || l.includes('offplan')) return 'Off-Plan %';
   if (l.includes('yield')) return 'Gross Yield';
   if (l.includes('appreciation')) return '5Y Appreciation';
-  if (l.includes('rent growth') || l.includes('rent contracts')) return 'Rent Growth YoY';
-  if (l.includes('rera')) return 'RERA Verified';
-  if (l.includes('sales')) return 'Transaction Volume';
+  if (l.includes('rent growth')) return 'Rent Growth YoY';
   if (l.includes('supply')) return 'Supply Risk';
   return null;
 }
