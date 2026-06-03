@@ -1057,6 +1057,24 @@ class AreaBedroomPricesResponse(Attribution):
 
 
 # ---------------------------------------------------------------------------
+# Community profile (Digital Dubai 2024 population)
+# ---------------------------------------------------------------------------
+
+class AreaCommunityProfile(Attribution):
+    community_code: Optional[int] = None
+    area_name_en: Optional[str] = None
+    area_name_ar: Optional[str] = None
+    sector: Optional[int] = None
+    total_population: Optional[int] = None
+    area_km2: Optional[float] = None
+    population_density: Optional[float] = None
+    density_tier: Optional[str] = None  # "very_high" | "high" | "medium" | "low"
+    density_rank: Optional[int] = None  # 1 = densest
+    density_rank_total: Optional[int] = None
+    matched: bool = False
+
+
+# ---------------------------------------------------------------------------
 # Building sales history
 # ---------------------------------------------------------------------------
 

@@ -23,6 +23,7 @@ from app.models.dld import (
     DldAreaAppreciation,
     DldAreaLifestyleScore,
     DldAreaMetrics,
+    DldAreaPopulation,
     DldBedroomBenchmark,
     DldBuilding,
     DldBuildingDerived,
@@ -93,6 +94,7 @@ from app.schemas.dld import (
     DldYieldHistoryResponse,
     AreaBedroomPricesResponse,
     AreaCategoryBreakdownItem,
+    AreaCommunityProfile,
     AreaCategoryBreakdownResponse,
     DldCommunitiesResponse,
     DldCommunityItem,
@@ -3872,6 +3874,77 @@ async def get_area_bedroom_prices(
         area_name_display=area.name_display,
         rows=items,
         total_rows=len(items),
+    )
+
+
+def _density_tier(density: float | None) -> str | None:
+    if density is None:
+        return None
+    if density >= 50_000:
+        return "very_high"
+    if density >= 20_000:
+        return "high"
+    if density >= 5_000:
+        return "medium"
+    return "low"
+
+
+@router.get(
+    "/areas/{name_or_norm}/community-profile",
+    response_model=AreaCommunityProfile,
+)
+async def get_area_community_profile(
+    name_or_norm: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Digital Dubai 2024 community population profile for an area.
+
+    Joins dld_area_population on normalized area name. Returns matched=False
+    with all other fields null when the area has no population row (e.g.
+    industrial-only zones, off-plan masterplans without registered residents
+    yet, or community names not in the 2024 PDF). Density tier follows the
+    Dubai-wide thresholds documented in the area-page Community Profile.
+    """
+    norm = name_or_norm.strip().lower()
+    pop = (
+        await db.execute(
+            select(DldAreaPopulation).where(
+                DldAreaPopulation.area_name_norm == norm
+            )
+        )
+    ).scalar_one_or_none()
+    if not pop:
+        return AreaCommunityProfile(matched=False)
+
+    # Density rank — 1 = highest density across all loaded rows.
+    rank_row = (
+        await db.execute(
+            select(func.count())
+            .select_from(DldAreaPopulation)
+            .where(DldAreaPopulation.population_density > pop.population_density)
+        )
+    ).scalar_one() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(DldAreaPopulation))
+    ).scalar_one() or 0
+
+    return AreaCommunityProfile(
+        community_code=int(pop.community_code),
+        area_name_en=pop.area_name_en,
+        area_name_ar=pop.area_name_ar,
+        sector=int(pop.sector),
+        total_population=int(pop.total_population),
+        area_km2=float(pop.area_km2) if pop.area_km2 is not None else None,
+        population_density=float(pop.population_density)
+        if pop.population_density is not None
+        else None,
+        density_tier=_density_tier(
+            float(pop.population_density) if pop.population_density is not None else None
+        ),
+        density_rank=int(rank_row) + 1 if total else None,
+        density_rank_total=int(total) if total else None,
+        matched=True,
+        data_source="Digital Dubai Official Statistics 2024",
     )
 
 

@@ -345,6 +345,20 @@ export interface AreaBedroomPricesResponse extends DldAttribution {
   total_rows: number;
 }
 
+export interface AreaCommunityProfile extends DldAttribution {
+  community_code: number | null;
+  area_name_en: string | null;
+  area_name_ar: string | null;
+  sector: number | null;
+  total_population: number | null;
+  area_km2: number | null;
+  population_density: number | null;
+  density_tier: 'very_high' | 'high' | 'medium' | 'low' | null;
+  density_rank: number | null;
+  density_rank_total: number | null;
+  matched: boolean;
+}
+
 export interface BuildingRentHistoryPoint {
   year: number;
   avg_annual_rent: number | null;

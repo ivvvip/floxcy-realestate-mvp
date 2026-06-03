@@ -606,3 +606,28 @@ class DldAreaLandSummary(Base):
     land_type_mix: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     top_master_projects: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DldAreaPopulation(Base):
+    """Official Digital Dubai 2024 community-level population + area-size
+    statistics. Keyed by community_code (DLD's 3-digit sector code, e.g. 346
+    = Business Bay). Source: Digital Dubai Official Statistics 2024 PDF.
+
+    Joins to dld_canonical_areas via normalized area_name_en. ~126 areas
+    covered (the inhabited subset of Dubai's 9 sectors).
+    """
+    __tablename__ = "dld_area_population"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    community_code: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    area_name_en: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    area_name_ar: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sector: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    total_population: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    area_km2: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    population_density: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(64), default="Digital Dubai 2024", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

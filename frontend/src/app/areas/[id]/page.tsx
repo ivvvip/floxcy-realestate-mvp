@@ -15,12 +15,13 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaBedroomPrices, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory, getOffplanProjects } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaBedroomPrices, getDldAreaCategoryBreakdown, getDldAreaCommunityProfile, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory, getOffplanProjects } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
 import { AreaSmartSummary, AreaBottomCTAs } from './AreaSmartSummary';
 import { AreaBedroomBreakdown } from './AreaBedroomBreakdown';
+import { AreaCommunityProfile } from './AreaCommunityProfile';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -174,6 +175,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // has no bedroom-tagged transactions for the area.
   const bedroomPrices = area.dld?.dld_name
     ? await getDldAreaBedroomPrices(area.dld.dld_name.toLowerCase()).catch(
+        () => null,
+      )
+    : null;
+
+  // Digital Dubai 2024 community population/density. Returns
+  // matched=false (cheap object, soft-fail) when the area isn't in the
+  // PDF roster (e.g. industrial zones, off-plan masterplans pre-build).
+  const communityProfile = area.dld?.dld_name
+    ? await getDldAreaCommunityProfile(area.dld.dld_name.toLowerCase()).catch(
         () => null,
       )
     : null;
@@ -357,23 +367,32 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         marketAvgYieldPct={6.98}
       />
 
-      {/* Bedroom-level breakdown — "What can you buy here?" */}
-      {bedroomPrices && bedroomPrices.rows.length > 0 && (
+      {/* Bedroom-level breakdown + Community profile — both inside one
+          band, each soft-failing when its data isn't available. */}
+      {((bedroomPrices && bedroomPrices.rows.length > 0) ||
+        communityProfile?.matched) && (
         <div className="border-b border-border bg-bg">
           <Container>
-            <div className="py-5">
-              <AreaBedroomBreakdown
-                areaName={area.name}
-                rows={bedroomPrices.rows}
-                avgAnnualRent={
-                  area.dld?.avg_annual_rent ?? area.latest?.avg_annual_rent ?? null
-                }
-                marketYieldPct={
-                  area.dld?.rental_yield_pct ??
-                  area.latest?.rental_yield ??
-                  null
-                }
-              />
+            <div className="py-5 space-y-5">
+              {bedroomPrices && bedroomPrices.rows.length > 0 && (
+                <AreaBedroomBreakdown
+                  areaName={area.name}
+                  rows={bedroomPrices.rows}
+                  avgAnnualRent={
+                    area.dld?.avg_annual_rent ??
+                    area.latest?.avg_annual_rent ??
+                    null
+                  }
+                  marketYieldPct={
+                    area.dld?.rental_yield_pct ??
+                    area.latest?.rental_yield ??
+                    null
+                  }
+                />
+              )}
+              {communityProfile?.matched && (
+                <AreaCommunityProfile profile={communityProfile} />
+              )}
             </div>
           </Container>
         </div>
