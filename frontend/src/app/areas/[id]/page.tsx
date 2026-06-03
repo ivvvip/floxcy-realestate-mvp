@@ -15,10 +15,12 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory, getOffplanProjects } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaBedroomPrices, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory, getOffplanProjects } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
+import { AreaSmartSummary, AreaBottomCTAs } from './AreaSmartSummary';
+import { AreaBedroomBreakdown } from './AreaBedroomBreakdown';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -166,6 +168,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     ? await getDldAreaCategoryBreakdown(
         area.dld.dld_name.toLowerCase(),
       ).catch(() => null)
+    : null;
+
+  // Per-bedroom sale benchmarks (Studio / 1BR / 2BR / …). Hidden when DLD
+  // has no bedroom-tagged transactions for the area.
+  const bedroomPrices = area.dld?.dld_name
+    ? await getDldAreaBedroomPrices(area.dld.dld_name.toLowerCase()).catch(
+        () => null,
+      )
     : null;
 
   // Off-plan projects under construction in this area. Hidden when the
@@ -318,6 +328,51 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                     : '—'
                 }
                 mono
+              />
+            </div>
+          </Container>
+        </div>
+      )}
+
+      {/* Smart summary — plain-language verdict, At-a-Glance tiles, and
+          investor-fit cards. Derived entirely from data already fetched. */}
+      <AreaSmartSummary
+        area={area}
+        appreciation5yPct={priceHistory?.appreciation_5y_pct ?? null}
+        cagr5yPct={priceHistory?.cagr_5y_pct ?? null}
+        startingPpsf={
+          priceHistory?.points && priceHistory.points.length > 0
+            ? priceHistory.points[0].avg_ppsf_ready ??
+              priceHistory.points[0].avg_ppsf ??
+              null
+            : null
+        }
+        latestPpsf={
+          priceHistory?.points && priceHistory.points.length > 0
+            ? priceHistory.points[priceHistory.points.length - 1].avg_ppsf_ready ??
+              priceHistory.points[priceHistory.points.length - 1].avg_ppsf ??
+              null
+            : null
+        }
+        marketAvgYieldPct={6.98}
+      />
+
+      {/* Bedroom-level breakdown — "What can you buy here?" */}
+      {bedroomPrices && bedroomPrices.rows.length > 0 && (
+        <div className="border-b border-border bg-bg">
+          <Container>
+            <div className="py-5">
+              <AreaBedroomBreakdown
+                areaName={area.name}
+                rows={bedroomPrices.rows}
+                avgAnnualRent={
+                  area.dld?.avg_annual_rent ?? area.latest?.avg_annual_rent ?? null
+                }
+                marketYieldPct={
+                  area.dld?.rental_yield_pct ??
+                  area.latest?.rental_yield ??
+                  null
+                }
               />
             </div>
           </Container>
@@ -1463,6 +1518,17 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             )}
           </div>
         </section>
+
+        <AreaBottomCTAs
+          areaName={area.name}
+          areaSlugForRoi={
+            area.dld?.dld_name?.toLowerCase() ?? area.name.toLowerCase()
+          }
+          areaSlugForBrokers={
+            area.dld?.dld_name?.toLowerCase() ?? area.name.toLowerCase()
+          }
+          areaId={area.id}
+        />
 
         <div className="pb-10" />
       </Container>

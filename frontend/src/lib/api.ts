@@ -53,6 +53,7 @@ import type {
   DldBuildingRentHistoryResponse,
   DldRentHistoryResponse,
   DldYieldHistoryResponse,
+  AreaBedroomPricesResponse,
   UpcomingAvailabilityResponse,
   CanonicalAreasResponse,
   DashboardDataResponse,
@@ -701,6 +702,20 @@ export async function getDldAreaRentHistory(
   return request<DldRentHistoryResponse>(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/rent-history`,
     { revalidate: 3600 }
+  );
+}
+
+export async function getDldAreaBedroomPrices(
+  nameNorm: string,
+  opts?: { reg_type?: 'ready' | 'off_plan'; year?: number },
+): Promise<AreaBedroomPricesResponse> {
+  const q = new URLSearchParams();
+  if (opts?.reg_type) q.set('reg_type', opts.reg_type);
+  if (opts?.year) q.set('year', String(opts.year));
+  const qs = q.toString();
+  return request<AreaBedroomPricesResponse>(
+    `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/bedroom-prices${qs ? '?' + qs : ''}`,
+    { revalidate: 3600 },
   );
 }
 

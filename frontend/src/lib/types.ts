@@ -329,6 +329,22 @@ export interface DldYieldHistoryResponse extends DldAttribution {
   trend: 'rising' | 'falling' | 'flat' | null;
 }
 
+export interface BedroomBenchmarkRow {
+  bedroom_type: string;
+  reg_type: 'ready' | 'off_plan' | string;
+  year: number;
+  avg_price_aed: number | null;
+  median_price_aed: number | null;
+  avg_ppsf: number | null;
+  transaction_count: number;
+}
+export interface AreaBedroomPricesResponse extends DldAttribution {
+  area_name_norm: string;
+  area_name_display: string | null;
+  rows: BedroomBenchmarkRow[];
+  total_rows: number;
+}
+
 export interface BuildingRentHistoryPoint {
   year: number;
   avg_annual_rent: number | null;
