@@ -249,36 +249,46 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                     </span>
                   )}
                 </div>
-                {/* View on Map — verified link goes to coords; unverified falls
-                    back to a search. */}
+                {/* View on Map — always uses the building name + area in the
+                    query so Google Maps shows the building name in results,
+                    not a "25.0571,55.2137" lat/lon string. Verified
+                    buildings include the precise coords as a fallback in
+                    the URL so Maps can re-rank around them. */}
                 <div className="mt-2">
-                  {b.osm_verified && b.lat != null && b.lon != null ? (
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
-                    >
-                      <MapPin className="h-3 w-3 text-positive" strokeWidth={2.5} />
-                      View on Google Maps
-                      <ExternalLink className="h-3 w-3" strokeWidth={2} />
-                    </a>
-                  ) : (
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        [b.display_name ?? b.project_name, b.area_name, 'Dubai']
-                          .filter(Boolean)
-                          .join(' '),
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium text-fg-subtle hover:text-fg hover:border-border-strong transition-colors"
-                    >
-                      <MapPin className="h-3 w-3" strokeWidth={2.5} />
-                      Search on Google Maps
-                      <ExternalLink className="h-3 w-3" strokeWidth={2} />
-                    </a>
-                  )}
+                  {(() => {
+                    const nameQuery = [
+                      b.display_name ?? b.project_name,
+                      b.area_name,
+                      'Dubai',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+                    const verified = b.osm_verified && b.lat != null && b.lon != null;
+                    const href = verified
+                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nameQuery)}&ll=${b.lat},${b.lon}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nameQuery)}`;
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn(
+                          'inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium hover:text-fg hover:border-border-strong transition-colors',
+                          verified ? 'text-fg-muted' : 'text-fg-subtle',
+                        )}
+                      >
+                        <MapPin
+                          className={cn(
+                            'h-3 w-3',
+                            verified && 'text-positive',
+                          )}
+                          strokeWidth={2.5}
+                        />
+                        {verified ? 'View on Google Maps' : 'Search on Google Maps'}
+                        <ExternalLink className="h-3 w-3" strokeWidth={2} />
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="text-left sm:text-right text-[11px] text-fg-subtle whitespace-nowrap">

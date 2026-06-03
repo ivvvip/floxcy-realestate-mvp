@@ -124,3 +124,30 @@ input[type='number']::-webkit-inner-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
 }
+
+/* Leaflet popup theming — dark background to match Floxcy's UI. The
+   `.floxcy-popup` class is passed via L.bindPopup({ className }) in
+   src/components/FloxcyMap.tsx. */
+.leaflet-popup.floxcy-popup .leaflet-popup-content-wrapper,
+.leaflet-popup.floxcy-popup .leaflet-popup-tip {
+  background: #131725;
+  color: #F8F9FA;
+  border: 1px solid #2A2F3E;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.leaflet-popup.floxcy-popup .leaflet-popup-content-wrapper {
+  border-radius: 6px;
+}
+.leaflet-popup.floxcy-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  color: #F8F9FA;
+}
+.leaflet-popup.floxcy-popup a {
+  color: #00D4AA;
+}
+.leaflet-popup.floxcy-popup .leaflet-popup-close-button {
+  color: #9CA3AF;
+}
+.leaflet-popup.floxcy-popup .leaflet-popup-close-button:hover {
+  color: #F8F9FA;
+}
