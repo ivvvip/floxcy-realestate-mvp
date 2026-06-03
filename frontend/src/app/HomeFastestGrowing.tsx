@@ -29,14 +29,14 @@ export async function HomeFastestGrowing() {
                   className="h-3 w-3 text-accent"
                   strokeWidth={2}
                 />
-                Historical price growth · DLD 2021–2026
+                Historical price growth · DLD records
               </div>
               <h2 className="mt-1 text-lg font-semibold text-fg">
                 Fastest Growing Areas — last 5 years
               </h2>
               <p className="mt-1 text-xs text-fg-muted max-w-2xl">
                 Top {data.count} Dubai areas by registered Sales-of-Unit
-                appreciation between 2021 and 2026. Computed from{' '}
+                cumulative price growth since the area&apos;s first DLD sale. Computed from{' '}
                 {data.data_source}; areas need a full 5-year series to qualify.
               </p>
             </div>

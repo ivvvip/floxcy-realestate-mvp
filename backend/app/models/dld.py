@@ -209,8 +209,10 @@ class DldPriceHistory(Base):
 
 
 class DldAreaAppreciation(Base):
-    """Derived 1y/3y/5y appreciation + 5y CAGR per area, computed from
-    dld_price_history at ETL time. UNIQUE(area_name_norm)."""
+    """Derived 1y/3y/5y/10y appreciation + 5y/10y CAGR per area, computed
+    from dld_price_history at ETL time. UNIQUE(area_name_norm). The 10y
+    columns are populated once the history backfill reaches 2009 (areas
+    without 10y of price data leave them null)."""
     __tablename__ = "dld_area_appreciation"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -223,7 +225,9 @@ class DldAreaAppreciation(Base):
     appreciation_1y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     appreciation_3y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     appreciation_5y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    appreciation_10y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     cagr_5y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    cagr_10y_pct: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     years_of_data: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

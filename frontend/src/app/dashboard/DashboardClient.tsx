@@ -83,7 +83,7 @@ export function DashboardClient({ data }: Props) {
         </Section>
         <Section
           title="Yearly transaction activity"
-          subtitle="Off-plan vs ready, count + value, 2021–2026"
+          subtitle="Off-plan vs ready, count + value, historical"
           source="DLD"
           className="lg:col-span-7"
         >
@@ -113,7 +113,7 @@ export function DashboardClient({ data }: Props) {
         </Section>
         <Section
           title="Top 5y appreciation"
-          subtitle="Cumulative sale-ppsf change 2021→2026"
+          subtitle="Cumulative sale-ppsf change, latest 5-year window"
           source="DLD Price History"
         >
           <TopBarList

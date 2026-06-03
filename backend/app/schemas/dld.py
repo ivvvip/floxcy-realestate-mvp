@@ -124,7 +124,9 @@ class DldPriceHistoryResponse(Attribution):
     appreciation_1y_pct: Optional[float] = None
     appreciation_3y_pct: Optional[float] = None
     appreciation_5y_pct: Optional[float] = None
+    appreciation_10y_pct: Optional[float] = None
     cagr_5y_pct: Optional[float] = None
+    cagr_10y_pct: Optional[float] = None
     years_of_history: int = 0
 
 

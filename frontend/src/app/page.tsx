@@ -178,7 +178,7 @@ export default async function HomePage() {
                 <KpiTile
                   label="Sales transactions"
                   value={formatNumber(market.total_sales)}
-                  hint="2021–2026"
+                  hint="DLD historical"
                 />
                 <KpiTile
                   label="Total volume"
@@ -189,7 +189,7 @@ export default async function HomePage() {
                 <KpiTile
                   label="Rent contracts"
                   value={formatNumber(market.rent_contracts)}
-                  hint="2021–2026"
+                  hint="Ejari 2021–2026"
                 />
                 <KpiTile
                   label="Areas covered"
@@ -244,7 +244,7 @@ export default async function HomePage() {
                   <PicksTile
                     label="Off-plan share"
                     value={`${market.offplan_percentage.toFixed(1)}%`}
-                    sub="of all sales · 2021–2026"
+                    sub="of all sales · DLD historical"
                   />
                 )}
               </div>
@@ -486,7 +486,7 @@ export default async function HomePage() {
       {/* Featured Developers — top 5 by DLD sales volume */}
       <HomeFeaturedDevelopers />
 
-      {/* Fastest Growing Areas — DLD 2021–2026 appreciation widget */}
+      {/* Fastest Growing Areas — DLD historical appreciation widget */}
       <HomeFastestGrowing />
 
       {/* Top buildings by annual income (FIX 1: Building Income Rankings) */}

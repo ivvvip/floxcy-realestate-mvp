@@ -278,7 +278,9 @@ export interface DldPriceHistoryResponse extends DldAttribution {
   appreciation_1y_pct: number | null;
   appreciation_3y_pct: number | null;
   appreciation_5y_pct: number | null;
+  appreciation_10y_pct: number | null;
   cagr_5y_pct: number | null;
+  cagr_10y_pct: number | null;
   years_of_history: number;
 }
 

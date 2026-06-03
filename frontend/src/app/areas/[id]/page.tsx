@@ -124,7 +124,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     : null;
 
   // 5-year price history from etl_dld_history.py — hidden when the area
-  // has no qualifying Sales-of-Unit rows in the 2021–2026 export.
+  // has no qualifying Sales-of-Unit rows in the 2009–2026 export.
   const priceHistory = area.dld?.dld_name
     ? await getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(
         () => null
@@ -362,6 +362,16 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             ? priceHistory.points[priceHistory.points.length - 1].avg_ppsf_ready ??
               priceHistory.points[priceHistory.points.length - 1].avg_ppsf ??
               null
+            : null
+        }
+        startingYear={
+          priceHistory?.points && priceHistory.points.length > 0
+            ? priceHistory.points[0].year
+            : null
+        }
+        latestYear={
+          priceHistory?.points && priceHistory.points.length > 0
+            ? priceHistory.points[priceHistory.points.length - 1].year
             : null
         }
         marketAvgYieldPct={6.98}
@@ -616,8 +626,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           </section>
         )}
 
-        {/* Price History (2021–2026) — DLD historical Sales-of-Unit */}
-        {priceHistory && priceHistory.points.length >= 2 && (
+        {/* Price History — DLD historical Sales-of-Unit (range pulled from data) */}
+        {priceHistory && priceHistory.points.length >= 2 && (() => {
+          const firstYear = priceHistory.points[0].year;
+          const lastYear = priceHistory.points[priceHistory.points.length - 1].year;
+          const rangeLabel = `${firstYear}–${lastYear}`;
+          const arrowLabel = `${firstYear} → ${lastYear}`;
+          const has10y = priceHistory.appreciation_10y_pct != null;
+          return (
           <section
             id="price-history"
             className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
@@ -625,57 +641,76 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             <div className="chart-header">
               <span className="chart-header-label inline-flex items-center gap-1.5">
                 <Info className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
-                Price History · {priceHistory.area_name_display} · 2021–2026
+                Price History · {priceHistory.area_name_display} · {rangeLabel}
               </span>
               <span className="text-[11px] text-fg-subtle">
                 {priceHistory.years_of_history} years · DLD Sales-of-Unit
               </span>
             </div>
-            {/* 4-tile appreciation strip */}
+            {/* 4-tile appreciation strip — swaps 5y for 10y when available */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
-              <MetricTile
-                label="5-year growth"
-                tooltip="5Y Appreciation"
-                value={
-                  priceHistory.appreciation_5y_pct != null
-                    ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
-                    : '—'
-                }
-                hint="2021 → 2026"
-                tone={
-                  priceHistory.appreciation_5y_pct == null
-                    ? 'default'
-                    : priceHistory.appreciation_5y_pct >= 0
-                      ? 'positive'
-                      : 'negative'
-                }
-                mono
-              />
+              {has10y ? (
+                <MetricTile
+                  label="10-year growth"
+                  tooltip="5Y Appreciation"
+                  value={
+                    `${priceHistory.appreciation_10y_pct! >= 0 ? '+' : ''}${priceHistory.appreciation_10y_pct!.toFixed(1)}%`
+                  }
+                  hint={`${lastYear - 10} → ${lastYear}`}
+                  tone={priceHistory.appreciation_10y_pct! >= 0 ? 'positive' : 'negative'}
+                  mono
+                />
+              ) : (
+                <MetricTile
+                  label="5-year growth"
+                  tooltip="5Y Appreciation"
+                  value={
+                    priceHistory.appreciation_5y_pct != null
+                      ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
+                      : '—'
+                  }
+                  hint={`${lastYear - 5} → ${lastYear}`}
+                  tone={
+                    priceHistory.appreciation_5y_pct == null
+                      ? 'default'
+                      : priceHistory.appreciation_5y_pct >= 0
+                        ? 'positive'
+                        : 'negative'
+                  }
+                  mono
+                />
+              )}
               <MetricTile
                 label="Annual growth rate"
                 value={
-                  priceHistory.cagr_5y_pct != null
-                    ? `${priceHistory.cagr_5y_pct >= 0 ? '+' : ''}${priceHistory.cagr_5y_pct.toFixed(2)}%`
-                    : '—'
+                  has10y && priceHistory.cagr_10y_pct != null
+                    ? `${priceHistory.cagr_10y_pct >= 0 ? '+' : ''}${priceHistory.cagr_10y_pct.toFixed(2)}%`
+                    : priceHistory.cagr_5y_pct != null
+                      ? `${priceHistory.cagr_5y_pct >= 0 ? '+' : ''}${priceHistory.cagr_5y_pct.toFixed(2)}%`
+                      : '—'
                 }
-                hint="5y CAGR"
+                hint={has10y && priceHistory.cagr_10y_pct != null ? '10y CAGR' : '5y CAGR'}
                 tone={
-                  priceHistory.cagr_5y_pct == null
+                  (has10y ? priceHistory.cagr_10y_pct : priceHistory.cagr_5y_pct) == null
                     ? 'default'
-                    : priceHistory.cagr_5y_pct >= 0
+                    : (has10y ? priceHistory.cagr_10y_pct! : priceHistory.cagr_5y_pct!) >= 0
                       ? 'positive'
                       : 'negative'
                 }
                 mono
               />
               <MetricTile
-                label="3-year growth"
+                label={has10y ? '5-year growth' : '3-year growth'}
                 value={
-                  priceHistory.appreciation_3y_pct != null
-                    ? `${priceHistory.appreciation_3y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_3y_pct.toFixed(1)}%`
-                    : '—'
+                  has10y
+                    ? priceHistory.appreciation_5y_pct != null
+                      ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
+                      : '—'
+                    : priceHistory.appreciation_3y_pct != null
+                      ? `${priceHistory.appreciation_3y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_3y_pct.toFixed(1)}%`
+                      : '—'
                 }
-                hint="2023 → 2026"
+                hint={has10y ? `${lastYear - 5} → ${lastYear}` : `${lastYear - 3} → ${lastYear}`}
                 mono
               />
               <MetricTile
@@ -685,7 +720,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                     ? `${priceHistory.appreciation_1y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_1y_pct.toFixed(1)}%`
                     : '—'
                 }
-                hint="2025 → 2026"
+                hint={`${lastYear - 1} → ${lastYear}`}
                 mono
               />
             </div>
@@ -706,11 +741,12 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 Series: average AED/sqft per year, ready stock preferred
                 (off-plan launches blended only when no ready trades
                 cleared). Source: DLD registered Sales-of-Unit transactions
-                2021–2026.
+                {' '}{rangeLabel}.
               </p>
             </div>
           </section>
-        )}
+          );
+        })()}
 
         {/* Rent & Yield History (2021-2026) — DLD Ejari + derived yield */}
         {yieldHistory && yieldHistory.points.filter(p => p.gross_yield_pct != null).length >= 2 && (() => {
@@ -822,8 +858,8 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 />
                 <p className="mt-2 text-[10px] text-fg-subtle">
                   Series: gross yield = avg rent/sqft ÷ avg sale PPSF × 100,
-                  display-capped at 20%. Source: DLD Ejari rents + registered
-                  Sales-of-Unit, 2021–2026.
+                  display-capped at 20%. Source: DLD Ejari rents (2021–2026)
+                  + registered Sales-of-Unit (2009–2026).
                 </p>
               </div>
             </section>

@@ -1069,7 +1069,9 @@ async def _load_price_history_block(
         "appreciation_1y_pct": float(appreciation.appreciation_1y_pct) if appreciation.appreciation_1y_pct is not None else None,
         "appreciation_3y_pct": float(appreciation.appreciation_3y_pct) if appreciation.appreciation_3y_pct is not None else None,
         "appreciation_5y_pct": float(appreciation.appreciation_5y_pct) if appreciation.appreciation_5y_pct is not None else None,
+        "appreciation_10y_pct": float(appreciation.appreciation_10y_pct) if appreciation.appreciation_10y_pct is not None else None,
         "cagr_5y_pct": float(appreciation.cagr_5y_pct) if appreciation.cagr_5y_pct is not None else None,
+        "cagr_10y_pct": float(appreciation.cagr_10y_pct) if appreciation.cagr_10y_pct is not None else None,
         "years_of_data": int(appreciation.years_of_data or 0),
     }
 
@@ -1262,7 +1264,9 @@ async def get_dld_area_price_history(
         appreciation_1y_pct=(appreciation or {}).get("appreciation_1y_pct"),
         appreciation_3y_pct=(appreciation or {}).get("appreciation_3y_pct"),
         appreciation_5y_pct=(appreciation or {}).get("appreciation_5y_pct"),
+        appreciation_10y_pct=(appreciation or {}).get("appreciation_10y_pct"),
         cagr_5y_pct=(appreciation or {}).get("cagr_5y_pct"),
+        cagr_10y_pct=(appreciation or {}).get("cagr_10y_pct"),
         years_of_history=(appreciation or {}).get("years_of_data", len(points)),
     )
 

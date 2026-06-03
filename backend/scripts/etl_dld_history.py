@@ -54,7 +54,12 @@ from _transactions_classifier import (  # noqa: E402
 csv.field_size_limit(sys.maxsize)
 
 CHUNK_REPORT_DEFAULT = 500_000
-YEARS = set(range(2021, 2027))
+# History window. Pre-2009 the data is dominated by plot-only land sales,
+# project_name_en tagging is <2%, and the price distribution is structurally
+# different (different DLD procedure mix). 2009 is the practical floor where
+# unit-level sales become well-represented and bedroom benchmarks start to
+# carry signal. See the per-year quality audit for the breakdown.
+YEARS = set(range(2009, 2027))
 BUILDING_MIN_TRANSACTIONS = 3
 BEDROOM_MIN_SAMPLES = 5
 
@@ -452,10 +457,15 @@ def build_appreciation_rows(history_rows: list[dict]) -> list[dict]:
         a1 = _delta(1)
         a3 = _delta(3)
         a5 = _delta(5)
+        a10 = _delta(10)
         cagr5 = None
         base5 = years_map.get(latest - 5, {}).get("avg_ppsf_all")
         if base5 and base5 > 0:
             cagr5 = round((((ppsf_latest / base5) ** (1 / 5)) - 1) * 100, 2)
+        cagr10 = None
+        base10 = years_map.get(latest - 10, {}).get("avg_ppsf_all")
+        if base10 and base10 > 0:
+            cagr10 = round((((ppsf_latest / base10) ** (1 / 10)) - 1) * 100, 2)
 
         out.append({
             "area_name_norm": area_norm,
@@ -464,7 +474,9 @@ def build_appreciation_rows(history_rows: list[dict]) -> list[dict]:
             "appreciation_1y_pct": a1,
             "appreciation_3y_pct": a3,
             "appreciation_5y_pct": a5,
+            "appreciation_10y_pct": a10,
             "cagr_5y_pct": cagr5,
+            "cagr_10y_pct": cagr10,
             "years_of_data": len(years),
         })
     return out
@@ -623,7 +635,8 @@ def write_to_db(
                 str(uuid.uuid4()), area_ids.get(r["area_name_norm"]),
                 r["area_name_norm"], r["base_year"], r["latest_year"],
                 r["appreciation_1y_pct"], r["appreciation_3y_pct"],
-                r["appreciation_5y_pct"], r["cagr_5y_pct"], r["years_of_data"],
+                r["appreciation_5y_pct"], r["appreciation_10y_pct"],
+                r["cagr_5y_pct"], r["cagr_10y_pct"], r["years_of_data"],
             ) for r in appreciations]
             psycopg2.extras.execute_values(
                 cur,
@@ -631,7 +644,7 @@ def write_to_db(
                 INSERT INTO dld_area_appreciation (
                     id, dld_area_id, area_name_norm, base_year, latest_year,
                     appreciation_1y_pct, appreciation_3y_pct, appreciation_5y_pct,
-                    cagr_5y_pct, years_of_data
+                    appreciation_10y_pct, cagr_5y_pct, cagr_10y_pct, years_of_data
                 ) VALUES %s
                 """,
                 ap_rows,

@@ -20,6 +20,8 @@ interface Props {
   cagr5yPct: number | null;
   startingPpsf: number | null;
   latestPpsf: number | null;
+  startingYear: number | null;
+  latestYear: number | null;
   marketAvgYieldPct: number;
 }
 
@@ -36,6 +38,8 @@ export function AreaSmartSummary({
   cagr5yPct,
   startingPpsf,
   latestPpsf,
+  startingYear,
+  latestYear,
   marketAvgYieldPct,
 }: Props) {
   const yieldPct =
@@ -125,7 +129,7 @@ export function AreaSmartSummary({
               tooltip="5Y Appreciation"
               headline={
                 appreciation5yPct != null
-                  ? `${appreciation5yPct >= 0 ? '+' : ''}${appreciation5yPct.toFixed(0)}% since 2021`
+                  ? `${appreciation5yPct >= 0 ? '+' : ''}${appreciation5yPct.toFixed(0)}% since ${startingYear ?? latestYear ? (latestYear! - 5) : 2021}`
                   : '—'
               }
               caption={
@@ -133,7 +137,9 @@ export function AreaSmartSummary({
                   ? `AED ${formatNumber(startingPpsf, 0)} → AED ${formatNumber(latestPpsf, 0)}/sqft`
                   : cagr5yPct != null
                     ? `${cagr5yPct >= 0 ? '+' : ''}${cagr5yPct.toFixed(1)}% per year (CAGR)`
-                    : 'Price growth 2021–2026'
+                    : startingYear && latestYear
+                      ? `Price growth ${startingYear}–${latestYear}`
+                      : 'Price growth (historical)'
               }
               tone={
                 appreciation5yPct != null && appreciation5yPct >= 100
