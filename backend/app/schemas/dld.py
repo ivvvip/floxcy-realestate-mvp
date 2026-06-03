@@ -1028,3 +1028,50 @@ class AreaLifestyleScoreResponse(Attribution):
     nearest_mall: Optional[str] = None
     nearest_landmark: Optional[str] = None
     metro_stations_count: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Bedroom benchmarks (per-bedroom sale price by area + reg_type + year)
+# ---------------------------------------------------------------------------
+
+class BedroomBenchmarkRow(BaseModel):
+    bedroom_type: str   # Studio / 1BR / 2BR / 3BR / 4BR / 5BR+ / Penthouse / Single Room
+    reg_type: str       # ready / off_plan
+    year: int
+    avg_price_aed: Optional[float] = None
+    median_price_aed: Optional[float] = None
+    avg_ppsf: Optional[float] = None
+    transaction_count: int
+
+
+class AreaBedroomPricesResponse(Attribution):
+    area_name_norm: str
+    area_name_display: Optional[str] = None
+    rows: List[BedroomBenchmarkRow]
+    total_rows: int
+
+
+# ---------------------------------------------------------------------------
+# Building sales history
+# ---------------------------------------------------------------------------
+
+class BuildingSalesResponse(Attribution):
+    id: UUID
+    building_name_en: str
+    building_name_slug: str
+    area_name_en: Optional[str] = None
+    master_project_en: Optional[str] = None
+    total_transactions: int
+    avg_sale_price_ready: Optional[float] = None
+    avg_sale_price_offplan: Optional[float] = None
+    avg_ppsf_ready: Optional[float] = None
+    avg_ppsf_offplan: Optional[float] = None
+    median_sale_price: Optional[float] = None
+    min_sale_price: Optional[float] = None
+    max_sale_price: Optional[float] = None
+    years_covered: int
+    first_seen_year: Optional[int] = None
+    last_seen_year: Optional[int] = None
+    last_transaction_date: Optional[date] = None
+    parking_pct: Optional[float] = None
+    bulk_transaction_count: int = 0

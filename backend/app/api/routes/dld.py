@@ -23,9 +23,11 @@ from app.models.dld import (
     DldAreaAppreciation,
     DldAreaLifestyleScore,
     DldAreaMetrics,
+    DldBedroomBenchmark,
     DldBuilding,
     DldBuildingDerived,
     DldBuildingRentHistory,
+    DldBuildingsSales,
     DldCanonicalArea,
     DldLeaseExpiryForecast,
     DldPriceHistory,
@@ -89,8 +91,11 @@ from app.schemas.dld import (
     DldPriceHistoryResponse,
     DldRentHistoryResponse,
     DldYieldHistoryResponse,
+    AreaBedroomPricesResponse,
     AreaLifestyleScoreResponse,
+    BedroomBenchmarkRow,
     BuildingLeaseExpiryResponse,
+    BuildingSalesResponse,
     BuildingRentHistoryPoint,
     DldBuildingRentHistoryResponse,
     LeaseExpiryMonthBucket,
@@ -3604,4 +3609,103 @@ async def get_area_lifestyle_score(
         nearest_mall=ls.nearest_mall,
         nearest_landmark=ls.nearest_landmark,
         metro_stations_count=int(ls.metro_stations_count or 0),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bedroom benchmarks + Building sales history
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/areas/{name_or_norm}/bedroom-prices",
+    response_model=AreaBedroomPricesResponse,
+)
+async def get_area_bedroom_prices(
+    name_or_norm: str,
+    db: AsyncSession = Depends(get_db),
+    reg_type: Optional[str] = None,  # 'ready' / 'off_plan' / None for both
+    year: Optional[int] = None,
+):
+    """Per-bedroom sale price benchmarks for the area, optionally filtered
+    by reg_type (ready/off_plan) and year. Source: dld_bedroom_benchmarks
+    built from transactions_2021_2026.csv rooms_en."""
+    norm_s = name_or_norm.strip().lower()
+    area = (
+        await db.execute(select(DldArea).where(DldArea.name_norm == norm_s))
+    ).scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    stmt = (
+        select(DldBedroomBenchmark)
+        .where(DldBedroomBenchmark.area_name_norm == norm_s)
+        .order_by(
+            DldBedroomBenchmark.year.desc(),
+            DldBedroomBenchmark.bedroom_type,
+            DldBedroomBenchmark.reg_type,
+        )
+    )
+    if reg_type in ("ready", "off_plan"):
+        stmt = stmt.where(DldBedroomBenchmark.reg_type == reg_type)
+    if year is not None:
+        stmt = stmt.where(DldBedroomBenchmark.year == year)
+
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [
+        BedroomBenchmarkRow(
+            bedroom_type=r.bedroom_type,
+            reg_type=r.reg_type,
+            year=int(r.year),
+            avg_price_aed=float(r.avg_price_aed) if r.avg_price_aed is not None else None,
+            median_price_aed=float(r.median_price_aed) if r.median_price_aed is not None else None,
+            avg_ppsf=float(r.avg_ppsf) if r.avg_ppsf is not None else None,
+            transaction_count=int(r.transaction_count or 0),
+        )
+        for r in rows
+    ]
+    return AreaBedroomPricesResponse(
+        area_name_norm=area.name_norm,
+        area_name_display=area.name_display,
+        rows=items,
+        total_rows=len(items),
+    )
+
+
+@router.get(
+    "/buildings/{building_id}/sales-history",
+    response_model=BuildingSalesResponse,
+)
+async def get_building_sales_history(
+    building_id: UUID, db: AsyncSession = Depends(get_db),
+):
+    """Aggregate sales benchmark for the building over 2021-2026. Source:
+    dld_buildings_sales (extracted from the transactions stream itself —
+    parallel to the rents-side dld_buildings_derived)."""
+    b = (
+        await db.execute(
+            select(DldBuildingsSales).where(DldBuildingsSales.id == building_id)
+        )
+    ).scalar_one_or_none()
+    if not b:
+        raise HTTPException(status_code=404, detail="Building sales record not found")
+    return BuildingSalesResponse(
+        id=b.id,
+        building_name_en=b.building_name_en,
+        building_name_slug=b.building_name_slug,
+        area_name_en=b.area_name_en,
+        master_project_en=b.master_project_en,
+        total_transactions=int(b.total_transactions or 0),
+        avg_sale_price_ready=float(b.avg_sale_price_ready) if b.avg_sale_price_ready is not None else None,
+        avg_sale_price_offplan=float(b.avg_sale_price_offplan) if b.avg_sale_price_offplan is not None else None,
+        avg_ppsf_ready=float(b.avg_ppsf_ready) if b.avg_ppsf_ready is not None else None,
+        avg_ppsf_offplan=float(b.avg_ppsf_offplan) if b.avg_ppsf_offplan is not None else None,
+        median_sale_price=float(b.median_sale_price) if b.median_sale_price is not None else None,
+        min_sale_price=float(b.min_sale_price) if b.min_sale_price is not None else None,
+        max_sale_price=float(b.max_sale_price) if b.max_sale_price is not None else None,
+        years_covered=int(b.years_covered or 0),
+        first_seen_year=int(b.first_seen_year) if b.first_seen_year is not None else None,
+        last_seen_year=int(b.last_seen_year) if b.last_seen_year is not None else None,
+        last_transaction_date=b.last_transaction_date,
+        parking_pct=float(b.parking_pct) if b.parking_pct is not None else None,
+        bulk_transaction_count=int(b.bulk_transaction_count or 0),
     )

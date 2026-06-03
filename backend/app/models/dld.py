@@ -64,6 +64,9 @@ class DldAreaMetrics(Base):
     rent_count_2026: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     rental_yield_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
     rent_growth_yoy_pct: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    # Share of sale transactions whose has_parking=1 — feeds /areas/[id]
+    # without needing a separate query.
+    parking_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -411,6 +414,92 @@ class DldAreaLifestyleScore(Base):
     nearest_landmark: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     metro_stations_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DldBuildingsSales(Base):
+    """Synthetic per-(building_name_en, area) building entity extracted from
+    the transactions stream. Parallel to dld_buildings_derived (which is
+    rents-side) — together they give 4,900+ buildings vs the 47 the
+    published DLD buildings CSV carries."""
+    __tablename__ = "dld_buildings_sales"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    building_name_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    building_name_slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_en: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    master_project_en: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    total_transactions: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    avg_sale_price_ready: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_sale_price_offplan: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_ppsf_ready: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    avg_ppsf_offplan: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    median_sale_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    min_sale_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    max_sale_price: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    years_covered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    first_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_seen_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_transaction_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    parking_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    bulk_transaction_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "building_name_en", "dld_area_id",
+            name="uq_dld_buildings_sales_name_area",
+        ),
+    )
+
+
+class DldBedroomBenchmark(Base):
+    """Per (area, bedroom_type, reg_type, year) sale price benchmark — uses
+    rooms_en from the transactions stream as the bedroom granularity that
+    dld_rent_benchmarks's size_band coarsens away."""
+    __tablename__ = "dld_bedroom_benchmarks"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    bedroom_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    reg_type: Mapped[str] = mapped_column(String(16), nullable=False)  # ready / off_plan
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    avg_price_aed: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    median_price_aed: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    avg_ppsf: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    transaction_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "area_name_norm", "bedroom_type", "reg_type", "year",
+            name="uq_dld_bedroom_benchmarks_key",
+        ),
+    )
+
+
+class DldGiftTransfer(Base):
+    """Per-(area, year) gift-transfer counts. Kept out of price math entirely
+    so Grants and other ownership transfers don't pollute avg sale prices."""
+    __tablename__ = "dld_gift_transfers"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dld_area_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("dld_areas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    area_name_norm: Mapped[str] = mapped_column(String(255), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    transfer_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("area_name_norm", "year", name="uq_dld_gift_transfers_area_year"),
+    )
 
 
 class DldLaborCampStats(Base):

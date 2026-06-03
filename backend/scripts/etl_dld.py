@@ -42,6 +42,9 @@ from _building_classifier import (  # noqa: E402
     display_name,
     is_identifiable,
 )
+from _transactions_classifier import (  # noqa: E402
+    normalize_metro as tx_normalize_metro,
+)
 
 # Community ↔ admin-sector aliases. Without this, community names like
 # "Jumeirah Village Circle" / "Majan" show zero rent because DLD files
@@ -586,7 +589,9 @@ def compute_lifestyle_scores(
             if not sector:
                 continue
             for area in areas_for_rent_row(sector, r.get("master_project_en")):
-                metro = (r.get("nearest_metro_en") or "").strip()
+                # Fix DLD's "Buj Khalifa..." typo at read time so the same
+                # station with both spellings collapses to one count.
+                metro = tx_normalize_metro(r.get("nearest_metro_en"))
                 if metro:
                     metro_counts[area][metro] += 1
                 mall = (r.get("nearest_mall_en") or "").strip()
