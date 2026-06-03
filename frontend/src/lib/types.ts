@@ -865,17 +865,16 @@ export interface AreaCategoryBreakdownResponse extends DldAttribution {
 // Dashboard pulse — 7-widget aggregator
 // ---------------------------------------------------------------------------
 
-export interface PulseFactor {
+export interface MarketOverviewMetric {
   name: string;
   value: string;
-  tone: 'positive' | 'neutral' | 'negative';
-  weight: number;
+  period?: string | null;
 }
 
-export interface MarketSentiment {
-  signal: 'bullish' | 'neutral' | 'bearish';
-  score: number;
-  factors: PulseFactor[];
+export interface MarketOverview {
+  period_label: string;
+  metrics: MarketOverviewMetric[];
+  source: string;
 }
 
 export interface ScatterMatrixPoint {
@@ -926,7 +925,7 @@ export interface DataFreshness {
 }
 
 export interface DashboardPulseResponse extends DldAttribution {
-  sentiment: MarketSentiment;
+  market_overview: MarketOverview;
   matrix_points: ScatterMatrixPoint[];
   rent_vs_buy: RentVsBuyGauge | null;
   hot_areas: HotAreaItem[];

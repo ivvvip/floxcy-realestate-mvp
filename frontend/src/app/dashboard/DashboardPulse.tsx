@@ -24,12 +24,6 @@ const QUADRANT_LABELS = {
   avoid:           { text: '⚠️ Avoid',           tone: 'warning'  },
 } as const;
 
-const SENTIMENT_DISPLAY = {
-  bullish: { emoji: '🟢', label: 'BULLISH', tone: 'positive', subtitle: 'Multiple positive signals across DLD data.' },
-  neutral: { emoji: '🟡', label: 'NEUTRAL', tone: 'fg',       subtitle: 'Mixed signals — wait for stronger trend.' },
-  bearish: { emoji: '🔴', label: 'BEARISH', tone: 'negative', subtitle: 'Negative signals outweigh positives.' },
-} as const;
-
 /**
  * The 7 dashboard widgets in one block, fed by /api/v1/dld/dashboard-pulse.
  *
@@ -51,7 +45,7 @@ export function DashboardPulse({ pulse }: { pulse: DashboardPulseResponse | null
   }
   return (
     <div className="space-y-4">
-      <SentimentHero pulse={pulse} />
+      <MarketOverviewCard pulse={pulse} />
       <div className="grid gap-4 lg:grid-cols-2">
         <YieldVsAppreciationMatrix pulse={pulse} />
         <RentVsBuyCard pulse={pulse} />
@@ -67,70 +61,40 @@ export function DashboardPulse({ pulse }: { pulse: DashboardPulseResponse | null
 }
 
 // ---------------------------------------------------------------------------
-// 1. Market sentiment hero
+// 1. Market overview — neutral facts only. No BULLISH/BEARISH labels, no
+// red tones, no aggregate verdict. Investors read the numbers and decide.
 // ---------------------------------------------------------------------------
 
-function SentimentHero({ pulse }: { pulse: DashboardPulseResponse }) {
-  const s = SENTIMENT_DISPLAY[pulse.sentiment.signal];
+function MarketOverviewCard({ pulse }: { pulse: DashboardPulseResponse }) {
+  const ov = pulse.market_overview;
   return (
-    <section
-      className={cn(
-        'rounded-lg border p-4 sm:p-5',
-        pulse.sentiment.signal === 'bullish' && 'border-positive/40 bg-positive/5',
-        pulse.sentiment.signal === 'neutral' && 'border-border bg-bg-card',
-        pulse.sentiment.signal === 'bearish' && 'border-negative/40 bg-negative/5',
-      )}
-    >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
-            Market sentiment
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl">{s.emoji}</span>
-            <span
-              className={cn(
-                'text-2xl font-semibold',
-                s.tone === 'positive' && 'text-positive',
-                s.tone === 'negative' && 'text-negative',
-                s.tone === 'fg' && 'text-fg',
-              )}
-            >
-              {s.label}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-fg-muted">{s.subtitle}</p>
+    <section className="rounded-lg border border-border bg-bg-card p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+          {ov.period_label}
         </div>
-        <div className="text-[11px] text-fg-subtle text-right">
-          Based on{' '}
-          <span className="font-mono text-fg">{pulse.sentiment.factors.length}</span>{' '}
-          factors from DLD data
+        <div className="text-[11px] text-fg-subtle">
+          Source: {ov.source}
         </div>
       </div>
-      {pulse.sentiment.factors.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {pulse.sentiment.factors.map((f) => (
-            <div
-              key={f.name}
-              className="rounded border border-border bg-bg-card px-3 py-2"
-            >
-              <div className="text-[10px] uppercase tracking-wide text-fg-subtle truncate">
-                {f.name}
+      <div className="mt-3 border-t border-border" />
+      <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {ov.metrics.map((m) => (
+          <div key={m.name} className="min-w-0">
+            <dt className="text-[10px] uppercase tracking-wide text-fg-subtle truncate">
+              {m.name}
+            </dt>
+            <dd className="mt-1 text-lg sm:text-xl font-mono tabular text-fg">
+              {m.value}
+            </dd>
+            {m.period && (
+              <div className="mt-0.5 text-[10px] text-fg-subtle truncate">
+                {m.period}
               </div>
-              <div
-                className={cn(
-                  'mt-1 text-sm font-mono tabular',
-                  f.tone === 'positive' && 'text-positive',
-                  f.tone === 'negative' && 'text-negative',
-                  f.tone === 'neutral' && 'text-fg',
-                )}
-              >
-                {f.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

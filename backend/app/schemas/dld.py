@@ -1100,18 +1100,23 @@ class BuildingSalesResponse(Attribution):
 # Dashboard pulse — single-call aggregator for the dashboard widgets
 # ---------------------------------------------------------------------------
 
-class PulseFactor(BaseModel):
-    """One signal that feeds the market-sentiment headline."""
+class MarketOverviewMetric(BaseModel):
+    """One headline metric for the dashboard market overview. Pure facts —
+    no tone, no sentiment scoring. Investors read the number and decide."""
     name: str
-    value: str        # display form, e.g. "+8.2%", "rising", "1,245 sales"
-    tone: Literal["positive", "neutral", "negative"]
-    weight: int = 1   # tone * weight feeds the sentiment score
+    value: str        # display form, e.g. "59,601", "6.98%", "+8.3% YoY"
+    period: Optional[str] = None  # e.g. "Jan–May 2026"
 
 
-class MarketSentiment(BaseModel):
-    signal: Literal["bullish", "neutral", "bearish"]
-    score: int        # signed integer = positive_weight - negative_weight
-    factors: List[PulseFactor]
+class MarketOverview(BaseModel):
+    """Neutral facts panel that replaces the old BULLISH/BEARISH headline.
+
+    The frontend renders the metrics as plain rows with no color coding
+    and no aggregate verdict — the user wants raw data, not opinions.
+    """
+    period_label: str   # e.g. "Dubai Market · June 2026"
+    metrics: List[MarketOverviewMetric]
+    source: str         # "DLD Official Data"
 
 
 class ScatterMatrixPoint(BaseModel):
@@ -1162,7 +1167,7 @@ class DataFreshness(BaseModel):
 
 
 class DashboardPulseResponse(Attribution):
-    sentiment: MarketSentiment
+    market_overview: MarketOverview
     matrix_points: List[ScatterMatrixPoint]
     rent_vs_buy: Optional[RentVsBuyGauge] = None
     hot_areas: List[HotAreaItem]

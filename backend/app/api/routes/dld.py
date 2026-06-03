@@ -101,10 +101,10 @@ from app.schemas.dld import (
     DashboardPulseResponse,
     DataFreshness,
     HotAreaItem,
-    MarketSentiment,
+    MarketOverview,
+    MarketOverviewMetric,
     OffplanArea,
     OffplanPipeline,
-    PulseFactor,
     RentVsBuyGauge,
     ScatterMatrixPoint,
     BuildingRentHistoryPoint,
@@ -4039,97 +4039,73 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
         top_areas=offplan_top[:5],
     ) if offplan_top else None
 
-    # ---- Widget 1: Market sentiment composite ----
-    factors: list[PulseFactor] = []
+    # ---- Widget 1: Market overview — neutral facts, no verdict ----
+    # The user asked us to drop BULLISH/BEARISH labels and red colors.
+    # Show raw numbers (sales YTD, avg yield, 1y price growth, off-plan
+    # share) and let investors form their own opinion.
+    overview_metrics: list[MarketOverviewMetric] = []
 
-    # Factor 1: YoY transaction count (latest vs prior). Snapshot is
-    # 2026-06-01 so the latest year is partial — annualize the run-rate
-    # before comparing so the trend isn't misleadingly negative.
+    # Sales YTD — count the latest year's transactions in the period that
+    # actually elapsed, label the period explicitly so it's not confused
+    # with a full-year number.
+    snapshot_month = 6  # snapshot is 2026-06-01 → through end of May
+    period_label = "Jan–May 2026" if latest_year == 2026 else f"Full {latest_year}"
     if hot_rows:
         agg_latest = sum(int(r[2] or 0) for r in hot_rows)
-        agg_prior = sum(int(r[3] or 0) for r in hot_rows)
-        # Months elapsed in the latest year up to the snapshot date. With a
-        # 2026-06-01 snapshot, ~5 months → scale latest by 12/5 = 2.4.
-        latest_year_fraction = 5 / 12 if latest_year == 2026 else 1.0
-        annualized_latest = agg_latest / latest_year_fraction
-        if agg_prior > 0:
-            txn_pct = (annualized_latest - agg_prior) / agg_prior * 100
-            tone = "positive" if txn_pct > 5 else "negative" if txn_pct < -5 else "neutral"
-            factors.append(PulseFactor(
-                name="Transaction volume YoY",
-                value=f"{txn_pct:+.1f}%",
-                tone=tone,
-                weight=2,
-            ))
-
-    # Factor 2: Average 1y price appreciation across areas.
-    appr_1y = [float(app.appreciation_1y_pct) for _, _, app in metrics_rows
-               if app and app.appreciation_1y_pct is not None]
-    if appr_1y:
-        avg_appr = sum(appr_1y) / len(appr_1y)
-        tone = "positive" if avg_appr > 5 else "negative" if avg_appr < 0 else "neutral"
-        factors.append(PulseFactor(
-            name="Average 1y price growth",
-            value=f"{avg_appr:+.1f}%",
-            tone=tone,
-            weight=2,
+        overview_metrics.append(MarketOverviewMetric(
+            name="Sales YTD",
+            value=f"{agg_latest:,}",
+            period=period_label,
         ))
 
-    # Factor 3: Yield direction (latest yield vs prior across covered areas).
+    # Average gross yield across covered areas, latest year.
     yield_latest_q = await db.execute(
-        select(
-            func.avg(DldYieldHistory.gross_yield_pct)
-        ).where(
+        select(func.avg(DldYieldHistory.gross_yield_pct))
+        .where(
             DldYieldHistory.year == latest_year,
             DldYieldHistory.gross_yield_pct.is_not(None),
         )
     )
     avg_yield_latest = yield_latest_q.scalar()
-    yield_prior_q = await db.execute(
-        select(
-            func.avg(DldYieldHistory.gross_yield_pct)
-        ).where(
-            DldYieldHistory.year == prior_year,
-            DldYieldHistory.gross_yield_pct.is_not(None),
-        )
-    )
-    avg_yield_prior = yield_prior_q.scalar()
-    if avg_yield_latest is not None and avg_yield_prior is not None:
-        delta = float(avg_yield_latest) - float(avg_yield_prior)
-        # Falling yields are NEGATIVE for new buyers (compressing returns).
-        # Rising yields are POSITIVE.
-        tone = "positive" if delta > 0.1 else "negative" if delta < -0.1 else "neutral"
-        direction = "rising" if delta > 0.1 else "falling" if delta < -0.1 else "flat"
-        factors.append(PulseFactor(
-            name="Yield direction",
-            value=direction,
-            tone=tone,
-            weight=1,
+    if avg_yield_latest is not None:
+        overview_metrics.append(MarketOverviewMetric(
+            name="Avg Yield",
+            value=f"{float(avg_yield_latest):.2f}%",
         ))
 
-    # Factor 4: Off-plan share of latest-year sales (proxy for supply pipeline).
-    if offplan:
-        offplan_share = (offplan.total_offplan_count / max(1, agg_latest if 'agg_latest' in locals() else 1)) * 100
-        # Healthy off-plan share is 30-60%. Very high = oversupply risk.
-        tone = "neutral"
-        if offplan_share > 70:
-            tone = "negative"
-        elif 30 <= offplan_share <= 60:
-            tone = "positive"
-        factors.append(PulseFactor(
-            name="Off-plan share",
-            value=f"{offplan_share:.0f}%",
-            tone=tone,
-            weight=1,
+    # 1y price growth — average across areas with appreciation data.
+    appr_1y = [float(app.appreciation_1y_pct) for _, _, app in metrics_rows
+               if app and app.appreciation_1y_pct is not None]
+    if appr_1y:
+        avg_appr = sum(appr_1y) / len(appr_1y)
+        overview_metrics.append(MarketOverviewMetric(
+            name="Price Growth",
+            value=f"{avg_appr:+.1f}% YoY",
         ))
 
-    # Composite score → bullish/neutral/bearish
-    score = sum(
-        f.weight * (1 if f.tone == "positive" else -1 if f.tone == "negative" else 0)
-        for f in factors
+    # Off-plan share of YTD sales — just a fact about the mix.
+    if offplan and 'agg_latest' in locals() and agg_latest > 0:
+        offplan_share = offplan.total_offplan_count / agg_latest * 100
+        overview_metrics.append(MarketOverviewMetric(
+            name="Off-plan",
+            value=f"{offplan_share:.0f}% of sales",
+        ))
+
+    # Friendly month name for the period_label.
+    _MONTH_NAMES = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+    snapshot_label = (
+        f"{_MONTH_NAMES[snapshot_month - 1]} {latest_year}"
+        if latest_year == 2026 else f"{latest_year}"
     )
-    signal = "bullish" if score >= 2 else "bearish" if score <= -2 else "neutral"
-    sentiment = MarketSentiment(signal=signal, score=score, factors=factors)
+
+    market_overview = MarketOverview(
+        period_label=f"Dubai Market · {snapshot_label}",
+        metrics=overview_metrics,
+        source="DLD Official Data",
+    )
 
     # ---- Widget 7: Data freshness ----
     freshness = DataFreshness(
@@ -4140,7 +4116,7 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
     )
 
     return DashboardPulseResponse(
-        sentiment=sentiment,
+        market_overview=market_overview,
         matrix_points=matrix_points,
         rent_vs_buy=rent_vs_buy,
         hot_areas=hot_areas,
