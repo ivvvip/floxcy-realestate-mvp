@@ -21,6 +21,7 @@ import { dldRentCheck } from '@/lib/api';
 import { formatAED } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { AreaSelector } from '@/components/AreaSelector';
+import { MetricTooltip } from '@/components/MetricTooltip';
 import type {
   RentCheckResponse,
   SizeCategory,
@@ -660,6 +661,7 @@ function ResultPanel({
         />
         <Stat
           label="Confidence"
+          tooltip="Confidence Level"
           value={result.confidence}
           hint={
             result.confidence === 'high'
@@ -822,16 +824,19 @@ function Stat({
   value,
   hint,
   icon,
+  tooltip,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon?: React.ReactNode;
+  tooltip?: string;
 }) {
   return (
     <div className="flex-1 min-w-[120px] px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center">
         {label}
+        {tooltip && <MetricTooltip metric={tooltip} />}
       </div>
       <div className="mt-1 text-sm text-fg flex items-center gap-1.5 capitalize">
         {icon}

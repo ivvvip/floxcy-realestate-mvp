@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { ComparisonRadar } from '@/components/charts/ComparisonRadar';
 import { MultiLine } from '@/components/charts/MultiLine';
 import { FilterChip } from '@/components/data/FilterChip';
+import { MetricTooltip } from '@/components/MetricTooltip';
 import { DataBadge } from '@/components/data/DataBadge';
 import { CompareInsights } from './CompareInsights';
 
@@ -197,7 +198,11 @@ export function CompareClient({ areas }: Props) {
 }
 
 function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
-  const rows: { label: string; render: (a: CompareAreaData) => React.ReactNode }[] = [
+  const rows: {
+    label: string;
+    tooltip?: string;
+    render: (a: CompareAreaData) => React.ReactNode;
+  }[] = [
     { label: 'Type', render: (a) => <span className="pill">{a.area_type}</span> },
     {
       label: 'AED / sqft',
@@ -215,19 +220,23 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
     },
     {
       label: 'Yield',
+      tooltip: 'Gross Yield',
       render: (a) =>
         a.latest_yield != null ? formatPercent(a.latest_yield, 2) : '—',
     },
     {
       label: '1Y appreciation',
+      tooltip: '5Y Appreciation',
       render: (a) => <DataBadge value={a.appreciation_1y} format="percent" />,
     },
     {
       label: '3Y appreciation',
+      tooltip: '5Y Appreciation',
       render: (a) => <DataBadge value={a.appreciation_3y} format="percent" />,
     },
     {
       label: 'Occupancy',
+      tooltip: 'Occupancy Rate',
       render: (a) =>
         a.occupancy_rate != null ? formatPercent(a.occupancy_rate) : '—',
     },
@@ -238,6 +247,7 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
     },
     {
       label: 'Risk score',
+      tooltip: 'Supply Risk',
       render: (a) =>
         a.risk_score != null ? `${a.risk_score.toFixed(1)}/10` : '—',
     },
@@ -266,7 +276,12 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.label}>
-              <td className="text-fg-muted">{row.label}</td>
+              <td className="text-fg-muted">
+                <span className="inline-flex items-center">
+                  {row.label}
+                  {row.tooltip && <MetricTooltip metric={row.tooltip} />}
+                </span>
+              </td>
               {areas.map((a) => (
                 <td key={a.id} className="num">
                   {row.render(a)}

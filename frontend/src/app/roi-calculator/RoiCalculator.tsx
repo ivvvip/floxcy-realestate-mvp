@@ -10,6 +10,7 @@ import {
 import { calculateDldRoi } from '@/lib/api';
 import { formatAED, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { MetricTooltip } from '@/components/MetricTooltip';
 import type {
   RoiCalcRequest, RoiCalcResponse, RoiPaymentType,
 } from '@/lib/types';
@@ -316,9 +317,10 @@ function Results({ r }: { r: RoiCalcResponse }) {
 
       <Section icon={<Coins className="h-3.5 w-3.5" />} title="Rental returns" num={2}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPI label="Gross yield" value={`${r.rental_returns.gross_yield_pct.toFixed(2)}%`} accent />
+          <KPI label="Gross yield" tooltip="Gross Yield" value={`${r.rental_returns.gross_yield_pct.toFixed(2)}%`} accent />
           <KPI
             label="Net yield"
+            tooltip="Net Yield"
             value={`${r.rental_returns.net_yield_pct.toFixed(2)}%`}
             tone={r.rental_returns.net_yield_pct >= 6 ? 'positive' : r.rental_returns.net_yield_pct >= 4 ? 'neutral' : 'negative'}
           />
@@ -368,7 +370,7 @@ function Results({ r }: { r: RoiCalcResponse }) {
         )}
       </Section>
 
-      <Section icon={<PiggyBank className="h-3.5 w-3.5" />} title="Payback period" num={4}>
+      <Section icon={<PiggyBank className="h-3.5 w-3.5" />} title="Payback period" num={4} tooltip="Payback Period">
         {r.payback_years != null ? (
           <div className="text-2xl font-semibold tabular text-fg">
             {r.payback_years.toFixed(1)}<span className="text-sm text-fg-muted ml-1">years</span>
@@ -521,12 +523,13 @@ function Results({ r }: { r: RoiCalcResponse }) {
 // ===========================================================================
 
 function Section({
-  icon, title, num, children,
+  icon, title, num, children, tooltip,
 }: {
   icon: React.ReactNode;
   title: string;
   num: number;
   children: React.ReactNode;
+  tooltip?: string;
 }) {
   return (
     <section className="border border-border rounded-lg bg-bg-card overflow-hidden">
@@ -534,6 +537,7 @@ function Section({
         <span className="inline-flex items-center gap-2 text-xs font-semibold text-fg">
           <span className="text-fg-subtle">{icon}</span>
           {title}
+          {tooltip && <MetricTooltip metric={tooltip} />}
         </span>
         <span className="text-[10px] text-fg-subtle tabular">§{num}</span>
       </div>
@@ -543,13 +547,14 @@ function Section({
 }
 
 function KPI({
-  label, value, sublabel, accent, tone,
+  label, value, sublabel, accent, tone, tooltip,
 }: {
   label: string;
   value: string;
   sublabel?: string;
   accent?: boolean;
   tone?: 'positive' | 'negative' | 'neutral';
+  tooltip?: string;
 }) {
   const tc =
     tone === 'positive' ? 'text-positive' :
@@ -557,7 +562,10 @@ function KPI({
     accent ? 'text-accent' : 'text-fg';
   return (
     <div className="rounded-md border border-border bg-bg-elev/30 p-3">
-      <div className="text-[10px] uppercase tracking-wide text-fg-subtle">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle inline-flex items-center">
+        {label}
+        {tooltip && <MetricTooltip metric={tooltip} />}
+      </div>
       <div className={cn('mt-1 text-base font-semibold tabular', tc)}>{value}</div>
       {sublabel && <div className="text-[10px] text-fg-subtle mt-0.5">{sublabel}</div>}
     </div>

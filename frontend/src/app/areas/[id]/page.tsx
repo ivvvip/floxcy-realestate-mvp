@@ -274,11 +274,13 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="Rental Yield"
+                tooltip="Gross Yield"
                 value={formatPercent(area.latest.rental_yield, 2)}
                 mono
               />
               <MetricTile
                 label="1Y Appreciation"
+                tooltip="5Y Appreciation"
                 value={
                   <DataBadge
                     value={area.latest.appreciation_1y}
@@ -289,6 +291,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="3Y Appreciation"
+                tooltip="5Y Appreciation"
                 value={
                   <DataBadge
                     value={area.latest.appreciation_3y}
@@ -299,6 +302,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="Occupancy"
+                tooltip="Occupancy Rate"
                 value={
                   area.latest.occupancy_rate != null
                     ? formatPercent(area.latest.occupancy_rate, 1)
@@ -443,6 +447,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="Rental yield"
+                tooltip="Gross Yield"
                 value={
                   area.dld.rental_yield_pct != null
                     ? formatPercent(area.dld.rental_yield_pct)
@@ -458,6 +463,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="YoY rent growth"
+                tooltip="Rent Growth YoY"
                 value={
                   area.dld.rent_growth_yoy_pct != null
                     ? `${area.dld.rent_growth_yoy_pct >= 0 ? '+' : ''}${area.dld.rent_growth_yoy_pct.toFixed(1)}%`
@@ -480,6 +486,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 {area.dld.freehold_pct != null && (
                   <MetricTile
                     label="Freehold parcels"
+                    tooltip="Freehold"
                     value={`${area.dld.freehold_pct.toFixed(1)}%`}
                     hint={
                       area.dld.total_parcels != null
@@ -554,6 +561,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
               <MetricTile
                 label="5-year growth"
+                tooltip="5Y Appreciation"
                 value={
                   priceHistory.appreciation_5y_pct != null
                     ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
@@ -675,6 +683,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
                 <MetricTile
                   label="Latest gross yield"
+                  tooltip="Gross Yield"
                   value={
                     endYield >= 20
                       ? '≥20%'

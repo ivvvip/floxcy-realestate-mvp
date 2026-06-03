@@ -17,6 +17,21 @@ import {
 } from '@/components/charts/ChartTheme';
 import { formatAED, formatAEDFull, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { MetricTooltip, type MetricKey } from '@/components/MetricTooltip';
+
+// Maps a backend KPI/section label to a tooltip entry. Returns null when the
+// label has no corresponding contextual help.
+function tooltipForLabel(label: string): MetricKey | null {
+  const l = label.toLowerCase();
+  if (l.includes('off-plan') || l.includes('offplan')) return 'Off-Plan %';
+  if (l.includes('yield')) return 'Gross Yield';
+  if (l.includes('appreciation')) return '5Y Appreciation';
+  if (l.includes('rent growth') || l.includes('rent contracts')) return 'Rent Growth YoY';
+  if (l.includes('rera')) return 'RERA Verified';
+  if (l.includes('sales')) return 'Transaction Volume';
+  if (l.includes('supply')) return 'Supply Risk';
+  return null;
+}
 import type {
   ActivityPoint, BrokerLicensePoint, DashboardDataResponse, DashboardKpi,
   DashboardPriceHistoryPoint, SalesCompositionSlice, SupplyPipelineItem,
@@ -172,11 +187,15 @@ function Section({
   className?: string;
 }) {
   const now = useNow();
+  const tooltipKey = tooltipForLabel(title);
   return (
     <section className={cn('border border-border rounded-lg bg-bg-card overflow-hidden', className)}>
       <div className="border-b border-border px-4 py-3 flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-sm font-semibold text-fg tracking-tight">{title}</h2>
+          <h2 className="text-sm font-semibold text-fg tracking-tight inline-flex items-center">
+            {title}
+            {tooltipKey && <MetricTooltip metric={tooltipKey} size="md" />}
+          </h2>
           {subtitle && (
             <p className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</p>
           )}
@@ -298,14 +317,16 @@ function KpiTile({ kpi }: { kpi: DashboardKpi }) {
   // For AED tiles, show the unabbreviated number on hover so users can
   // sanity-check the magnitude when "AED 1.14T" is displayed.
   const fullTooltip = kpi.unit === 'aed' ? formatAEDFull(kpi.value) : undefined;
+  const tooltipKey = tooltipForLabel(kpi.label);
   return (
     <div
       className="border border-border rounded-md bg-bg-elev/30 p-4"
       title={fullTooltip}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+        <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center">
           {kpi.label}
+          {tooltipKey && <MetricTooltip metric={tooltipKey} />}
         </div>
         <Icon className="h-3.5 w-3.5 text-fg-subtle" strokeWidth={2} />
       </div>

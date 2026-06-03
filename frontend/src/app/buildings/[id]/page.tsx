@@ -27,6 +27,7 @@ import {
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { BuildingConsultationButton } from './BuildingConsultationButton';
+import { MetricTooltip } from '@/components/MetricTooltip';
 
 export const revalidate = 600;
 
@@ -254,6 +255,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
               <Tile
                 label="Total annual income"
+                tooltip="Building Income"
                 value={
                   b.total_annual_income != null
                     ? formatAED(b.total_annual_income)
@@ -264,6 +266,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
               />
               <Tile
                 label="Occupancy"
+                tooltip="Occupancy Rate"
                 value={
                   b.occupancy_proxy_pct != null
                     ? `${b.occupancy_proxy_pct.toFixed(0)}%`
@@ -273,6 +276,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
               />
               <Tile
                 label="Implied yield"
+                tooltip="Gross Yield"
                 value={
                   b.implied_yield_pct != null
                     ? formatPercent(b.implied_yield_pct, 2)
@@ -287,6 +291,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
               />
               <Tile
                 label="YoY rent trend"
+                tooltip="Rent Growth YoY"
                 value={
                   ctx?.rent_growth_yoy_pct != null
                     ? `${ctx.rent_growth_yoy_pct >= 0 ? '+' : ''}${ctx.rent_growth_yoy_pct.toFixed(1)}%`
@@ -599,17 +604,20 @@ function Tile({
   sub,
   icon,
   tone = 'default',
+  tooltip,
 }: {
   label: string;
   value: string;
   sub?: string;
   icon?: React.ReactNode;
   tone?: 'default' | 'positive' | 'negative' | 'accent';
+  tooltip?: string;
 }) {
   return (
     <div className="bg-bg-card px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
+      <div className="text-[10px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center">
         {label}
+        {tooltip && <MetricTooltip metric={tooltip} />}
       </div>
       <div
         className={cn(

@@ -17,6 +17,7 @@ import type { DashboardPulseResponse } from '@/lib/types';
 import { formatAEDFull, formatLargeAED, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { YieldVsAppreciationMatrix } from './YieldAppreciationMatrix';
+import { MetricTooltip } from '@/components/MetricTooltip';
 
 /**
  * The 7 dashboard widgets in one block, fed by /api/v1/dld/dashboard-pulse.
@@ -118,7 +119,10 @@ function RentVsBuyCard({ pulse }: { pulse: DashboardPulseResponse }) {
   const pct = Math.min(100, Math.max(0, (g.payback_years / 30) * 100));
   return (
     <section className="card p-4">
-      <h3 className="text-sm font-semibold text-fg">Dubai rent-vs-buy index</h3>
+      <h3 className="text-sm font-semibold text-fg inline-flex items-center">
+        Dubai rent-vs-buy index
+        <MetricTooltip metric="Payback Period" />
+      </h3>
       <p className="mt-0.5 text-[11px] text-fg-subtle">
         Weighted across {g.based_on_areas} covered areas
       </p>
@@ -184,6 +188,7 @@ function HotAreasCard({ pulse }: { pulse: DashboardPulseResponse }) {
       <h3 className="text-sm font-semibold text-fg inline-flex items-center gap-1.5">
         <Activity className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
         Hot areas — transaction volume YoY
+        <MetricTooltip metric="Transaction Volume" />
       </h3>
       <p className="mt-0.5 text-[11px] text-fg-subtle">
         Latest year vs prior, areas with ≥50 prior-year sales.
@@ -249,6 +254,7 @@ function OffplanPipelineCard({ pulse }: { pulse: DashboardPulseResponse }) {
       <h3 className="text-sm font-semibold text-fg inline-flex items-center gap-1.5">
         <Building2 className="h-3.5 w-3.5 text-accent" strokeWidth={2} />
         Off-plan pipeline
+        <MetricTooltip metric="Off-Plan %" />
       </h3>
       <p className="mt-0.5 text-[11px] text-fg-subtle">
         Estimated volume from {formatNumber(op.total_offplan_count)} off-plan

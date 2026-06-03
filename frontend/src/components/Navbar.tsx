@@ -20,7 +20,6 @@ const LINKS = [
   { href: '/advisor', key: 'nav.ai_analyst' },
   { href: '/rent-check', key: 'nav.rent_check' },
   { href: '/brokers/directory', key: 'nav.brokers' },
-  { href: '/roi-calculator', key: 'nav.roi' },
   { href: '/learn', key: 'nav.learn' },
 ];
 

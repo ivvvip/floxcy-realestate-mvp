@@ -14,6 +14,7 @@ import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { FilterChip } from '@/components/data/FilterChip';
 import { AreaSelector } from '@/components/AreaSelector';
+import { MetricTooltip } from '@/components/MetricTooltip';
 import { getOpportunitiesFeed, getOffplanProjects } from '@/lib/api';
 import type { OffplanProjectCard } from '@/lib/types';
 
@@ -332,13 +333,19 @@ function DealCard({ deal }: { deal: BrokerDealFeedItem }) {
             <div className="text-fg tabular">{formatAED(deal.price, { compact: true })}</div>
           </div>
           <div>
-            <div className="text-fg-subtle uppercase tracking-wide">Yield</div>
+            <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
+              Yield
+              <MetricTooltip metric="Gross Yield" />
+            </div>
             <div className="text-fg tabular">
               {deal.rental_yield != null ? formatPercent(deal.rental_yield, 2) : '—'}
             </div>
           </div>
           <div>
-            <div className="text-fg-subtle uppercase tracking-wide">Risk</div>
+            <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
+              Risk
+              <MetricTooltip metric="Supply Risk" />
+            </div>
             <div className={cn('tabular capitalize', RISK_TONE[deal.risk_level] ?? 'text-fg')}>
               {deal.risk_level}
             </div>
@@ -406,13 +413,19 @@ function SignalCard({ signal }: { signal: AreaSignalFeedItem }) {
             </div>
           </div>
           <div>
-            <div className="text-fg-subtle uppercase tracking-wide">Yield</div>
+            <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
+              Yield
+              <MetricTooltip metric="Gross Yield" />
+            </div>
             <div className="text-fg tabular">
               {formatPercent(signal.key_metrics.rental_yield, 2)}
             </div>
           </div>
           <div>
-            <div className="text-fg-subtle uppercase tracking-wide">1Y App</div>
+            <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
+              1Y App
+              <MetricTooltip metric="5Y Appreciation" />
+            </div>
             <div className="text-fg tabular">
               {signal.key_metrics.appreciation_1y != null
                 ? formatPercent(signal.key_metrics.appreciation_1y, 1)

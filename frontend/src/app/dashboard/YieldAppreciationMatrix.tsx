@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DashboardPulseResponse } from '@/lib/types';
 import { cn } from '@/lib/cn';
+import { MetricTooltip } from '@/components/MetricTooltip';
 
 const QUADRANT_TONE = {
   best_investment: 'positive',
@@ -60,8 +61,10 @@ export function YieldVsAppreciationMatrix({
     <section className="card p-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-fg">
+          <h3 className="text-sm font-semibold text-fg inline-flex items-center">
             Yield × 5-year appreciation
+            <MetricTooltip metric="Gross Yield" />
+            <MetricTooltip metric="5Y Appreciation" />
           </h3>
           <p className="mt-0.5 text-[11px] text-fg-subtle">
             {points.length.toLocaleString()} areas · click any dot to explore

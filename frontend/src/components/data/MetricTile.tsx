@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import { DataBadge } from './DataBadge';
+import { MetricTooltip, type MetricKey } from '@/components/MetricTooltip';
 
 interface MetricTileProps {
   label: string;
@@ -10,6 +11,7 @@ interface MetricTileProps {
   mono?: boolean;
   className?: string;
   tone?: 'default' | 'positive' | 'negative' | 'accent';
+  tooltip?: MetricKey | string;
 }
 
 export function MetricTile({
@@ -21,6 +23,7 @@ export function MetricTile({
   mono = false,
   className,
   tone = 'default',
+  tooltip,
 }: MetricTileProps) {
   return (
     <div
@@ -29,8 +32,9 @@ export function MetricTile({
         className
       )}
     >
-      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium">
+      <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center">
         {label}
+        {tooltip && <MetricTooltip metric={tooltip} />}
       </div>
       <div
         className={cn(
