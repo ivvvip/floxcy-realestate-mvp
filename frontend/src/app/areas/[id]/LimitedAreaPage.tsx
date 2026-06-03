@@ -19,18 +19,21 @@ import {
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
-import { getDldAreaTopBuildings } from '@/lib/api';
+import { getDldAreaTopBuildings, getDldAreaPriceHistory } from '@/lib/api';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import type { AreaLimitedDetail } from '@/lib/types';
 import { cn } from '@/lib/cn';
+import { AreaPriceHistorySection } from './AreaPriceHistorySection';
 
 export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
   // The /dld/areas/{name_norm}/top-buildings endpoint handles aliases and
   // tower-density empty-states; here we just consume whatever it returns.
-  const topBuildings = await getDldAreaTopBuildings(
-    area.dld.dld_name.toLowerCase(),
-    6
-  ).catch(() => null);
+  // Price history fetch runs in parallel; AreaPriceHistorySection soft-fails
+  // (renders nothing) when the area has no qualifying Sales-of-Unit rows.
+  const [topBuildings, priceHistory] = await Promise.all([
+    getDldAreaTopBuildings(area.dld.dld_name.toLowerCase(), 6).catch(() => null),
+    getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(() => null),
+  ]);
 
   const d = area.dld;
   const isEmpty = area.coverage_tier === 'none';
@@ -198,6 +201,10 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
               </div>
             </section>
           )}
+
+          {/* Long-term price history — only renders when we have ≥2 yearly
+              points. Same component used by the curated detail page. */}
+          <AreaPriceHistorySection priceHistory={priceHistory} />
 
           {/* Why limited */}
           {!isEmpty && (
