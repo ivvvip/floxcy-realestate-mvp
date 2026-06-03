@@ -21,18 +21,20 @@ export default async function OpportunitiesPage() {
   let error: string | null = null;
   // Canonical area names — single source of truth for the area picker.
   // Empty list on failure degrades the combobox to a free-text input.
-  let areaOptions: { name: string; name_norm: string }[] = [];
+  let areaOptions: { name: string; name_norm: string; occurrence_count: number }[] = [];
   try {
     const [feed, canonical] = await Promise.all([
       getOpportunitiesFeed({ kind: 'all', limit: 60, min_score: 0 }),
-      getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+      getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
     ]);
     opportunities = feed.opportunities ?? [];
     total = feed.total ?? 0;
     if (canonical) {
-      areaOptions = canonical.items
-        .map((a) => ({ name: a.area_name, name_norm: a.area_name_upper }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      areaOptions = canonical.items.map((a) => ({
+        name: a.area_name,
+        name_norm: a.area_name_upper,
+        occurrence_count: a.occurrence_count,
+      }));
     }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Failed to load opportunities.';

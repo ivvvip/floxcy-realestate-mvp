@@ -24,6 +24,7 @@ import {
   getDldBrokers,
 } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { AreaSelector } from '@/components/AreaSelector';
 import type {
   BrokerGoal,
   BrokerMatchItem,
@@ -39,7 +40,7 @@ const PAGE_SIZE = 24;
 interface AreaOption {
   name: string;
   name_norm: string;
-  rent_count: number;
+  occurrence_count: number;
 }
 
 interface Props {
@@ -313,7 +314,7 @@ function BrokerWizard({
 
         {step === 2 && (
           <StepWrap title="Preferred area?">
-            <AreaSelect value={area} onChange={setArea} options={areaOptions} />
+            <AreaSelector value={area} onChange={setArea} options={areaOptions} />
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
@@ -481,79 +482,6 @@ function BigChoice({
       {emoji && <span aria-hidden>{emoji}</span>}
       <span className="font-medium">{label}</span>
     </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Area select (reused from /rent-check, simplified)
-// ---------------------------------------------------------------------------
-function AreaSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: AreaOption | null;
-  onChange: (v: AreaOption) => void;
-  options: AreaOption[];
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const filtered = useMemo(() => {
-    const qq = query.trim().toLowerCase();
-    if (!qq) return options.slice(0, 50);
-    return options.filter((o) => o.name.toLowerCase().includes(qq)).slice(0, 80);
-  }, [options, query]);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 rounded-md border border-border bg-bg-card px-3 py-2.5 text-left text-sm min-h-[44px]"
-      >
-        <span className={value ? 'text-fg' : 'text-fg-subtle'}>
-          {value ? value.name : 'Pick an area (optional)'}
-        </span>
-        <ChevronDown
-          className={cn('h-4 w-4 text-fg-subtle transition-transform', open && 'rotate-180')}
-          strokeWidth={2}
-        />
-      </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-bg-card shadow-lg max-h-[50vh] overflow-hidden flex flex-col">
-          <div className="relative border-b border-border">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
-              strokeWidth={2}
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type to filter…"
-              autoFocus
-              className="w-full bg-transparent pl-9 pr-3 py-2.5 text-sm outline-none"
-            />
-          </div>
-          <ul className="overflow-y-auto py-1">
-            {filtered.map((o) => (
-              <li key={o.name_norm}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(o);
-                    setOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elev"
-                >
-                  <span className="text-fg">{o.name}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
   );
 }
 

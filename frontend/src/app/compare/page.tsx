@@ -20,7 +20,7 @@ async function loadAreas(): Promise<Area[]> {
   try {
     const [curated, canon] = await Promise.all([
       getAreas().catch(() => []),
-      getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+      getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
     ]);
     if (!canon || canon.items.length === 0) return curated;
 

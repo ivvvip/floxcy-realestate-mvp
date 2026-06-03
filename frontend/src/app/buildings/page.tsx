@@ -26,11 +26,15 @@ export default async function BuildingsIndexPage() {
     getDldStats().catch(() => null),
     getDldBuildings({ sort_by: 'rent_count', limit: 50 }).catch(() => null),
     getDldBuildingsDerived({ page: 1, page_size: 1 }).catch(() => null),
-    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
   ]);
 
   const areaOptions = (canon?.items ?? [])
-    .map((a) => ({ name: a.area_name, name_norm: a.area_name_upper.toLowerCase() }))
+    .map((a) => ({
+      name: a.area_name,
+      name_norm: a.area_name_upper.toLowerCase(),
+      occurrence_count: a.occurrence_count,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (

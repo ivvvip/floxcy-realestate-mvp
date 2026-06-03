@@ -13,10 +13,12 @@ import {
 import { getDldBuildings, getDldBuildingsDerived } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { DldBuildingItem } from '@/lib/types';
+import { AreaSelector } from '@/components/AreaSelector';
 
 interface AreaOption {
   name: string;
   name_norm: string;
+  occurrence_count: number;
 }
 
 interface Props {
@@ -202,7 +204,7 @@ export function BuildingsIndexClient({
 
       {/* Filter bar */}
       <section className="card p-4 sm:p-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <AreaSelect value={area} onChange={setArea} options={areaOptions} />
+        <AreaSelector value={area} onChange={setArea} options={areaOptions} />
         {tab === 'official' ? (
           <div>
             <label
@@ -552,96 +554,6 @@ function BuildingCard({ b }: { b: DldBuildingItem }) {
         </span>
       </div>
     </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Area searchable select (same shape as /rent-check + /brokers/directory)
-// ---------------------------------------------------------------------------
-function AreaSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: AreaOption | null;
-  onChange: (v: AreaOption | null) => void;
-  options: AreaOption[];
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 60);
-    return options.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 80);
-  }, [options, query]);
-
-  return (
-    <div className="relative">
-      <label className="block text-[10px] uppercase tracking-wide text-fg-subtle font-medium">
-        Area
-      </label>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="mt-1 w-full flex items-center justify-between gap-2 rounded-md border border-border bg-bg-card px-3 py-2.5 text-left text-sm min-h-[44px]"
-      >
-        <span className={cn(value ? 'text-fg' : 'text-fg-subtle', 'truncate')}>
-          {value ? value.name : 'All areas'}
-        </span>
-        <div className="flex items-center gap-1.5">
-          {value && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(null);
-              }}
-              className="text-[11px] text-fg-subtle hover:text-fg"
-            >
-              clear
-            </button>
-          )}
-          <ChevronDown
-            className={cn('h-4 w-4 text-fg-subtle transition-transform', open && 'rotate-180')}
-            strokeWidth={2}
-          />
-        </div>
-      </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-bg-card shadow-lg max-h-[60vh] overflow-hidden flex flex-col">
-          <div className="relative border-b border-border">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
-              strokeWidth={2}
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type to filter…"
-              autoFocus
-              className="w-full bg-transparent pl-9 pr-3 py-2.5 text-sm outline-none"
-            />
-          </div>
-          <ul className="overflow-y-auto py-1">
-            {filtered.map((o) => (
-              <li key={o.name_norm}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(o);
-                    setOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-fg hover:bg-bg-elev"
-                >
-                  {o.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
   );
 }
 

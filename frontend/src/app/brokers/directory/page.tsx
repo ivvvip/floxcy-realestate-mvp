@@ -23,7 +23,7 @@ export default async function BrokersDirectoryPage() {
   // we drop the rent_count weighting and just show every viable area.
   const [stats, canon, top, nationality] = await Promise.all([
     getDldStats().catch(() => null),
-    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
     getTopCompanies(10).catch(() => null),
     getBrokerNationalityStats().catch(() => null),
   ]);
@@ -32,9 +32,8 @@ export default async function BrokersDirectoryPage() {
     .map((a) => ({
       name: a.area_name,
       name_norm: a.area_name_upper.toLowerCase(),
-      rent_count: a.occurrence_count,
-    }))
-    .sort((a, b) => b.rent_count - a.rent_count);
+      occurrence_count: a.occurrence_count,
+    }));
 
   return (
     <div className="bg-bg">

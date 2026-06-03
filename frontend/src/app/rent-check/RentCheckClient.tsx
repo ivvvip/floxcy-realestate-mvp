@@ -20,6 +20,7 @@ import {
 import { dldRentCheck } from '@/lib/api';
 import { formatAED } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { AreaSelector } from '@/components/AreaSelector';
 import type {
   RentCheckResponse,
   SizeCategory,
@@ -37,6 +38,9 @@ export interface RentCheckAreaOption {
   name_norm: string;
   rent_count: number;
   median_annual_rent: number | null;
+  /** Total records across all DLD source datasets — drives the
+   * data-state suffix in the shared AreaSelector. */
+  occurrence_count: number;
 }
 
 const SQM_TO_SQFT = 10.7639;
@@ -196,13 +200,15 @@ export function RentCheckClient({ areaOptions }: RentCheckClientProps) {
       {/* Form column */}
       <form onSubmit={onSubmit} className="space-y-4">
         <Step n={1} title="Pick your area">
-          <AreaSelect
+          <AreaSelector
             value={area}
             onChange={(o) => {
               setArea(o);
               setNoDataNotice(null);
             }}
             options={areaOptions}
+            label="Area"
+            placeholder="Pick your area"
           />
           {areaOptions.length === 0 && (
             <p className="mt-2 text-[11px] text-warning">
@@ -398,163 +404,6 @@ const TIER_LABEL: Record<DataTier, string> = {
   none: '(no rent data)',
 };
 
-// ---------------------------------------------------------------------------
-// Area searchable select
-// ---------------------------------------------------------------------------
-function AreaSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: RentCheckAreaOption | null;
-  onChange: (v: RentCheckAreaOption) => void;
-  options: RentCheckAreaOption[];
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (!wrapperRef.current) return;
-      if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 50);
-    return options
-      .filter((o) => o.name.toLowerCase().includes(q))
-      .slice(0, 80);
-  }, [options, query]);
-
-  function pick(o: RentCheckAreaOption) {
-    onChange(o);
-    setQuery('');
-    setOpen(false);
-  }
-
-  return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((v) => !v);
-          setTimeout(() => inputRef.current?.focus(), 50);
-        }}
-        className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-md border bg-bg-card px-3 py-2.5 text-left text-sm min-h-[44px]',
-          open ? 'border-accent' : 'border-border hover:border-fg-subtle'
-        )}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className={cn(value ? 'text-fg' : 'text-fg-subtle', 'truncate')}>
-          {value ? (
-            <>
-              {value.name}
-              {value.rent_count > 0 ? (
-                <span className="text-fg-subtle">
-                  {' '}· {value.rent_count.toLocaleString()} contracts
-                </span>
-              ) : (
-                <span className="text-warning"> · no rent data</span>
-              )}
-            </>
-          ) : (
-            'Search all 362 Dubai areas…'
-          )}
-        </span>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-fg-subtle transition-transform',
-            open && 'rotate-180'
-          )}
-          strokeWidth={2}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-md border border-border bg-bg-card shadow-lg max-h-[60vh] overflow-hidden flex flex-col">
-          <div className="relative border-b border-border">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-subtle"
-              strokeWidth={2}
-            />
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type to filter…"
-              className="w-full bg-transparent pl-9 pr-3 py-2.5 text-sm outline-none placeholder:text-fg-subtle"
-            />
-          </div>
-          <ul role="listbox" className="overflow-y-auto py-1">
-            {filtered.length === 0 && (
-              <li className="px-3 py-3 text-xs text-fg-subtle">
-                No areas match &ldquo;{query}&rdquo;.
-              </li>
-            )}
-            {filtered.map((o) => {
-              const active = value?.name_norm === o.name_norm;
-              const tier = dataTier(o.rent_count);
-              return (
-                <li key={o.name_norm}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => pick(o)}
-                    className={cn(
-                      'w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elev',
-                      active && 'bg-accent/10'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'truncate',
-                        active
-                          ? 'text-accent'
-                          : tier === 'none'
-                            ? 'text-fg-muted'
-                            : 'text-fg'
-                      )}
-                    >
-                      {o.name}
-                      {TIER_LABEL[tier] && (
-                        <span
-                          className={cn(
-                            'ml-1.5 text-[10px]',
-                            tier === 'none' && 'text-warning',
-                            tier === 'limited' && 'text-fg-subtle'
-                          )}
-                        >
-                          {TIER_LABEL[tier]}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[11px] tabular text-fg-subtle whitespace-nowrap">
-                      {o.rent_count > 0
-                        ? `${o.rent_count.toLocaleString()} contracts`
-                        : '—'}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // No-data notice — shown when the selected area has 0 contracts or when the

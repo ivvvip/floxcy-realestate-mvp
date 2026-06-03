@@ -24,13 +24,15 @@ export default async function RentCheckPage() {
   const [stats, areas, canon] = await Promise.all([
     getDldStats().catch(() => null),
     getDldAreas({ limit: 500 }).catch(() => null),
-    getCanonicalAreas({ min_occurrences: 5 }).catch(() => null),
+    getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
   ]);
 
   // Canonical is the spine: ALL 284 areas in the dropdown, even ones with
-  // no rent data yet (they'll just show 0 contracts). We then overlay
+  // no rent data yet (they'll just show 0 contracts). We overlay
   // dld_areas data (rent_count + median_annual_rent) where available so
-  // the dropdown can hint at coverage strength per area.
+  // the rent-check suggestion sidebar can still rank by rent activity.
+  // The dropdown itself sorts A-Z and shows data-state per area via the
+  // shared AreaSelector.
   const dldByUpper = new Map(
     (areas?.items ?? []).map((a) => [
       a.name.toUpperCase(),
@@ -45,9 +47,9 @@ export default async function RentCheckPage() {
         name_norm: overlay?.name_norm ?? c.area_name_upper.toLowerCase(),
         rent_count: overlay?.rent_count ?? 0,
         median_annual_rent: overlay?.median_annual_rent ?? 0,
+        occurrence_count: c.occurrence_count,
       };
-    })
-    .sort((a, b) => b.rent_count - a.rent_count);
+    });
 
   return (
     <div className="bg-bg">
