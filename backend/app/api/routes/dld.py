@@ -105,6 +105,10 @@ from app.schemas.dld import (
     DashboardPulseResponse,
     DataFreshness,
     HotAreaItem,
+    MapAreaItem,
+    MapAreasResponse,
+    MapBuildingItem,
+    MapBuildingsResponse,
     MarketOverview,
     MarketOverviewMetric,
     OffplanArea,
@@ -4417,3 +4421,102 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
         offplan=offplan,
         freshness=freshness,
     )
+
+
+# ---------------------------------------------------------------------------
+# /map endpoints — Dubai-wide Leaflet map
+# ---------------------------------------------------------------------------
+
+@router.get("/map/areas", response_model=MapAreasResponse)
+async def map_areas(db: AsyncSession = Depends(get_db)):
+    """All canonical areas with coordinates (263 today) joined to their
+    headline yield + ppsf + transaction count. Polygon is the raw GeoJSON
+    blob stored on the canonical row (139 currently). The map page
+    consumes this in one shot — payload is ~250 KB compressed."""
+    rows = (await db.execute(
+        select(
+            DldCanonicalArea.area_name,
+            DldCanonicalArea.area_name_slug,
+            DldCanonicalArea.latitude,
+            DldCanonicalArea.longitude,
+            DldCanonicalArea.polygon,
+        )
+        .where(DldCanonicalArea.latitude.isnot(None))
+        .order_by(DldCanonicalArea.area_name)
+    )).all()
+
+    # Pull metrics + appreciation keyed by name_norm (lowercase area_name)
+    metric_rows = (await db.execute(
+        select(
+            DldArea.name_norm,
+            DldAreaMetrics.rental_yield_pct,
+            DldAreaMetrics.median_price_per_sqft,
+            DldAreaMetrics.sales_count,
+        )
+        .outerjoin(DldAreaMetrics, DldAreaMetrics.dld_area_id == DldArea.id)
+        .where(DldAreaMetrics.period == "2026-ytd")
+    )).all()
+    metrics_by_name = {
+        n.lower(): (y, p, s) for n, y, p, s in metric_rows if n
+    }
+
+    items: list[MapAreaItem] = []
+    for name, slug, lat, lon, poly in rows:
+        n_lower = (name or "").lower()
+        y, p, s = metrics_by_name.get(n_lower, (None, None, None))
+        items.append(MapAreaItem(
+            name=name,
+            slug=slug,
+            lat=float(lat) if lat is not None else None,
+            lon=float(lon) if lon is not None else None,
+            polygon=poly if poly else None,
+            yield_pct=float(y) if y is not None else None,
+            avg_ppsf=float(p) if p is not None else None,
+            transaction_count=int(s) if s is not None else None,
+        ))
+    return MapAreasResponse(count=len(items), areas=items)
+
+
+@router.get("/map/buildings", response_model=MapBuildingsResponse)
+async def map_buildings(db: AsyncSession = Depends(get_db)):
+    """OSM-verified buildings (504 today) with lat/lon for marker rendering.
+    Pulled from dld_buildings_derived where osm_verified=TRUE. category
+    feeds the marker color; area_slug links each marker into /areas/[slug]."""
+    rows = (await db.execute(
+        select(
+            DldBuildingDerived.id,
+            DldBuildingDerived.project_name_en,
+            DldBuildingDerived.lat,
+            DldBuildingDerived.lon,
+            DldBuildingDerived.property_category,
+            DldBuildingDerived.contract_count,
+            DldBuildingDerived.avg_annual_rent,
+            DldBuildingDerived.area_name_en,
+            DldCanonicalArea.area_name_slug,
+        )
+        .outerjoin(
+            DldCanonicalArea,
+            func.lower(DldCanonicalArea.area_name) == func.lower(DldBuildingDerived.area_name_en),
+        )
+        .where(
+            DldBuildingDerived.osm_verified.is_(True),
+            DldBuildingDerived.lat.isnot(None),
+            DldBuildingDerived.lon.isnot(None),
+        )
+        .order_by(DldBuildingDerived.contract_count.desc())
+    )).all()
+
+    items: list[MapBuildingItem] = []
+    for bid, name, lat, lon, cat, cnt, rent, area_name, area_slug in rows:
+        items.append(MapBuildingItem(
+            id=bid,
+            name=name or "Unnamed building",
+            lat=float(lat),
+            lon=float(lon),
+            category=cat,
+            contract_count=int(cnt or 0),
+            avg_annual_rent=float(rent) if rent is not None else None,
+            area_name=area_name,
+            area_slug=area_slug,
+        ))
+    return MapBuildingsResponse(count=len(items), buildings=items)

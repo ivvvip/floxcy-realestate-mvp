@@ -350,6 +350,37 @@ export interface AreaBedroomPricesResponse extends DldAttribution {
   total_rows: number;
 }
 
+export interface MapAreaItem {
+  name: string;
+  slug: string;
+  lat: number | null;
+  lon: number | null;
+  // GeoJSON Geometry (Polygon | MultiPolygon) or null.
+  polygon: object | null;
+  yield_pct: number | null;
+  avg_ppsf: number | null;
+  transaction_count: number | null;
+}
+export interface MapAreasResponse extends DldAttribution {
+  count: number;
+  areas: MapAreaItem[];
+}
+export interface MapBuildingItem {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  category: string | null;
+  contract_count: number;
+  avg_annual_rent: number | null;
+  area_name: string | null;
+  area_slug: string | null;
+}
+export interface MapBuildingsResponse extends DldAttribution {
+  count: number;
+  buildings: MapBuildingItem[];
+}
+
 export interface AreaCommunityProfile extends DldAttribution {
   community_code: number | null;
   area_name_en: string | null;

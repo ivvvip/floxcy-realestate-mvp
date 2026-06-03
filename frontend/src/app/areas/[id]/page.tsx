@@ -23,6 +23,8 @@ import { AreaSmartSummary, AreaBottomCTAs } from './AreaSmartSummary';
 import { AreaBedroomBreakdown } from './AreaBedroomBreakdown';
 import { AreaCommunityProfile } from './AreaCommunityProfile';
 import { AreaPriceHistorySection } from './AreaPriceHistorySection';
+import { AreaMiniMap } from './AreaMiniMap';
+import { getMapAreas, getMapBuildings } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
 import {
@@ -171,6 +173,28 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         area.dld.dld_name.toLowerCase(),
       ).catch(() => null)
     : null;
+
+  // Mini-map data — fetch in parallel; both endpoints are 1h cached, so
+  // repeat hits across area pages reuse the same server cache.
+  const [mapAreasData, mapBuildingsData] = await Promise.all([
+    getMapAreas().catch(() => null),
+    getMapBuildings().catch(() => null),
+  ]);
+  const mapArea =
+    mapAreasData?.areas.find(
+      (a) =>
+        a.name.toLowerCase() === area.name.toLowerCase() ||
+        a.slug === params.id,
+    ) ?? null;
+  const mapBuildings =
+    mapArea && mapBuildingsData
+      ? mapBuildingsData.buildings.filter(
+          (b) =>
+            (b.area_slug && b.area_slug === mapArea.slug) ||
+            (b.area_name &&
+              b.area_name.toLowerCase() === area.name.toLowerCase()),
+        )
+      : [];
 
   // Per-bedroom sale benchmarks (Studio / 1BR / 2BR / …). Hidden when DLD
   // has no bedroom-tagged transactions for the area.
@@ -625,6 +649,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               <span className="font-mono text-fg">{area.dld.dld_name}</span>.
             </div>
           </section>
+        )}
+
+        {/* Mini-map — area polygon + buildings inside. Hidden when neither
+            coords nor any verified buildings exist for this area. */}
+        {mapArea && (mapArea.polygon || mapArea.lat != null || mapBuildings.length > 0) && (
+          <div className="mt-5">
+            <AreaMiniMap area={mapArea} buildings={mapBuildings} />
+          </div>
         )}
 
         {/* Price History — shared component (also rendered on LimitedAreaPage) */}

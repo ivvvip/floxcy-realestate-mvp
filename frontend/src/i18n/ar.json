@@ -8,6 +8,7 @@
 
   "nav": {
     "dashboard": "Dashboard",
+    "map": "Map",
     "areas": "Areas",
     "buildings": "Properties",
     "opportunities": "Opportunities",

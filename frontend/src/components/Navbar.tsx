@@ -12,6 +12,7 @@ import { useT } from '@/i18n/useT';
 // under `nav.*` and reference here.
 const LINKS = [
   { href: '/dashboard', key: 'nav.dashboard' },
+  { href: '/map', key: 'nav.map' },
   { href: '/areas', key: 'nav.areas' },
   { href: '/buildings', key: 'nav.buildings' },
   { href: '/opportunities', key: 'nav.opportunities' },

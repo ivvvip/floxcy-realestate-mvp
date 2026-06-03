@@ -55,6 +55,8 @@ import type {
   DldYieldHistoryResponse,
   AreaBedroomPricesResponse,
   AreaCommunityProfile,
+  MapAreasResponse,
+  MapBuildingsResponse,
   UpcomingAvailabilityResponse,
   CanonicalAreasResponse,
   DashboardDataResponse,
@@ -704,6 +706,18 @@ export async function getDldAreaRentHistory(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/rent-history`,
     { revalidate: 3600 }
   );
+}
+
+export async function getMapAreas(): Promise<MapAreasResponse> {
+  return request<MapAreasResponse>('/api/v1/dld/map/areas', {
+    revalidate: 3600,
+  });
+}
+
+export async function getMapBuildings(): Promise<MapBuildingsResponse> {
+  return request<MapBuildingsResponse>('/api/v1/dld/map/buildings', {
+    revalidate: 3600,
+  });
 }
 
 export async function getDldAreaCommunityProfile(

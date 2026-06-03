@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Suspense } from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, List, Map as MapIcon } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
-import { getDldStats, getDldBuildingsDerived, getCanonicalAreas } from '@/lib/api';
+import { getDldStats, getDldBuildingsDerived, getCanonicalAreas, getMapBuildings } from '@/lib/api';
 import { BuildingsIndexClient } from './BuildingsIndexClient';
+import { BuildingsMapView } from './BuildingsMapView';
 
 export const metadata: Metadata = {
   title: 'Property Intelligence — Buildings, Villas & Communities',
@@ -14,10 +16,17 @@ export const metadata: Metadata = {
 
 export const revalidate = 3600;
 
-export default async function BuildingsIndexPage() {
+interface PageProps {
+  searchParams?: { view?: string };
+}
+
+export default async function BuildingsIndexPage({ searchParams }: PageProps) {
+  const view = searchParams?.view === 'map' ? 'map' : 'list';
+
   // Buildings tab pre-fetches the apartment list — the default landing tab.
   // Canonical areas — single source of truth across all Floxcy dropdowns.
-  const [stats, initial, canon] = await Promise.all([
+  // Map view also fetches the 504 verified buildings in parallel (1h cache).
+  const [stats, initial, canon, mapBuildings] = await Promise.all([
     getDldStats().catch(() => null),
     getDldBuildingsDerived({
       page: 1,
@@ -25,6 +34,7 @@ export default async function BuildingsIndexPage() {
       category: 'apartment,hotel_apt',
     }).catch(() => null),
     getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
+    view === 'map' ? getMapBuildings().catch(() => null) : Promise.resolve(null),
   ]);
 
   const areaOptions = (canon?.items ?? [])
@@ -73,15 +83,39 @@ export default async function BuildingsIndexPage() {
 
       <Container>
         <div className="py-4 sm:py-6">
-          {/* Suspense wrap required by Next 14 because the child reads
-              search params via useSearchParams() and this page is ISR. */}
-          <Suspense fallback={<div className="card p-8 text-sm text-fg-subtle">Loading…</div>}>
-            <BuildingsIndexClient
-              initialItems={initial?.items ?? []}
-              initialTotal={initial?.total_available ?? 0}
-              areaOptions={areaOptions}
-            />
-          </Suspense>
+          {view === 'map' ? (
+            <BuildingsMapView buildings={mapBuildings?.buildings ?? []} />
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-xs text-fg-muted">
+                  View as
+                </div>
+                <div className="inline-flex rounded-md border border-border bg-bg-card overflow-hidden text-xs">
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-accent text-accent-fg font-medium">
+                    <List className="h-3 w-3" strokeWidth={2.5} />
+                    List
+                  </span>
+                  <Link
+                    href="/buildings?view=map"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-fg-muted hover:text-fg"
+                  >
+                    <MapIcon className="h-3 w-3" strokeWidth={2.5} />
+                    Map
+                  </Link>
+                </div>
+              </div>
+              {/* Suspense wrap required by Next 14 because the child reads
+                  search params via useSearchParams() and this page is ISR. */}
+              <Suspense fallback={<div className="card p-8 text-sm text-fg-subtle">Loading…</div>}>
+                <BuildingsIndexClient
+                  initialItems={initial?.items ?? []}
+                  initialTotal={initial?.total_available ?? 0}
+                  areaOptions={areaOptions}
+                />
+              </Suspense>
+            </>
+          )}
         </div>
       </Container>
     </div>

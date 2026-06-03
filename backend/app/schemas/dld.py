@@ -1228,3 +1228,40 @@ class DashboardPulseResponse(Attribution):
     hot_areas: List[HotAreaItem]
     offplan: Optional[OffplanPipeline] = None
     freshness: DataFreshness
+
+
+# ---------------------------------------------------------------------------
+# /map endpoints — Dubai-wide Leaflet view
+# ---------------------------------------------------------------------------
+
+class MapAreaItem(BaseModel):
+    name: str
+    slug: str
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    polygon: Optional[dict] = None  # GeoJSON Polygon/MultiPolygon, null when none
+    yield_pct: Optional[float] = None
+    avg_ppsf: Optional[float] = None
+    transaction_count: Optional[int] = None
+
+
+class MapAreasResponse(Attribution):
+    count: int
+    areas: List[MapAreaItem]
+
+
+class MapBuildingItem(BaseModel):
+    id: UUID
+    name: str
+    lat: float
+    lon: float
+    category: Optional[str] = None  # apartment | villa | office | etc
+    contract_count: int = 0
+    avg_annual_rent: Optional[float] = None
+    area_name: Optional[str] = None
+    area_slug: Optional[str] = None
+
+
+class MapBuildingsResponse(Attribution):
+    count: int
+    buildings: List[MapBuildingItem]
