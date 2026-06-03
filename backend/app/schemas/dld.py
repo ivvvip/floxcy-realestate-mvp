@@ -1074,6 +1074,32 @@ class AreaCategoryBreakdownResponse(Attribution):
     items: List[AreaCategoryBreakdownItem]
 
 
+# ---------------------------------------------------------------------------
+# Communities — master_project_en aggregates from dld_buildings_derived
+# ---------------------------------------------------------------------------
+
+class DldCommunityItem(BaseModel):
+    """One master-planned community aggregate (DAMAC Hills, JVC, etc.).
+    Roll-up of all dld_buildings_derived rows that share the same
+    master_project_en value."""
+    slug: str
+    master_project: str
+    primary_area_name: Optional[str] = None
+    area_count: int
+    building_count: int
+    total_contracts: int
+    avg_annual_rent: Optional[float] = None
+    total_annual_income: Optional[float] = None
+    income_range_label: Optional[str] = None
+    confidence: str
+
+
+class DldCommunitiesResponse(Attribution):
+    count: int
+    total_available: int
+    items: List[DldCommunityItem]
+
+
 class BuildingSalesResponse(Attribution):
     id: UUID
     building_name_en: str

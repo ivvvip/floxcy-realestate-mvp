@@ -861,6 +861,25 @@ export interface AreaCategoryBreakdownResponse extends DldAttribution {
   items: AreaCategoryBreakdownItem[];
 }
 
+export interface DldCommunityItem {
+  slug: string;
+  master_project: string;
+  primary_area_name: string | null;
+  area_count: number;
+  building_count: number;
+  total_contracts: number;
+  avg_annual_rent: number | null;
+  total_annual_income: number | null;
+  income_range_label: string | null;
+  confidence: string;
+}
+
+export interface DldCommunitiesResponse extends DldAttribution {
+  count: number;
+  total_available: number;
+  items: DldCommunityItem[];
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard pulse — 7-widget aggregator
 // ---------------------------------------------------------------------------

@@ -747,54 +747,77 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
           );
         })()}
 
-        {/* Property-category breakdown — counts per type, links into the
-            5-tab /buildings UI pre-filtered by area + category */}
-        {categoryBreakdown && categoryBreakdown.total_buildings > 0 && (
-          <section
-            id="category-breakdown"
-            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
-          >
-            <div className="chart-header">
-              <span className="chart-header-label">
-                This area has
-              </span>
-              <span className="text-[11px] text-fg-subtle">
-                {categoryBreakdown.total_buildings.toLocaleString()} buildings total
-              </span>
-            </div>
-            <div className="grid gap-px bg-border sm:grid-cols-3 md:grid-cols-4">
-              {categoryBreakdown.items.map((it) => (
+        {/* Property breakdown — rolled up into the 4 Property Intelligence
+            buckets (Buildings / Villas / Communities / Commercial). Each
+            tile deep-links into /buildings with the matching tab + area
+            pre-filtered. */}
+        {categoryBreakdown && categoryBreakdown.total_buildings > 0 && (() => {
+          const areaSlug = area.dld?.dld_name?.toLowerCase() ?? '';
+          const buckets: Array<{
+            key: 'buildings' | 'villas' | 'commercial';
+            emoji: string;
+            label: string;
+            cats: string[];
+          }> = [
+            { key: 'buildings',  emoji: '🏢', label: 'Buildings',  cats: ['apartment', 'hotel_apt'] },
+            { key: 'villas',     emoji: '🏡', label: 'Villas',     cats: ['villa'] },
+            { key: 'commercial', emoji: '🏬', label: 'Commercial', cats: ['office', 'retail', 'warehouse', 'labor_camp', 'whole_building', 'other'] },
+          ];
+          const tiles = buckets
+            .map((b) => ({
+              ...b,
+              count: categoryBreakdown.items
+                .filter((it) => b.cats.includes(it.property_category))
+                .reduce((s, it) => s + it.building_count, 0),
+            }))
+            .filter((b) => b.count > 0);
+          if (tiles.length === 0) return null;
+          return (
+            <section
+              id="category-breakdown"
+              className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+            >
+              <div className="chart-header">
+                <span className="chart-header-label">Property Breakdown</span>
+                <span className="text-[11px] text-fg-subtle">
+                  {categoryBreakdown.total_buildings.toLocaleString()} properties total
+                </span>
+              </div>
+              <div className="grid gap-px bg-border sm:grid-cols-2 md:grid-cols-4">
+                {tiles.map((t) => (
+                  <Link
+                    key={t.key}
+                    href={`/buildings?tab=${t.key}&area=${encodeURIComponent(areaSlug)}`}
+                    className="bg-bg-card p-3 hover:bg-bg-elev/40"
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span aria-hidden className="text-base">{t.emoji}</span>
+                      <span className="text-2xl font-mono text-fg">
+                        {t.count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-fg-muted">{t.label}</div>
+                  </Link>
+                ))}
                 <Link
-                  key={it.property_category}
-                  href={`/buildings?tab=${
-                    it.property_category === 'villa'
-                      ? 'villas'
-                      : ['apartment', 'hotel_apt'].includes(it.property_category)
-                        ? 'residential'
-                        : ['office', 'retail', 'warehouse'].includes(it.property_category)
-                          ? 'commercial'
-                          : 'special'
-                  }&area=${encodeURIComponent(area.dld?.dld_name?.toLowerCase() ?? '')}`}
+                  href={`/buildings?tab=communities&area=${encodeURIComponent(areaSlug)}`}
                   className="bg-bg-card p-3 hover:bg-bg-elev/40"
                 >
                   <div className="flex items-baseline gap-2">
-                    <span aria-hidden className="text-base">{it.emoji}</span>
-                    <span className="text-2xl font-mono text-fg">
-                      {it.building_count.toLocaleString()}
-                    </span>
+                    <span aria-hidden className="text-base">🏘️</span>
+                    <span className="text-2xl font-mono text-fg">→</span>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-fg-muted">
-                    {it.label}
-                  </div>
+                  <div className="mt-0.5 text-[11px] text-fg-muted">Communities</div>
                 </Link>
-              ))}
-            </div>
-            <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
-              Counts come from the synthetic building dim (dld_buildings_derived)
-              built from DLD Ejari rent contracts 2021–2026.
-            </div>
-          </section>
-        )}
+              </div>
+              <div className="px-4 py-2 text-[10px] text-fg-subtle border-t border-border">
+                Rolled up from the synthetic building dim (dld_buildings_derived)
+                built from DLD Ejari rent contracts 2021–2026. Click any tile to
+                filter Property Intelligence by this area.
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Lifestyle scores — metro / mall / landmark derived from rent stream */}
         {lifestyle && lifestyle.overall_score != null && (

@@ -46,6 +46,7 @@ import type {
   DldAreaDetailResponse,
   DldPriceHistoryResponse,
   AreaCategoryBreakdownResponse,
+  DldCommunitiesResponse,
   AreaLifestyleScoreResponse,
   DashboardPulseResponse,
   BuildingLeaseExpiryResponse,
@@ -924,6 +925,24 @@ export async function getDldAreaCategoryBreakdown(
   return request<AreaCategoryBreakdownResponse>(
     `/api/v1/dld/areas/${encodeURIComponent(nameNorm)}/category-breakdown`,
     { revalidate: 3600 }
+  );
+}
+
+export async function getDldCommunities(opts?: {
+  area?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<DldCommunitiesResponse> {
+  const params = new URLSearchParams();
+  if (opts?.area) params.set('area', opts.area);
+  if (opts?.q) params.set('q', opts.q);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.page_size) params.set('page_size', String(opts.page_size));
+  const qs = params.toString();
+  return request<DldCommunitiesResponse>(
+    `/api/v1/dld/communities${qs ? `?${qs}` : ''}`,
+    { revalidate: 600 }
   );
 }
 

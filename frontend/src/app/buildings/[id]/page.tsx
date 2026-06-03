@@ -50,16 +50,30 @@ async function fetchBuildingDetail(id: string) {
   }
 }
 
+// Category-driven titles. Villas should not read as "X-Ray", commercial
+// buildings should signal "commercial property", residential towers keep
+// the X-Ray naming.
+function titleForCategory(
+  category?: string | null
+): { short: string; crumb: string } {
+  if (category === 'villa') return { short: 'Villa Intelligence', crumb: 'Villa Intelligence' };
+  if (category === 'office' || category === 'retail' || category === 'warehouse' || category === 'labor_camp' || category === 'whole_building') {
+    return { short: 'Commercial Property', crumb: 'Commercial Properties' };
+  }
+  return { short: 'Building X-Ray', crumb: 'Building X-Ray' };
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const res = await fetchBuildingDetail(params.id);
     const b = res.building;
+    const t = titleForCategory(b.property_category);
     return {
-      title: `${b.display_name ?? b.project_name ?? 'Building'} — X-Ray`,
-      description: `Per-building rent intelligence for ${b.display_name ?? b.project_name ?? 'this building'} (${b.area_name ?? 'Dubai'}). Total annual income, occupancy proxy, implied yield. Source: DLD Ejari.`,
+      title: `${b.display_name ?? b.project_name ?? 'Property'} — ${t.short}`,
+      description: `Per-property rent intelligence for ${b.display_name ?? b.project_name ?? 'this property'} (${b.area_name ?? 'Dubai'}). Total annual income, occupancy proxy, implied yield. Source: DLD Ejari.`,
     };
   } catch {
-    return { title: 'Building X-Ray' };
+    return { title: 'Property Intelligence' };
   }
 }
 
@@ -97,6 +111,9 @@ export default async function BuildingDetailPage({ params }: PageProps) {
 
   const b = detailRes.building;
   const ctx = b.area_context;
+  const heading = titleForCategory(b.property_category);
+  const isVilla = b.property_category === 'villa';
+  const noun = isVilla ? 'villa' : 'building';
 
   return (
     <div className="bg-bg">
@@ -105,8 +122,9 @@ export default async function BuildingDetailPage({ params }: PageProps) {
           <div className="pt-4 pb-3">
             <Breadcrumbs
               items={[
-                { label: 'Building X-Ray', href: '/buildings' },
-                { label: b.project_name ?? 'Building' },
+                { label: 'Property Intelligence', href: '/buildings' },
+                { label: heading.crumb, href: '/buildings' },
+                { label: b.project_name ?? heading.short },
               ]}
             />
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -114,8 +132,11 @@ export default async function BuildingDetailPage({ params }: PageProps) {
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-fg-muted" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight truncate">
-                    {b.display_name ?? b.project_name ?? 'Unnamed building'}
+                    {b.display_name ?? b.project_name ?? `Unnamed ${noun}`}
                   </h1>
+                  <span className="inline-flex items-center rounded-full border border-border bg-bg-elev/50 px-2 py-0.5 text-[10px] text-fg-muted whitespace-nowrap">
+                    {heading.short}
+                  </span>
                 </div>
                 {/* Honesty banner when the row isn't a specific building.
                     Hidden when the classifier confirmed a real_building /

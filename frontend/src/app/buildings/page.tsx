@@ -7,26 +7,23 @@ import { getDldStats, getDldBuildingsDerived, getCanonicalAreas } from '@/lib/ap
 import { BuildingsIndexClient } from './BuildingsIndexClient';
 
 export const metadata: Metadata = {
-  title: 'Building X-Ray — Per-project rent intelligence',
+  title: 'Property Intelligence — Buildings, Villas & Communities',
   description:
-    'Drill into 8,075 Dubai buildings: per-building rent contract count, average rent, occupancy proxy, and income range. Powered by Dubai Land Department Ejari data.',
+    'Drill into 8,075 Dubai buildings, villas, and master-planned communities: per-property rent contract count, average rent, occupancy proxy, and income range. Powered by Dubai Land Department Ejari data.',
 };
 
 export const revalidate = 3600;
 
 export default async function BuildingsIndexPage() {
-  // Top 50 buildings + the full area picker, both prefetched. Areas filtered
-  // to those actually linked to ≥1 building so the dropdown stays usable.
+  // Buildings tab pre-fetches the apartment list — the default landing tab.
   // Canonical areas — single source of truth across all Floxcy dropdowns.
-  // min_occurrences=5 filters the ~26 noise areas (one-off DLD entries).
-  // Derived total: just need the count for the tab badge; page_size=1 keeps
-  // the prefetch cheap. Soft-fail so the official tab still renders if the
-  // derived endpoint is briefly unavailable.
-  // Prefetch the All-tab content (derived buildings, page 1) so the page
-  // hydrates with real cards instead of a loading state.
   const [stats, initial, canon] = await Promise.all([
     getDldStats().catch(() => null),
-    getDldBuildingsDerived({ page: 1, page_size: 24 }).catch(() => null),
+    getDldBuildingsDerived({
+      page: 1,
+      page_size: 24,
+      category: 'apartment,hotel_apt',
+    }).catch(() => null),
     getCanonicalAreas({ min_occurrences: 0 }).catch(() => null),
   ]);
 
@@ -43,21 +40,22 @@ export default async function BuildingsIndexPage() {
       <div className="border-b border-border">
         <Container>
           <div className="pt-4 pb-3">
-            <Breadcrumbs items={[{ label: 'Building X-Ray' }]} />
+            <Breadcrumbs items={[{ label: 'Property Intelligence' }]} />
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-fg-muted" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight">
-                    Building X-Ray
+                    Property Intelligence
                   </h1>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Per-project rent intelligence on{' '}
+                  Buildings, Villas & Communities — per-property rent
+                  intelligence on{' '}
                   <span className="font-mono text-fg">
                     {stats?.total_buildings.toLocaleString() ?? '8,075'}
                   </span>{' '}
-                  Dubai buildings. No competitor exposes this view.
+                  Dubai properties. No competitor exposes this view.
                 </p>
               </div>
               <div className="text-left sm:text-right text-[11px] text-fg-subtle">

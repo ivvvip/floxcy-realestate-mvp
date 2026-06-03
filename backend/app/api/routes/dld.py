@@ -94,6 +94,8 @@ from app.schemas.dld import (
     AreaBedroomPricesResponse,
     AreaCategoryBreakdownItem,
     AreaCategoryBreakdownResponse,
+    DldCommunitiesResponse,
+    DldCommunityItem,
     AreaLifestyleScoreResponse,
     BedroomBenchmarkRow,
     BuildingLeaseExpiryResponse,
@@ -3618,6 +3620,108 @@ async def get_building_derived(
         area_context=area_ctx,
     )
     return DldBuildingDetailResponse(building=detail)
+
+
+# ---------------------------------------------------------------------------
+# Communities — master_project_en aggregates from dld_buildings_derived
+# ---------------------------------------------------------------------------
+
+def _slugify_master_project(s: str) -> str:
+    """Lower-case, alphanumeric-only slug used to deep-link community cards
+    back into the master_project filter on /properties."""
+    out = []
+    prev_dash = False
+    for ch in s.lower():
+        if ch.isalnum():
+            out.append(ch)
+            prev_dash = False
+        elif not prev_dash:
+            out.append("-")
+            prev_dash = True
+    return "".join(out).strip("-")
+
+
+@router.get("/communities", response_model=DldCommunitiesResponse)
+async def list_communities(
+    db: AsyncSession = Depends(get_db),
+    area: Optional[str] = None,
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+):
+    """List master-planned communities — aggregate of all
+    dld_buildings_derived rows sharing a master_project_en value
+    (DAMAC Hills, JVC, Dubai Marina, etc.).
+
+    Filters:
+      area  — DLD area name_norm (exact lower-case match)
+      q     — case-insensitive substring on master_project_en
+    """
+    filters = [DldBuildingDerived.master_project_en.is_not(None)]
+    if area:
+        filters.append(func.lower(DldArea.name_norm) == area.strip().lower())
+    if q:
+        filters.append(
+            DldBuildingDerived.master_project_en.ilike(f"%{q.strip()}%")
+        )
+
+    # Aggregate per master_project_en. primary_area_name picks the area with
+    # the largest contract_count (max-of-sums per area is more complex than
+    # we need — we use max(area_name_en) as a deterministic tiebreaker).
+    base = (
+        select(
+            DldBuildingDerived.master_project_en.label("mp"),
+            func.count(DldBuildingDerived.id).label("building_count"),
+            func.count(func.distinct(DldBuildingDerived.dld_area_id)).label("area_count"),
+            func.sum(DldBuildingDerived.contract_count).label("total_contracts"),
+            func.avg(DldBuildingDerived.avg_annual_rent).label("avg_rent"),
+            func.max(DldArea.name_display).label("primary_area"),
+        )
+        .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
+        .where(and_(*filters))
+        .group_by(DldBuildingDerived.master_project_en)
+    )
+
+    # Count of distinct master_projects matching the filters
+    count_q = (
+        select(func.count(func.distinct(DldBuildingDerived.master_project_en)))
+        .select_from(DldBuildingDerived)
+        .outerjoin(DldArea, DldArea.id == DldBuildingDerived.dld_area_id)
+        .where(and_(*filters))
+    )
+    total = await db.scalar(count_q) or 0
+
+    rows = (
+        await db.execute(
+            base.order_by(func.sum(DldBuildingDerived.contract_count).desc().nullslast())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).all()
+
+    items = []
+    for r in rows:
+        avg = float(r.avg_rent) if r.avg_rent is not None else None
+        contracts = int(r.total_contracts or 0)
+        total_income = avg * contracts if avg is not None else None
+        items.append(
+            DldCommunityItem(
+                slug=_slugify_master_project(r.mp),
+                master_project=r.mp,
+                primary_area_name=r.primary_area,
+                area_count=int(r.area_count or 0),
+                building_count=int(r.building_count or 0),
+                total_contracts=contracts,
+                avg_annual_rent=avg,
+                total_annual_income=total_income,
+                income_range_label=_income_range_label(total_income),
+                confidence=confidence_for(contracts),
+            )
+        )
+
+    return DldCommunitiesResponse(
+        count=len(items), total_available=int(total), items=items
+    )
 
 
 # ---------------------------------------------------------------------------
