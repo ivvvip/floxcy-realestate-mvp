@@ -424,6 +424,7 @@ export async function getOpportunitiesFeed(opts?: {
   kind?: 'all' | 'signals' | 'deals';
   area?: string;
   strategy?: string;
+  category?: string;
   min_score?: number;
   limit?: number;
   sort_by?: 'score' | 'yield' | 'appreciation';
@@ -432,6 +433,7 @@ export async function getOpportunitiesFeed(opts?: {
   if (opts?.kind) params.set('kind', opts.kind);
   if (opts?.area) params.set('area', opts.area);
   if (opts?.strategy) params.set('strategy', opts.strategy);
+  if (opts?.category) params.set('category', opts.category);
   if (opts?.min_score != null) params.set('min_score', String(opts.min_score));
   if (opts?.limit) params.set('limit', String(opts.limit));
   if (opts?.sort_by) params.set('sort_by', opts.sort_by);

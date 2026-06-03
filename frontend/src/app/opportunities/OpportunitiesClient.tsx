@@ -14,6 +14,7 @@ import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { FilterChip } from '@/components/data/FilterChip';
 import { AreaSelector } from '@/components/AreaSelector';
+import { getOpportunitiesFeed } from '@/lib/api';
 
 interface AreaOption {
   name: string;
@@ -22,6 +23,17 @@ interface AreaOption {
 }
 
 type KindFilter = 'all' | 'deals' | 'signals';
+
+// Category filter chips. Maps the UI label to the comma-separated
+// category set the backend expects on /api/v1/opportunities?category=.
+// Default 'all' means no filter — every opportunity is included.
+const CATEGORY_CHIPS = [
+  { key: 'all',         label: 'All',         categories: ''                                },
+  { key: 'apartments',  label: 'Apartments',  categories: 'apartment,hotel_apt'             },
+  { key: 'villas',      label: 'Villas',      categories: 'villa'                           },
+  { key: 'commercial',  label: 'Commercial',  categories: 'office,retail,warehouse'         },
+] as const;
+type CategoryChip = (typeof CATEGORY_CHIPS)[number]['key'];
 type StrategyFilter =
   | 'all'
   | 'income' | 'growth' | 'balanced' | 'luxury' | 'high-risk';
@@ -55,6 +67,7 @@ interface Props {
 }
 
 export function OpportunitiesClient({ opportunities, total, areaOptions }: Props) {
+  void total;
   const [kind, setKind] = useState<KindFilter>('all');
   const [strategy, setStrategy] = useState<StrategyFilter>('all');
   const [minScore, setMinScore] = useState(0);
@@ -63,8 +76,43 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
   // even if the feed uses a slightly different spelling.
   const [area, setArea] = useState<AreaOption | null>(null);
 
+  // Category chip — when not 'all', re-fetches from /api/v1/opportunities
+  // with the corresponding category list. Server filters to opportunities
+  // whose area has ≥1 building in that category (mixed-use areas appear
+  // in every category they host).
+  const [category, setCategory] = useState<CategoryChip>('all');
+  const [feedOpportunities, setFeedOpportunities] = useState(opportunities);
+  const [feedLoading, setFeedLoading] = useState(false);
+
+  useEffect(() => {
+    const cat = CATEGORY_CHIPS.find((c) => c.key === category)?.categories ?? '';
+    if (!cat) {
+      // 'All' tab — use the SSR-prefetched list as-is.
+      setFeedOpportunities(opportunities);
+      return;
+    }
+    let cancelled = false;
+    setFeedLoading(true);
+    getOpportunitiesFeed({ kind: 'all', limit: 60, min_score: 0, category: cat })
+      .then((res) => {
+        if (cancelled) return;
+        setFeedOpportunities(res.opportunities ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFeedOpportunities([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setFeedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [category, opportunities]);
+
   const filtered = useMemo(() => {
-    let list = opportunities;
+    let list = feedOpportunities;
     if (kind === 'deals') list = list.filter((o) => o.kind === 'broker_deal');
     if (kind === 'signals') list = list.filter((o) => o.kind === 'area_signal');
     if (strategy !== 'all') {
@@ -80,16 +128,16 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
     return [...list].sort(
       (a, b) => b.opportunity_score - a.opportunity_score
     );
-  }, [opportunities, kind, strategy, minScore, area]);
+  }, [feedOpportunities, kind, strategy, minScore, area]);
 
   const counts = useMemo(() => {
-    const c = { all: opportunities.length, deals: 0, signals: 0 };
-    for (const o of opportunities) {
+    const c = { all: feedOpportunities.length, deals: 0, signals: 0 };
+    for (const o of feedOpportunities) {
       if (o.kind === 'broker_deal') c.deals++;
       else c.signals++;
     }
     return c;
-  }, [opportunities]);
+  }, [feedOpportunities]);
 
   if (!opportunities.length) {
     return (
@@ -101,6 +149,32 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
 
   return (
     <div className="space-y-5">
+      {/* Property-category chips — server-side re-fetch when changed */}
+      <div className="flex items-center gap-2 flex-wrap text-[11px] text-fg-subtle">
+        <span className="uppercase tracking-wide">Property type</span>
+        {CATEGORY_CHIPS.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => setCategory(c.key)}
+            disabled={feedLoading && category !== c.key}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              category === c.key
+                ? 'border-accent bg-accent/10 text-fg'
+                : 'border-border bg-bg-card text-fg-muted hover:text-fg',
+              feedLoading && category !== c.key && 'opacity-50 cursor-wait'
+            )}
+            aria-pressed={category === c.key}
+          >
+            {c.label}
+          </button>
+        ))}
+        {feedLoading && (
+          <span className="ml-1 text-fg-subtle">Loading…</span>
+        )}
+      </div>
+
       {/* Tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterChip

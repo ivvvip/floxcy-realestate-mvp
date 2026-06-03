@@ -25,6 +25,7 @@ from app.core.dependencies import AuthPrincipal, require_admin
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
+from app.models.dld import DldArea, DldBuildingDerived
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.market_snapshot import MarketSnapshot
 from app.redis_client import redis_client
@@ -136,6 +137,15 @@ async def list_opportunities(
     type: Optional[str] = Query(default=None, description="Signal-only: opportunity_type"),
     area: Optional[str] = Query(default=None, description="Deal-only: case-insensitive area substring"),
     strategy: Optional[str] = Query(default=None, description="Deal-only: strategy_type"),
+    category: Optional[str] = Query(
+        default=None,
+        description=(
+            "Comma-separated property_category list. When set, returns only "
+            "opportunities whose area has ≥1 building in the selected "
+            "category set (dld_buildings_derived). Mixed-use areas appear in "
+            "every category they host."
+        ),
+    ),
     min_score: int = Query(default=0, ge=0, le=100),
     limit: int = Query(default=20, ge=1, le=100),
     sort_by: str = Query(default="score", description="score|yield|appreciation"),
@@ -157,6 +167,32 @@ async def list_opportunities(
     """
     items: list[dict] = []
 
+    # ---- Category filter: pre-compute the set of areas that have buildings
+    # in the requested category set. Mixed-use areas appear in every
+    # category they host (no scoring change — see Step 7 spec). ----
+    allowed_curated_area_ids: Optional[set[str]] = None
+    allowed_area_name_norms: Optional[set[str]] = None
+    if category:
+        cats = [c.strip() for c in category.split(",") if c.strip()]
+        if cats:
+            # Join dld_buildings_derived → dld_areas → curated areas. The
+            # area_signal endpoint keys on curated `Area.id`; broker deals
+            # match by area name. Resolve both sets in one round-trip.
+            stmt = (
+                select(DldArea.name_norm, DldArea.curated_area_id)
+                .join(
+                    DldBuildingDerived,
+                    DldBuildingDerived.dld_area_id == DldArea.id,
+                )
+                .where(DldBuildingDerived.property_category.in_(cats))
+                .distinct()
+            )
+            rows = (await db.execute(stmt)).all()
+            allowed_area_name_norms = {r[0] for r in rows if r[0]}
+            allowed_curated_area_ids = {
+                str(r[1]) for r in rows if r[1] is not None
+            }
+
     # ---- Area signals ----
     if kind in ("all", "signals"):
         areas, history_by_id = await _load_universe(db)
@@ -167,6 +203,10 @@ async def list_opportunities(
             filtered = [r for r in reports if r.opportunity_score >= min_score]
             if type:
                 filtered = [r for r in filtered if r.opportunity_type == type]
+            if allowed_curated_area_ids is not None:
+                filtered = [
+                    r for r in filtered if str(r.area_id) in allowed_curated_area_ids
+                ]
             for r in filtered:
                 history = history_by_id.get(UUID(r.area_id))
                 confidence = build_confidence_report(
@@ -195,6 +235,12 @@ async def list_opportunities(
             score = float(d.opportunity_score) if d.opportunity_score is not None else 0.0
             if score < min_score:
                 continue
+            if allowed_area_name_norms is not None:
+                # Broker deals have a free-text area field — match
+                # case-insensitively against the resolved name_norms.
+                deal_area_norm = (d.area or "").strip().lower()
+                if deal_area_norm not in allowed_area_name_norms:
+                    continue
             items.append(_deal_to_card(d))
 
     # ---- Sort across the merged set ----
