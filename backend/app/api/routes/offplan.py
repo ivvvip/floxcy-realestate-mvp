@@ -27,7 +27,7 @@ from app.database import get_db
 from app.models.dld import DldArea, DldBuildingsSales
 from app.models.investor_lead import InvestorLead
 
-from app.api.routes.developers import _detect_brand, _slugify
+from app.api.routes.developers import _detect_brand_multi, _slugify
 
 
 router = APIRouter(
@@ -140,7 +140,10 @@ async def _load_project_rows(
         if not mp:
             continue
         slug = _slugify(mp)
-        dev_slug, dev_name = _detect_brand(mp)
+        # Try master_project first, then fall back to building name —
+        # AZIZI / BINGHATTI / etc don't appear in master_project_en but
+        # do appear in building_name_en.
+        dev_slug, dev_name = _detect_brand_multi(mp, bld_name)
         bucket = by_project.setdefault(slug, {
             "slug": slug,
             "master_project": mp,
@@ -171,15 +174,16 @@ async def _load_project_rows(
     return list(by_project.values())
 
 
-@router.get("/projects", response_model=OffplanListResponse)
-async def list_offplan_projects(
-    db: AsyncSession = Depends(get_db),
-    developer: Optional[str] = Query(None, description="Developer slug"),
-    area_slug: Optional[str] = Query(None, description="DLD area name_norm or slug"),
-    min_units: int = Query(0, ge=0),
-    sort: Literal["units", "newest", "oldest", "name"] = Query("units"),
-    limit: int = Query(60, ge=1, le=200),
-) -> OffplanListResponse:
+async def _build_offplan_items(
+    db: AsyncSession,
+    *,
+    developer: Optional[str] = None,
+    area_slug: Optional[str] = None,
+    min_units: int = 0,
+    sort: str = "units",
+) -> list[OffplanProjectCard]:
+    """Core offplan aggregation — split from the route so other endpoints
+    can call it without going through FastAPI Query injection."""
     where = []
     if area_slug:
         where.append(DldArea.name_norm == area_slug.replace("-", " ").lower())
@@ -216,7 +220,25 @@ async def list_offplan_projects(
         items.sort(key=lambda x: (x.earliest_year or 9999))
     else:
         items.sort(key=lambda x: x.master_project.lower())
+    return items
 
+
+@router.get("/projects", response_model=OffplanListResponse)
+async def list_offplan_projects(
+    db: AsyncSession = Depends(get_db),
+    developer: Optional[str] = Query(None, description="Developer slug"),
+    area_slug: Optional[str] = Query(None, description="DLD area name_norm or slug"),
+    min_units: int = Query(0, ge=0),
+    sort: Literal["units", "newest", "oldest", "name"] = Query("units"),
+    limit: int = Query(60, ge=1, le=200),
+) -> OffplanListResponse:
+    items = await _build_offplan_items(
+        db,
+        developer=developer,
+        area_slug=area_slug,
+        min_units=min_units,
+        sort=sort,
+    )
     return OffplanListResponse(total=len(items), items=items[:limit])
 
 
@@ -225,15 +247,10 @@ async def list_coming_soon(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(40, ge=1, le=100),
 ) -> OffplanListResponse:
-    full = await list_offplan_projects(db=db, sort="newest", limit=200)
-    fresh = sorted(
-        full.items,
-        key=lambda p: (p.latest_year or 0, p.earliest_year or 0),
-        reverse=True,
-    )[:limit]
+    items = await _build_offplan_items(db, sort="newest")
     return OffplanListResponse(
-        total=len(fresh),
-        items=fresh,
+        total=len(items),
+        items=items[:limit],
         data_source="Projects with the most recent transaction year — surrogate for 'launching soon'.",
     )
 

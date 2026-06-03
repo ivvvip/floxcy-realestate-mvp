@@ -14,7 +14,8 @@ import { formatAED, formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { FilterChip } from '@/components/data/FilterChip';
 import { AreaSelector } from '@/components/AreaSelector';
-import { getOpportunitiesFeed } from '@/lib/api';
+import { getOpportunitiesFeed, getOffplanProjects } from '@/lib/api';
+import type { OffplanProjectCard } from '@/lib/types';
 
 interface AreaOption {
   name: string;
@@ -22,7 +23,7 @@ interface AreaOption {
   occurrence_count: number;
 }
 
-type KindFilter = 'all' | 'deals' | 'signals';
+type KindFilter = 'all' | 'deals' | 'signals' | 'offplan';
 
 // Category filter chips. Maps the UI label to the comma-separated
 // category set the backend expects on /api/v1/opportunities?category=.
@@ -83,6 +84,29 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
   const [category, setCategory] = useState<CategoryChip>('all');
   const [feedOpportunities, setFeedOpportunities] = useState(opportunities);
   const [feedLoading, setFeedLoading] = useState(false);
+
+  // Off-plan tab — fetched lazily the first time the user opens it,
+  // then cached for the rest of the session.
+  const [offplanList, setOffplanList] = useState<{
+    items: OffplanProjectCard[]; total: number;
+  } | null>(null);
+  const [offplanLoading, setOffplanLoading] = useState(false);
+  useEffect(() => {
+    if (kind !== 'offplan' || offplanList || offplanLoading) return;
+    let cancelled = false;
+    setOffplanLoading(true);
+    getOffplanProjects({ sort: 'units', limit: 60 })
+      .then((res) => {
+        if (!cancelled) setOffplanList({ items: res.items, total: res.total });
+      })
+      .catch(() => {
+        if (!cancelled) setOffplanList({ items: [], total: 0 });
+      })
+      .finally(() => {
+        if (!cancelled) setOffplanLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [kind, offplanList, offplanLoading]);
 
   useEffect(() => {
     const cat = CATEGORY_CHIPS.find((c) => c.key === category)?.categories ?? '';
@@ -195,6 +219,12 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
           active={kind === 'signals'}
           onClick={() => setKind('signals')}
         />
+        <FilterChip
+          label="Off-Plan"
+          count={offplanList?.total ?? 0}
+          active={kind === 'offplan'}
+          onClick={() => setKind('offplan')}
+        />
       </div>
 
       {/* Filters */}
@@ -231,19 +261,35 @@ export function OpportunitiesClient({ opportunities, total, areaOptions }: Props
         </label>
       </div>
 
-      <div className="text-[11px] text-fg-subtle">
-        Showing {filtered.length} of {total} opportunities
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {filtered.map((o) =>
-          o.kind === 'broker_deal' ? (
-            <DealCard key={`deal-${o.id}`} deal={o} />
-          ) : (
-            <SignalCard key={`signal-${o.area_id}`} signal={o} />
-          )
-        )}
-      </div>
+      {kind === 'offplan' ? (
+        <>
+          <div className="text-[11px] text-fg-subtle">
+            {offplanLoading
+              ? 'Loading off-plan projects…'
+              : `Showing ${offplanList?.items.length ?? 0} off-plan projects`}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {(offplanList?.items ?? []).map((p) => (
+              <OffplanCard key={p.slug} p={p} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-[11px] text-fg-subtle">
+            Showing {filtered.length} of {total} opportunities
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {filtered.map((o) =>
+              o.kind === 'broker_deal' ? (
+                <DealCard key={`deal-${o.id}`} deal={o} />
+              ) : (
+                <SignalCard key={`signal-${o.area_id}`} signal={o} />
+              )
+            )}
+          </div>
+        </>
+      )}
 
       <div className="text-[11px] text-fg-subtle">
         Curated by Floxcy. Verified investment specialists submit deals;
@@ -395,6 +441,46 @@ function SignalCard({ signal }: { signal: AreaSignalFeedItem }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function OffplanCard({ p }: { p: OffplanProjectCard }) {
+  return (
+    <Link
+      href={`/offplan/${p.slug}`}
+      className="surface-card p-4 hover:border-accent/40 transition-colors block group"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-fg group-hover:text-accent truncate">
+            {p.master_project}
+          </div>
+          <div className="mt-0.5 text-[11px] text-fg-muted truncate">
+            {p.area_name ?? '—'} · {p.developer_name}
+          </div>
+        </div>
+        {p.offplan_buildings > 0 && (
+          <span className="pill pill-accent shrink-0">🏗️ Active</span>
+        )}
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <div className="text-[10px] text-fg-subtle uppercase tracking-wide">Off-plan</div>
+          <div className="tabular text-accent font-medium">{formatNumber(p.offplan_buildings)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-fg-subtle uppercase tracking-wide">Ready</div>
+          <div className="tabular text-fg font-medium">{formatNumber(p.ready_buildings)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-fg-subtle uppercase tracking-wide">Sales</div>
+          <div className="tabular text-fg font-medium">{formatNumber(p.total_units)}</div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-1 text-[11px] text-accent">
+        Open project <ArrowUpRight className="h-3 w-3" strokeWidth={2.5} />
+      </div>
+    </Link>
   );
 }
 

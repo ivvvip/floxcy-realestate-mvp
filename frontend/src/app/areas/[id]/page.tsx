@@ -15,7 +15,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
-import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory } from '@/lib/api';
+import { ApiError, getArea, getAreaConfidence, getAreaUndervaluation, getDldAreaCategoryBreakdown, getDldAreaLifestyleScore, getDldAreaTopBuildings, getDldAreaPriceHistory, getDldAreaRentHistory, getDldAreaUpcomingAvailability, getDldAreaYieldHistory, getOffplanProjects } from '@/lib/api';
 import type { AreaLimitedDetail, AreaDetail } from '@/lib/types';
 import { LimitedAreaPage } from './LimitedAreaPage';
 import { FloxcyInsight } from './FloxcyInsight';
@@ -166,6 +166,17 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     ? await getDldAreaCategoryBreakdown(
         area.dld.dld_name.toLowerCase(),
       ).catch(() => null)
+    : null;
+
+  // Off-plan projects under construction in this area. Hidden when the
+  // area has no master_project_en rows tagged off-plan in the
+  // transactions stream.
+  const activeDevelopment = area.dld?.dld_name
+    ? await getOffplanProjects({
+        area_slug: area.dld.dld_name.toLowerCase().replace(/\s+/g, '-'),
+        sort: 'units',
+        limit: 8,
+      }).catch(() => null)
     : null;
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
@@ -842,6 +853,51 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               contracts for this area. Metro score uses distinct stations
               (≥10 contracts each).
             </div>
+          </section>
+        )}
+
+        {/* Active development — off-plan projects from /api/v1/offplan */}
+        {activeDevelopment && activeDevelopment.items.length > 0 && (
+          <section
+            id="active-development"
+            className="mt-5 border border-border rounded-lg bg-bg-card overflow-hidden scroll-mt-28"
+          >
+            <div className="chart-header">
+              <span className="chart-header-label inline-flex items-center gap-1.5">
+                🏗️ Active development in this area
+              </span>
+              <Link
+                href={`/offplan?area_slug=${area.dld?.dld_name?.toLowerCase().replace(/\s+/g, '-') ?? ''}`}
+                className="text-[11px] text-accent hover:underline"
+              >
+                See all
+              </Link>
+            </div>
+            <div className="px-4 py-3 text-[11px] text-fg-muted border-b border-border">
+              {activeDevelopment.total} projects with at least one under-construction building under their master plan.
+            </div>
+            <ul className="divide-y divide-border">
+              {activeDevelopment.items.slice(0, 8).map((p) => (
+                <li key={p.slug}>
+                  <Link
+                    href={`/offplan/${p.slug}`}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-bg-elev/30 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-fg truncate">
+                        {p.master_project}
+                      </div>
+                      <div className="text-[11px] text-fg-subtle">
+                        {p.developer_name} · {p.offplan_buildings} under construction · {p.ready_buildings} ready
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[11px] tabular text-fg-muted">
+                      {formatNumber(p.total_units)} units
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

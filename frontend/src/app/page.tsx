@@ -33,6 +33,7 @@ import { cn } from '@/lib/cn';
 import { RoiMiniWidget } from './RoiMiniWidget';
 import { HomeOpportunities } from './HomeOpportunities';
 import { HomeFastestGrowing } from './HomeFastestGrowing';
+import { HomeFeaturedDevelopers } from './HomeFeaturedDevelopers';
 
 export const revalidate = 300;
 
@@ -481,6 +482,9 @@ export default async function HomePage() {
 
       {/* Today's Top Opportunities (P1B — Opportunity Engine) */}
       <HomeOpportunities />
+
+      {/* Featured Developers — top 5 by DLD sales volume */}
+      <HomeFeaturedDevelopers />
 
       {/* Fastest Growing Areas — DLD 2021–2026 appreciation widget */}
       <HomeFastestGrowing />

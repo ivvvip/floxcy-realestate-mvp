@@ -19,12 +19,12 @@ from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
-from app.models.dld import DldArea, DldBuildingsSales
+from app.models.dld import DldArea, DldBuilding, DldBuildingsSales
 
 
 router = APIRouter(
@@ -48,6 +48,17 @@ DEVELOPER_BRANDS: list[tuple[str, str, tuple[str, ...]]] = [
         "DUBAI CREEK",
         "EMIRATES HILLS",
         "BEACHFRONT",
+        "ADDRESS RES",
+        "ADDRESS HILL",
+        "ADDRESS HARB",
+        "ADDRESS BOUL",
+        "ADDRESS DOWN",
+        "VIDA RES",
+        "VIDA HILL",
+        "VIDA DUBAI",
+        "BURJ KHALIFA",
+        "OPERA DISTRICT",
+        "GRANDE",
     )),
     ("nakheel", "Nakheel", ("NAKHEEL", "PALM JUMEIRAH", "PALM JEBEL")),
     ("sobha", "Sobha Realty", ("SOBHA",)),
@@ -144,12 +155,51 @@ class DeveloperDetail(BaseModel):
 # Aggregation
 # ---------------------------------------------------------------------------
 
+def _detect_brand_multi(*candidates: Optional[str]) -> tuple[str, str]:
+    """Try each candidate string in order and return the first hit.
+    Lets us route a building when the brand lives in project_name even
+    if master_project is a generic area name."""
+    for c in candidates:
+        slug, name = _detect_brand(c)
+        if slug != "other":
+            return slug, name
+    return ("other", "Independent / Unbranded")
+
+
 async def _aggregate_developers(db: AsyncSession) -> dict[str, dict[str, Any]]:
-    """Walk dld_buildings_sales, group by detected brand."""
-    rows = (
+    """Build the developer roll-up from two complementary tables:
+
+      - dld_buildings_sales — transactions-side, has clean master_project_en
+        + the offplan vs ready price split, but master_project is mostly
+        area names (Business Bay, JVC) so brand signal is weak there.
+      - dld_buildings — published DLD buildings registry, smaller but
+        carries project_name strings like "DAMAC HILLS (2) - CAMELIA"
+        and "Address Hillcrest" where the brand IS in the project name.
+
+    Brand detection runs against (master_project_en, building_name_en)
+    for sales rows and (project_name, master_project) for buildings rows.
+    Buildings that route to the same brand slug collapse into one card.
+    """
+    agg: dict[str, dict[str, Any]] = {}
+
+    def _bucket(slug: str, name: str) -> dict[str, Any]:
+        return agg.setdefault(slug, {
+            "slug": slug, "name": name,
+            "master_projects": set(),
+            "offplan_master_projects": set(),
+            "areas": set(),
+            "area_names": [],
+            "units": 0,
+            "years": [],
+            "buildings": 0,
+        })
+
+    # ---- 1. Transactions-side rows ---------------------------------------
+    sales_rows = (
         await db.execute(
             select(
                 DldBuildingsSales.master_project_en,
+                DldBuildingsSales.building_name_en,
                 DldBuildingsSales.area_name_en,
                 DldBuildingsSales.dld_area_id,
                 DldBuildingsSales.total_transactions,
@@ -161,28 +211,20 @@ async def _aggregate_developers(db: AsyncSession) -> dict[str, dict[str, Any]]:
         )
     ).all()
 
-    agg: dict[str, dict[str, Any]] = {}
     for (
-        mp, area_name, area_id, total_txn,
+        mp, bld_name, area_name, area_id, total_txn,
         avg_ppsf_off, avg_price_off, first_year, last_year,
-    ) in rows:
-        slug, name = _detect_brand(mp)
-        bucket = agg.setdefault(slug, {
-            "slug": slug, "name": name,
-            "master_projects": set(),
-            "offplan_master_projects": set(),
-            "areas": set(),
-            "area_names": [],
-            "units": 0,  # transaction volume proxy
-            "years": [],
-            "buildings": 0,
-        })
+    ) in sales_rows:
+        slug, name = _detect_brand_multi(mp, bld_name)
+        bucket = _bucket(slug, name)
         bucket["buildings"] += 1
-        if mp:
-            key = mp.strip()
-            bucket["master_projects"].add(key)
+        # Project key: master_project_en if it routed; else the building
+        # name (so a branded "AZIZI MINA" still counts as a project).
+        proj_key = (mp or bld_name or "").strip()
+        if proj_key:
+            bucket["master_projects"].add(proj_key)
             if avg_ppsf_off is not None or avg_price_off is not None:
-                bucket["offplan_master_projects"].add(key)
+                bucket["offplan_master_projects"].add(proj_key)
         if total_txn:
             bucket["units"] += int(total_txn)
         if area_id:
@@ -193,6 +235,44 @@ async def _aggregate_developers(db: AsyncSession) -> dict[str, dict[str, Any]]:
             bucket["years"].append(int(first_year))
         if last_year:
             bucket["years"].append(int(last_year))
+
+    # ---- 2. Published buildings registry rows ----------------------------
+    bld_rows = (
+        await db.execute(
+            select(
+                DldBuilding.project_name,
+                DldBuilding.master_project,
+                DldArea.name_display,
+                DldBuilding.dld_area_id,
+                DldBuilding.flats,
+                DldBuilding.is_offplan,
+                DldBuilding.creation_date,
+            )
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+        )
+    ).all()
+
+    for pn, mp, area_name, area_id, flats, is_offplan, cdate in bld_rows:
+        slug, name = _detect_brand_multi(pn, mp)
+        if slug == "other":
+            continue  # don't duplicate the unbranded bucket from sales side
+        bucket = _bucket(slug, name)
+        bucket["buildings"] += 1
+        # Project key prefers project_name (richer) over master_project
+        proj_key = (pn or mp or "").strip()
+        if proj_key:
+            bucket["master_projects"].add(proj_key)
+            if is_offplan:
+                bucket["offplan_master_projects"].add(proj_key)
+        if flats:
+            bucket["units"] += int(flats)
+        if area_id:
+            bucket["areas"].add(area_id)
+        if area_name:
+            bucket["area_names"].append(area_name)
+        if cdate:
+            bucket["years"].append(cdate.year)
+
     return agg
 
 
@@ -315,43 +395,109 @@ async def get_developer(
         top_areas=_top_areas(stats["area_names"]),
     )
 
-    rows = (
+    # Build per-project rows by pulling raw rows from both tables and
+    # grouping in Python by detected brand — mirrors the aggregation
+    # logic and handles the case where the brand lives in building_name
+    # rather than master_project.
+    by_proj: dict[str, dict[str, Any]] = {}
+
+    sales_rows = (
         await db.execute(
             select(
                 DldBuildingsSales.master_project_en,
+                DldBuildingsSales.building_name_en,
                 DldBuildingsSales.area_name_en,
-                func.count(DldBuildingsSales.id).label("bld_count"),
-                func.coalesce(func.sum(DldBuildingsSales.total_transactions), 0).label("units"),
-                func.bool_or(
-                    DldBuildingsSales.avg_ppsf_offplan.is_not(None)
-                ).label("any_offplan"),
-                func.min(DldBuildingsSales.first_seen_year).label("y_min"),
-                func.max(DldBuildingsSales.last_seen_year).label("y_max"),
-                func.avg(DldBuildingsSales.avg_ppsf_ready).label("avg_ppsf"),
-            )
-            .group_by(
-                DldBuildingsSales.master_project_en,
-                DldBuildingsSales.area_name_en,
+                DldBuildingsSales.total_transactions,
+                DldBuildingsSales.avg_ppsf_offplan,
+                DldBuildingsSales.avg_ppsf_ready,
+                DldBuildingsSales.avg_sale_price_offplan,
+                DldBuildingsSales.first_seen_year,
+                DldBuildingsSales.last_seen_year,
             )
         )
     ).all()
+    for (
+        mp, bld_name, area, total_txn, avg_off, avg_ready, avg_price_off,
+        y_first, y_last,
+    ) in sales_rows:
+        b_slug, _ = _detect_brand_multi(mp, bld_name)
+        if b_slug != slug.lower():
+            continue
+        proj_key = (mp or bld_name or "").strip()
+        if not proj_key:
+            continue
+        entry = by_proj.setdefault(proj_key, {
+            "master_project": proj_key,
+            "area_name": area,
+            "buildings_count": 0,
+            "total_units": 0,
+            "is_offplan": False,
+            "years": [],
+            "avg_ppsf_sum": 0.0,
+            "avg_ppsf_n": 0,
+        })
+        entry["buildings_count"] += 1
+        entry["total_units"] += int(total_txn or 0)
+        if avg_off is not None or avg_price_off is not None:
+            entry["is_offplan"] = True
+        if y_first:
+            entry["years"].append(int(y_first))
+        if y_last:
+            entry["years"].append(int(y_last))
+        if avg_ready is not None:
+            entry["avg_ppsf_sum"] += float(avg_ready)
+            entry["avg_ppsf_n"] += 1
+
+    bld_rows = (
+        await db.execute(
+            select(
+                DldBuilding.project_name,
+                DldBuilding.master_project,
+                DldArea.name_display,
+                DldBuilding.flats,
+                DldBuilding.is_offplan,
+                DldBuilding.creation_date,
+            )
+            .outerjoin(DldArea, DldArea.id == DldBuilding.dld_area_id)
+        )
+    ).all()
+    for pn, mp, area_name, flats, is_offplan, cdate in bld_rows:
+        b_slug, _ = _detect_brand_multi(pn, mp)
+        if b_slug != slug.lower():
+            continue
+        proj_key = (pn or mp or "").strip()
+        if not proj_key:
+            continue
+        entry = by_proj.setdefault(proj_key, {
+            "master_project": proj_key,
+            "area_name": area_name,
+            "buildings_count": 0,
+            "total_units": 0,
+            "is_offplan": False,
+            "years": [],
+            "avg_ppsf_sum": 0.0,
+            "avg_ppsf_n": 0,
+        })
+        entry["buildings_count"] += 1
+        entry["total_units"] += int(flats or 0)
+        if is_offplan:
+            entry["is_offplan"] = True
+        if cdate:
+            entry["years"].append(cdate.year)
 
     projects: list[DeveloperProjectRow] = []
-    for mp, area, bld_count, units, any_offplan, y_min, y_max, avg_ppsf in rows:
-        if _detect_brand(mp)[0] != slug.lower():
-            continue
-        if not mp:
-            continue
+    for proj_key, e in by_proj.items():
+        avg_ppsf = (e["avg_ppsf_sum"] / e["avg_ppsf_n"]) if e["avg_ppsf_n"] else None
         projects.append(DeveloperProjectRow(
-            project_slug=_slugify(mp),
-            master_project=mp,
-            area_name=area,
-            buildings_count=int(bld_count or 0),
-            total_units=int(units or 0),
-            is_offplan=bool(any_offplan),
-            earliest_year=int(y_min) if y_min else None,
-            latest_year=int(y_max) if y_max else None,
-            avg_ppsf=float(avg_ppsf) if avg_ppsf is not None else None,
+            project_slug=_slugify(proj_key),
+            master_project=proj_key,
+            area_name=e["area_name"],
+            buildings_count=e["buildings_count"],
+            total_units=e["total_units"],
+            is_offplan=e["is_offplan"],
+            earliest_year=min(e["years"]) if e["years"] else None,
+            latest_year=max(e["years"]) if e["years"] else None,
+            avg_ppsf=avg_ppsf,
         ))
 
     projects.sort(key=lambda p: (not p.is_offplan, -p.total_units))
