@@ -1777,3 +1777,97 @@ export interface OpportunityFeedResponse {
   generated_at: string;
   methodology_link: string;
 }
+
+// ---------- Developers + Off-plan ----------
+
+export interface DeveloperCard {
+  slug: string;
+  name: string;
+  total_projects: number;
+  offplan_projects: number;
+  total_units: number;
+  areas_served: number;
+  total_value_aed: number | null;
+  earliest_year: number | null;
+  track_record_score: number;
+  track_record_label: string;
+  top_areas: string[];
+}
+
+export interface DevelopersListResponse {
+  total: number;
+  items: DeveloperCard[];
+  data_source: string;
+  coverage_note: string;
+}
+
+export interface DeveloperProjectRow {
+  project_slug: string;
+  master_project: string;
+  area_name: string | null;
+  buildings_count: number;
+  total_units: number;
+  is_offplan: boolean;
+  earliest_year: number | null;
+  latest_year: number | null;
+  avg_ppsf: number | null;
+}
+
+export interface DeveloperDetail {
+  slug: string;
+  name: string;
+  summary: DeveloperCard;
+  projects: DeveloperProjectRow[];
+  data_source: string;
+}
+
+export interface OffplanProjectCard {
+  slug: string;
+  master_project: string;
+  area_name: string | null;
+  area_slug: string | null;
+  developer_slug: string;
+  developer_name: string;
+  buildings_count: number;
+  total_units: number;
+  earliest_year: number | null;
+  latest_year: number | null;
+  offplan_buildings: number;
+  ready_buildings: number;
+}
+
+export interface OffplanListResponse {
+  total: number;
+  items: OffplanProjectCard[];
+  data_source: string;
+}
+
+export interface OffplanPriceContext {
+  avg_ppsf_offplan: number | null;
+  avg_ppsf_ready: number | null;
+  delta_pct: number | null;
+  sample_offplan_sales: number;
+  sample_ready_sales: number;
+}
+
+export interface OffplanProjectDetail extends OffplanProjectCard {
+  sub_projects: string[];
+  price_context: OffplanPriceContext;
+  data_source: string;
+}
+
+export interface RegisterInterestRequest {
+  project_slug: string;
+  full_name: string;
+  whatsapp?: string | null;
+  email?: string | null;
+  budget_aed?: number | null;
+  timeline?: string | null;
+  message?: string | null;
+}
+
+export interface RegisterInterestResponse {
+  lead_id: string;
+  status: string;
+  message: string;
+}

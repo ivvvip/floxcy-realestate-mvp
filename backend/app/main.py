@@ -30,6 +30,8 @@ from app.api.routes import (
     consultations,
     webhooks,
     dld,
+    developers,
+    offplan,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -139,6 +141,8 @@ app.include_router(webhooks.router)
 
 # ---- DLD data layer ----
 app.include_router(dld.router)
+app.include_router(developers.router)
+app.include_router(offplan.router)
 
 
 @app.get("/")

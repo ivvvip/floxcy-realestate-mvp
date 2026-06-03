@@ -80,6 +80,12 @@ import type {
   RentAlertOut,
   BrokerConsultationRequestBody,
   BrokerConsultationResponse,
+  DevelopersListResponse,
+  DeveloperDetail,
+  OffplanListResponse,
+  OffplanProjectDetail,
+  RegisterInterestRequest,
+  RegisterInterestResponse,
 } from './types';
 import { getBrokerToken } from './brokerAuth';
 
@@ -1029,6 +1035,77 @@ export async function brokerConsultation(
   payload: BrokerConsultationRequestBody
 ): Promise<BrokerConsultationResponse> {
   return request<BrokerConsultationResponse>('/api/v1/dld/broker-consultation', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+// ---------- Developers ----------
+
+export async function getDevelopers(opts?: {
+  sort?: 'projects' | 'units' | 'score' | 'name';
+  limit?: number;
+}): Promise<DevelopersListResponse> {
+  const p = new URLSearchParams();
+  if (opts?.sort) p.set('sort', opts.sort);
+  if (opts?.limit) p.set('limit', String(opts.limit));
+  const qs = p.toString();
+  return request<DevelopersListResponse>(
+    `/api/v1/developers${qs ? `?${qs}` : ''}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getDeveloperDetail(slug: string): Promise<DeveloperDetail> {
+  return request<DeveloperDetail>(
+    `/api/v1/developers/${encodeURIComponent(slug)}`,
+    { revalidate: 300 }
+  );
+}
+
+// ---------- Off-plan ----------
+
+export async function getOffplanProjects(opts?: {
+  developer?: string;
+  area_slug?: string;
+  prop_sub_type?: string;
+  min_units?: number;
+  sort?: 'units' | 'newest' | 'oldest' | 'name';
+  limit?: number;
+}): Promise<OffplanListResponse> {
+  const p = new URLSearchParams();
+  if (opts?.developer) p.set('developer', opts.developer);
+  if (opts?.area_slug) p.set('area_slug', opts.area_slug);
+  if (opts?.prop_sub_type) p.set('prop_sub_type', opts.prop_sub_type);
+  if (opts?.min_units) p.set('min_units', String(opts.min_units));
+  if (opts?.sort) p.set('sort', opts.sort);
+  if (opts?.limit) p.set('limit', String(opts.limit));
+  const qs = p.toString();
+  return request<OffplanListResponse>(
+    `/api/v1/offplan/projects${qs ? `?${qs}` : ''}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getOffplanProject(slug: string): Promise<OffplanProjectDetail> {
+  return request<OffplanProjectDetail>(
+    `/api/v1/offplan/projects/${encodeURIComponent(slug)}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getOffplanComingSoon(limit = 40): Promise<OffplanListResponse> {
+  return request<OffplanListResponse>(
+    `/api/v1/offplan/coming-soon?limit=${limit}`,
+    { revalidate: 600 }
+  );
+}
+
+export async function registerOffplanInterest(
+  payload: RegisterInterestRequest
+): Promise<RegisterInterestResponse> {
+  return request<RegisterInterestResponse>('/api/v1/offplan/register-interest', {
     method: 'POST',
     body: JSON.stringify(payload),
     revalidate: false,
