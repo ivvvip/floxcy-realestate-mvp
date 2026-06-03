@@ -42,6 +42,34 @@ from pathlib import Path
 DATA_PATH = Path.home() / "dld-data" / "osm_buildings.json"
 FUZZY_CUTOFF = 0.86
 
+# Dubai-only bbox + NE-corner refinement. The Overpass query intentionally
+# pulls a slightly wider box (24.79–25.45 N, 54.85–55.70 E) so future
+# Mamzar/Mirdif edge additions land cleanly; in-script we then drop
+# anything that fell into Sharjah / Ajman / UAQ via the matcher. The
+# Dubai-Sharjah boundary cuts diagonally through the NE quadrant — there
+# is no Dubai land at (lat > 25.30, lon > 55.37); buildings there belong
+# to Al Nahda / Al Majaz / Al Taawun Sharjah even when OSM tagged them
+# without an addr:emirate hint.
+DUBAI_BBOX_LAT_MIN = 24.79
+DUBAI_BBOX_LAT_MAX = 25.40
+DUBAI_BBOX_LON_MIN = 54.85
+DUBAI_BBOX_LON_MAX = 55.65
+SHARJAH_NE_CUT_LAT = 25.30
+SHARJAH_NE_CUT_LON = 55.37
+
+
+def is_in_dubai(lat: float, lon: float) -> bool:
+    """True when the point is inside Floxcy's Dubai-only bbox AND outside
+    the NE Sharjah corner. Conservative — drops a handful of legitimate
+    edge buildings in Al Mamzar in exchange for never showing Sharjah."""
+    if not (DUBAI_BBOX_LAT_MIN <= lat <= DUBAI_BBOX_LAT_MAX):
+        return False
+    if not (DUBAI_BBOX_LON_MIN <= lon <= DUBAI_BBOX_LON_MAX):
+        return False
+    if lat > SHARJAH_NE_CUT_LAT and lon > SHARJAH_NE_CUT_LON:
+        return False
+    return True
+
 # Words that distort the SequenceMatcher score because they're so common
 # across Dubai building names. Stripped before normalisation so "Lake View"
 # and "Lake View Tower" rank as effectively the same string.
@@ -75,9 +103,29 @@ def normalize(name: str) -> str:
 
 
 def load_osm() -> list[dict]:
+    """Load the OSM dump, dropping any building outside Dubai. The Overpass
+    bbox is intentionally wide; this is the canonical Dubai-only gate."""
     if not DATA_PATH.exists():
         raise SystemExit(f"missing OSM dump: {DATA_PATH}")
-    return json.loads(DATA_PATH.read_text())
+    raw = json.loads(DATA_PATH.read_text())
+    kept: list[dict] = []
+    dropped = 0
+    for o in raw:
+        try:
+            lat = float(o["lat"])
+            lon = float(o["lon"])
+        except (KeyError, TypeError, ValueError):
+            dropped += 1
+            continue
+        if not is_in_dubai(lat, lon):
+            dropped += 1
+            continue
+        kept.append(o)
+    print(
+        f"OSM rows loaded:  {len(kept):,} kept · {dropped:,} dropped outside Dubai bbox",
+        flush=True,
+    )
+    return kept
 
 
 def main() -> int:
@@ -86,7 +134,6 @@ def main() -> int:
     args = ap.parse_args()
 
     osm = load_osm()
-    print(f"OSM rows loaded:  {len(osm):,}", flush=True)
 
     import psycopg2
     import psycopg2.extras
