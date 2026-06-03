@@ -3897,6 +3897,11 @@ _POPULATION_NAME_OVERRIDES: dict[str, str] = {
     "downtown dubai": "burj khalifa",  # DLD files Downtown Dubai under Burj Khalifa
     "the marina": "al thanyah fifth",  # Dubai Marina ≈ Marsa Dubai but Marina Walk uses 5
     "jumeirah village circle": "al barshaa south fourth",
+    # Qouz ↔ Goze: two-letter swap, below difflib 0.85 cutoff
+    "al qouz first": "al goze first",
+    "al qouz second": "al goze second",
+    "al qouz third": "al goze third",
+    "al qouz fourth": "al goze fourth",
 }
 
 
