@@ -226,9 +226,14 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
 
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
   const hasCoords = area.latitude != null && area.longitude != null;
+  // Name-based Google Maps URL so the result page shows the area name
+  // ("Business Bay, Dubai - Google Maps") instead of a raw lat,lon pin.
+  // When the area has verified coords we also pass &ll= so Maps re-ranks
+  // results around the precise centroid.
+  const mapsQuery = `${area.name} Dubai UAE`;
   const mapsUrl = hasCoords
-    ? `https://www.google.com/maps/search/?api=1&query=${area.latitude},${area.longitude}`
-    : null;
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}&ll=${area.latitude},${area.longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
 
   const summary = area.latest
     ? buildInvestmentSummary(area.name, {
@@ -286,7 +291,18 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                   {area.city}, {area.emirate}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                  title={`Open ${area.name} on Google Maps`}
+                >
+                  <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
+                  Open in Google Maps
+                  <ExternalLink className="h-3 w-3" strokeWidth={2} />
+                </a>
                 <Link
                   href={`/compare?ids=${area.id}`}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
@@ -1475,18 +1491,16 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 />
               )}
             </dl>
-            {mapsUrl && (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                id="map"
-                className="mt-5 inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-elev/60 px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors scroll-mt-28"
-              >
-                Open in Google Maps
-                <ExternalLink className="h-3 w-3" strokeWidth={2} />
-              </a>
-            )}
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noreferrer"
+              id="map"
+              className="mt-5 inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-elev/60 px-3 text-xs font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors scroll-mt-28"
+            >
+              Open in Google Maps
+              <ExternalLink className="h-3 w-3" strokeWidth={2} />
+            </a>
           </div>
         </section>
 

@@ -149,6 +149,7 @@ function buildAreaPopupHtml(
           : a.yield_pct >= 5
             ? 'Moderate yield'
             : 'Low yield';
+  const mapsHref = googleMapsQuery(a.name, 'Dubai UAE');
   return `
     <div style="font-family:inherit;font-size:12px;min-width:220px;line-height:1.4;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
@@ -178,10 +179,14 @@ function buildAreaPopupHtml(
             : ''
         }
       </div>
-      <div style="margin-top:8px;">
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
         <a href="${areaHrefBase}/${esc(a.slug)}"
            style="color:#00D4AA;font-weight:600;text-decoration:none;">
           View Area →
+        </a>
+        <a href="${mapsHref}" target="_blank" rel="noreferrer"
+           style="color:#9CA3AF;font-weight:500;text-decoration:none;">
+          Google Maps ↗
         </a>
       </div>
     </div>

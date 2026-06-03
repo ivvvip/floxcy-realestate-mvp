@@ -12,7 +12,9 @@ import {
   ArrowRight,
   Building2,
   Database,
+  ExternalLink,
   Info,
+  MapPin,
   ShieldAlert,
   Sparkles,
 } from 'lucide-react';
@@ -37,6 +39,9 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
 
   const d = area.dld;
   const isEmpty = area.coverage_tier === 'none';
+  // Name-based Google Maps URL — same pattern as the curated page so users
+  // get a labelled pin ("Al Bastakiyah, Dubai") instead of a raw lat,lon.
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(area.name + ' Dubai UAE')}`;
 
   return (
     <div className="bg-bg">
@@ -66,6 +71,19 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
                     </span>
                   )}
                 </p>
+                <div className="mt-2">
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`Open ${area.name} on Google Maps`}
+                    className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-bg-card px-2.5 text-[11px] font-medium text-fg-muted hover:text-fg hover:border-border-strong transition-colors"
+                  >
+                    <MapPin className="h-3 w-3" strokeWidth={2.5} />
+                    Open in Google Maps
+                    <ExternalLink className="h-3 w-3" strokeWidth={2} />
+                  </a>
+                </div>
               </div>
               <div className="text-left sm:text-right text-[11px] text-fg-subtle">
                 <div>
