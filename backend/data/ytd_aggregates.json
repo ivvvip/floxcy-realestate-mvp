@@ -1,0 +1,12 @@
+{
+  "period_end_month": 5,
+  "period_label": "Jan-May",
+  "year_2025": {
+    "transaction_count": 61575,
+    "total_value_aed": 123801890197.0
+  },
+  "year_2026": {
+    "transaction_count": 55466,
+    "total_value_aed": 124549812484.0
+  }
+}

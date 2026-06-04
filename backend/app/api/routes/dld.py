@@ -1,8 +1,10 @@
 """DLD-sourced endpoints — areas, buildings, rent fairness, RERA brokers."""
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import List, Optional
 from uuid import UUID
 
@@ -530,8 +532,15 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
         select(func.coalesce(func.sum(DldRentHistory.contract_count), 0))
         .where(DldRentHistory.year.in_([latest_year, latest_year - 1]))
     ) or 0)
+    # "Active brokers" = license valid at request time. `is_active` is set
+    # by the ETL against a snapshot date (`TODAY` constant in etl_dld.py)
+    # and ages without re-runs; the date check below stays accurate
+    # between snapshots and matches the audit query semantics.
+    today_date = _dt.utcnow().date()
     active_brokers = int(await db.scalar(
-        select(func.count()).select_from(DldReraBroker).where(DldReraBroker.is_active.is_(True))
+        select(func.count())
+        .select_from(DldReraBroker)
+        .where(DldReraBroker.license_end_date >= today_date)
     ) or 0)
     areas_tracked = int(await db.scalar(
         select(func.count()).select_from(DldCanonicalArea)
@@ -788,14 +797,13 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
         ))
 
     # ---- Same-period YoY (Jan–N latest_year vs Jan–N prev_year) ----
-    # The DLD price/rent history is yearly-aggregated only, so we approximate
-    # "same months" by prorating the prior full year on months elapsed in
-    # latest_year. If latest_year is not the current calendar year, the data
-    # is complete and no proration is needed.
+    # If scripts/compute_ytd_aggregates.py has written
+    # backend/data/ytd_aggregates.json we use those true same-period
+    # totals; otherwise we fall back to the historical 5/12 proration of
+    # the prior full year (and the label is changed to flag it as a
+    # proration so the UI isn't lying about the comparison).
     today = _dt.utcnow().date()
     if latest_year == today.year:
-        # ETL typically lags by ~1 month — treat data as covering full prior
-        # months only, e.g. on 2026-06-03 the latest cleared month is May (5).
         months_elapsed = max(1, today.month - 1)
     else:
         months_elapsed = 12
@@ -805,7 +813,43 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
         f"Jan–{MONTH_ABBR[months_elapsed - 1]}" if months_elapsed < 12 else "full year"
     )
 
-    if months_elapsed < 12:
+    ytd_helper_path = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "data" / "ytd_aggregates.json"
+    )
+    ytd_helper: Optional[dict] = None
+    if ytd_helper_path.exists():
+        try:
+            ytd_helper = json.loads(ytd_helper_path.read_text())
+        except Exception:
+            ytd_helper = None
+
+    if (
+        months_elapsed < 12
+        and ytd_helper
+        and ytd_helper.get(f"year_{latest_year - 1}")
+        and ytd_helper.get(f"year_{latest_year}")
+    ):
+        # True same-period comparison from the YTD helper.
+        prev_ytd = ytd_helper[f"year_{latest_year - 1}"]
+        cur_ytd = ytd_helper[f"year_{latest_year}"]
+        sales_prev_same = int(prev_ytd.get("transaction_count") or 0)
+        volume_prev_same = float(prev_ytd.get("total_value_aed") or 0)
+        sales_cur_same = int(cur_ytd.get("transaction_count") or sales_latest)
+        volume_cur_same = float(cur_ytd.get("total_value_aed") or volume_latest)
+        sales_delta_pct = (
+            (sales_cur_same - sales_prev_same) / sales_prev_same * 100
+            if sales_prev_same > 0 else None
+        )
+        volume_delta_pct = (
+            (volume_cur_same - volume_prev_same) / volume_prev_same * 100
+            if volume_prev_same > 0 else None
+        )
+        sales_delta_label = f"vs {period_label} {latest_year - 1}"
+        volume_delta_label = sales_delta_label
+    elif months_elapsed < 12:
+        # Fallback: prorate prior full year (legacy path). Flag the label
+        # so the UI doesn't claim a true same-period comparison.
         sales_prev_same = sales_prev * months_elapsed / 12
         volume_prev_same = volume_prev * months_elapsed / 12
         sales_delta_pct = (
@@ -816,7 +860,7 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
             (volume_latest - volume_prev_same) / volume_prev_same * 100
             if volume_prev_same > 0 else None
         )
-        sales_delta_label = f"vs {period_label} {latest_year - 1}"
+        sales_delta_label = f"vs {latest_year - 1} (prorated 5/12)"
         volume_delta_label = sales_delta_label
     else:
         sales_delta_pct = (
@@ -871,7 +915,7 @@ async def dld_dashboard_data(db: AsyncSession = Depends(get_db)):
         label="Active RERA brokers",
         value=float(active_brokers),
         unit="count",
-        sublabel="Currently licensed",
+        sublabel=f"Licensed as of {today_date.isoformat()}",
     ))
     kpis.append(DashboardKpi(
         label=f"Off-plan share {latest_year}",

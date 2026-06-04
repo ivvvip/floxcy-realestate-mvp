@@ -91,6 +91,13 @@ def areas_for_rent_row(
 DATA_DIR = Path(os.environ.get("DLD_DATA_DIR", str(Path.home() / "dld-data")))
 TODAY = dt.date(2026, 6, 1)
 
+# DLD source columns (`actual_area`, `ACTUAL_AREA`, `procedure_area`) are
+# square metres. Multiply by SQM_TO_SQFT to get AED/sqft — the Dubai
+# investor standard. Without this, every *_per_sqft column in this ETL
+# carries per-sqm values, which historically shipped to market_snapshots
+# with the wrong label and inflated headline PSF by ~10x.
+SQM_TO_SQFT = 10.7639
+
 SIZE_BANDS = [
     ("<50", 0, 50),
     ("50-99", 50, 100),
@@ -367,9 +374,11 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
         a = parse_float(r.get("ACTUAL_AREA"))
         if v is None or a is None or a <= 0 or v <= 0:
             continue
-        ppsf = v / a
-        # Sanity filter — exclude obvious data errors
-        if ppsf < 100 or ppsf > 20000:
+        ppsf = (v / a) / SQM_TO_SQFT
+        # Sanity filter — exclude obvious data errors.
+        # Dubai residential 2026 lives roughly in AED 200-7,000/sqft;
+        # we keep a wider envelope for villas / penthouse outliers.
+        if ppsf < 50 or ppsf > 12000:
             continue
         sales_ppsf[area].append(ppsf)
 
@@ -380,6 +389,10 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
     rent_amounts: dict[str, list[float]] = collections.defaultdict(list)
     rent_ppsf: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2026: dict[str, int] = collections.Counter()
+    # Latest cleared month in the 2026 stream — used to cut the 2025
+    # comparison rents to the same Jan-N window, so rent_growth_yoy_pct
+    # is a true same-period delta rather than partial-2026 vs full-2025.
+    latest_2026_month = 0
     for r in rents_2026:
         sector = norm(r.get("area_name_en"))
         if not sector:
@@ -388,26 +401,52 @@ def compute_area_metrics(txns: list[dict], rents_2026: list[dict], rents_2025: l
         a = parse_float(r.get("actual_area"))
         if amt is None or amt <= 0:
             continue
-        ppsf = (amt / a) if (a and a > 0) else None
+        # Track the latest month present in the 2026 stream — bounds the
+        # same-period 2025 comparison window below.
+        start = (r.get("contract_start_date") or "")[:10]
+        if len(start) == 10 and start[:4] == "2026":
+            try:
+                m = int(start[5:7])
+                if m > latest_2026_month:
+                    latest_2026_month = m
+            except ValueError:
+                pass
+        ppsf = ((amt / a) / SQM_TO_SQFT) if (a and a > 0) else None
         for area in areas_for_rent_row(sector, r.get("master_project_en")):
             rent_count_2026[area] += 1
             rent_amounts[area].append(amt)
-            if ppsf is not None and 10 <= ppsf <= 5000:
+            # Dubai annual rents per sqft cluster around 30-300 AED;
+            # the wider envelope accommodates labor camps + luxury beach.
+            if ppsf is not None and 1 <= ppsf <= 500:
                 rent_ppsf[area].append(ppsf)
 
-    # Rents 2025: just rent per sqft median (for YoY) — same alias fan-out.
+    # If we couldn't infer the latest month (e.g. mid-year rerun against
+    # historical-only data), fall back to 12 so 2025 stays at full-year.
+    period_end_month = latest_2026_month if 1 <= latest_2026_month <= 12 else 12
+
+    # Rents 2025 (Jan–`period_end_month`): same alias fan-out, but
+    # restricted to the same window as the 2026 stream so YoY is honest.
     rent_ppsf_2025: dict[str, list[float]] = collections.defaultdict(list)
     rent_count_2025: dict[str, int] = collections.Counter()
     for r in rents_2025:
         sector = norm(r.get("area_name_en"))
         if not sector:
             continue
+        start = (r.get("contract_start_date") or "")[:10]
+        if len(start) < 7 or start[:4] != "2025":
+            continue
+        try:
+            mo = int(start[5:7])
+        except ValueError:
+            continue
+        if mo > period_end_month:
+            continue
         amt = parse_float(r.get("annual_amount"))
         a = parse_float(r.get("actual_area"))
         if amt is None or a is None or amt <= 0 or a <= 0:
             continue
-        ppsf = amt / a
-        if 10 <= ppsf <= 5000:
+        ppsf = (amt / a) / SQM_TO_SQFT
+        if 1 <= ppsf <= 500:
             for area in areas_for_rent_row(sector, r.get("master_project_en")):
                 rent_count_2025[area] += 1
                 rent_ppsf_2025[area].append(ppsf)
@@ -476,7 +515,7 @@ def compute_buildings(buildings: list[dict], rents_2026: list[dict]):
 
         rents_for = proj_rents.get(proj_key, []) if proj_key else []
         amts = [a for a, _ in rents_for if a > 0]
-        ppsfs = [a / sq for a, sq in rents_for if sq > 0 and a > 0]
+        ppsfs = [(a / sq) / SQM_TO_SQFT for a, sq in rents_for if sq > 0 and a > 0]
         flats = parse_int(b.get("FLATS")) or 0
         occ = None
         if flats > 0:
@@ -675,8 +714,8 @@ def compute_benchmarks(buckets: dict[str, list[dict]]):
             band = size_band_of(sq)
             if not band:
                 continue
-            ppsf = amt / sq
-            if not (10 <= ppsf <= 5000):
+            ppsf = (amt / sq) / SQM_TO_SQFT
+            if not (1 <= ppsf <= 500):
                 continue
             is_bulk = bool(r.get("_is_bulk"))
             # Fan out to admin sector + every community alias + master_project_en
@@ -959,10 +998,10 @@ def write_to_db(
             snapshot_rows = []
             snap_date = dt.date(2026, 5, 31)
             for cid, name_norm_key, ppsf, rent, ypct, rcount, scount in cur.fetchall():
-                # avg_sale_price = ppsf × 100 sqm as a placeholder?
-                # Better: just leave it derived per-row. Use a typical mid-size unit estimate.
-                # The schema requires non-null avg_sale_price; we approximate using ppsf*120 sqm.
-                est_price = float(ppsf) * 120
+                # Estimate avg_sale_price from PSF × typical 120 sqm unit.
+                # ppsf here is true AED/sqft (post-SQM_TO_SQFT fix), so we
+                # convert the 120 sqm to sqft before multiplying.
+                est_price = float(ppsf) * 120 * SQM_TO_SQFT
                 snapshot_rows.append((
                     str(uuid.uuid4()), str(cid), snap_date,
                     est_price, float(ppsf), float(rent), float(ypct or 0),
