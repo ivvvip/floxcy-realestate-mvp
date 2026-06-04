@@ -331,7 +331,7 @@ async def list_canonical_areas(
     )
 
 
-MARKET_OVERVIEW_CACHE_KEY = "dld:market-overview:v1"
+MARKET_OVERVIEW_CACHE_KEY = "dld:market-overview:v2"
 MARKET_OVERVIEW_TTL_S = 3600  # 1h per spec
 
 
@@ -470,7 +470,7 @@ async def dld_market_overview(db: AsyncSession = Depends(get_db)):
 # a DLD ETL table; sections we don't have honest data for are omitted.
 # ---------------------------------------------------------------------------
 
-DASHBOARD_DATA_CACHE_KEY = "dld:dashboard-data:v2"
+DASHBOARD_DATA_CACHE_KEY = "dld:dashboard-data:v3"
 DASHBOARD_DATA_TTL_S = 3600
 
 
