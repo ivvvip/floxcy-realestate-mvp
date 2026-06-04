@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # App + migrations + entrypoint last — every code change invalidates only
 # from here down. Everything above is cached across commits.
 COPY ./app ./app
+COPY ./data ./data
 COPY ./alembic ./alembic
 COPY ./alembic.ini ./alembic.ini
 COPY ./entrypoint.sh ./entrypoint.sh
