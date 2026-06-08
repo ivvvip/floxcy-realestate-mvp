@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { areaMatchesQuery, primaryAlias } from '@/lib/areaSynonyms';
 
 /**
  * Shared area dropdown — single source of truth across /rent-check,
@@ -73,7 +74,10 @@ export function AreaSelector<T extends BaseAreaOption>({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return sorted;
-    return sorted.filter((o) => o.name.toLowerCase().includes(q));
+    // Match on the DLD display name OR any marketing-name synonym, so
+    // typing "Downtown" / "JLT" / "Maritime City" finds the right area
+    // even though DLD files them under cadastral names.
+    return sorted.filter((o) => areaMatchesQuery(o, q));
   }, [sorted, query]);
 
   return (
@@ -149,6 +153,11 @@ export function AreaSelector<T extends BaseAreaOption>({
                     className="w-full text-left px-3 py-2 text-sm hover:bg-bg-elev flex items-baseline gap-2"
                   >
                     <span className="text-fg truncate">{o.name}</span>
+                    {primaryAlias(o.name_norm) && (
+                      <span className="text-[10px] text-fg-subtle/70 shrink-0">
+                        · {primaryAlias(o.name_norm)}
+                      </span>
+                    )}
                     <span
                       className={cn(
                         'text-[10px] ml-auto shrink-0 tabular-nums',
