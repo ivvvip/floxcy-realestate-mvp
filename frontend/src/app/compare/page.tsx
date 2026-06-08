@@ -85,7 +85,7 @@ export default async function ComparePage() {
                   Compare Areas
                 </h1>
                 <p className="mt-1 text-xs text-fg-muted">
-                  Side-by-side metrics, radar profile, and 12-month price overlay
+                  Side-by-side metrics, radar profile, and multi-year DLD price overlay
                 </p>
               </div>
             </div>

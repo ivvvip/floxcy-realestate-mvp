@@ -1,14 +1,25 @@
-"""Area comparison endpoint."""
+"""Area comparison endpoint — real DLD only (World B retired, Phase 1).
+
+Every metric and the multi-year history come from the DLD tables; the legacy
+seeded `market_snapshots` path is gone. Per-area scoring reuses the Opportunity
+Engine's `build_report_dld` so the comparison grid, radar and AED-1M simulator
+show the SAME numbers an investor sees on /opportunities. Marketing-named areas
+(JVC, Dubai Marina, Dubai Hills) resolve to their cadastral twin for the
+multi-year history, exactly like the area detail page (Phase 2).
+"""
 from uuid import UUID
+from datetime import date
+from statistics import median
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.data.dld_area_aliases import cadastral_data_norm
 from app.models.area import Area
 from app.models.dld import DldArea, DldAreaMetrics, DldCanonicalArea
-from app.models.market_snapshot import MarketSnapshot
 from app.schemas.compare import (
     CompareAreaData,
     CompareDldBlock,
@@ -16,8 +27,137 @@ from app.schemas.compare import (
     CompareSnapshotPoint,
 )
 from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield, confidence_for
+from app.services.opportunity_engine import DldAreaInput, build_report_dld
 
 router = APIRouter(prefix="/api/v1/areas", tags=["compare"])
+
+
+# One row of real DLD inputs per area (mirrors the opportunities universe row).
+_AREA_DLD_SQL = text(
+    """
+    WITH latest_offplan AS (
+        SELECT DISTINCT ON (area_name_norm) area_name_norm, offplan_pct
+        FROM dld_price_history WHERE offplan_pct IS NOT NULL
+        ORDER BY area_name_norm, year DESC
+    )
+    SELECT a.id::text AS dld_area_id, a.name_display, a.name_norm,
+           m.median_price_per_sqft, m.median_annual_rent, m.median_rent_per_sqft,
+           m.rental_yield_pct, m.rent_growth_yoy_pct,
+           COALESCE(m.sales_count,0) AS sales_count,
+           COALESCE(m.rent_count_2026,0) AS rent_count,
+           ap.appreciation_1y_pct, ap.appreciation_3y_pct,
+           lo.offplan_pct
+    FROM dld_areas a
+    JOIN dld_area_metrics m ON m.dld_area_id = a.id AND m.period = '2026-ytd'
+    LEFT JOIN dld_area_appreciation ap ON ap.area_name_norm = :hist_norm
+    LEFT JOIN latest_offplan lo ON lo.area_name_norm = :hist_norm
+    WHERE a.name_norm = :own_norm
+    LIMIT 1
+    """
+)
+
+# Real multi-year history for the comparison chart (yearly DLD series, not the
+# old monthly seeded snapshots). Joined price⋈yield by year on the cadastral norm.
+_HISTORY_SQL = text(
+    """
+    SELECT p.year,
+           p.avg_ppsf_all,
+           p.median_deal_size,
+           y.gross_yield_pct
+    FROM dld_price_history p
+    LEFT JOIN dld_yield_history y
+           ON y.area_name_norm = p.area_name_norm AND y.year = p.year
+    WHERE p.area_name_norm = :hist_norm
+    ORDER BY p.year
+    """
+)
+
+
+async def _global_cohort_median(db: AsyncSession) -> float:
+    """Dubai-wide median of area median-ppsf (real), for the value component."""
+    rows = (
+        await db.execute(
+            select(DldAreaMetrics.median_price_per_sqft).where(
+                DldAreaMetrics.period == "2026-ytd",
+                DldAreaMetrics.median_price_per_sqft.isnot(None),
+            )
+        )
+    ).scalars().all()
+    prices = [float(p) for p in rows if p is not None]
+    return float(median(prices)) if prices else 1500.0
+
+
+async def _dld_for_curated(db: AsyncSession, cur: Area) -> Optional[DldArea]:
+    """Resolve a curated Area to a DLD row: its linked snapshot row, or — for
+    curated marketing areas with no link (Downtown, Dubai Hills Estate, Damac
+    Hills 2) — its cadastral twin (Phase 2 resolution)."""
+    da = (await db.execute(
+        select(DldArea).where(DldArea.curated_area_id == cur.id)
+    )).scalar_one_or_none()
+    if da:
+        return da
+    cad = cadastral_data_norm((cur.name or "").lower())
+    return (await db.execute(
+        select(DldArea).where(DldArea.name_norm == cad)
+    )).scalar_one_or_none()
+
+
+async def _resolve_to_dld(db: AsyncSession, raw: str) -> Optional[tuple[DldArea, Optional[Area]]]:
+    """Resolve a slug (curated UUID, DLD UUID, name_norm, or canonical slug) to
+    a (DldArea, optional curated Area) pair. Curated areas resolve to their
+    linked DLD row (or cadastral twin) so everything is scored from DLD."""
+    try:
+        as_uuid: Optional[UUID] = UUID(raw)
+    except ValueError:
+        as_uuid = None
+
+    if as_uuid:
+        cur = (await db.execute(select(Area).where(Area.id == as_uuid))).scalar_one_or_none()
+        if cur:
+            da = await _dld_for_curated(db, cur)
+            return (da, cur) if da else None
+        da = (await db.execute(select(DldArea).where(DldArea.id == as_uuid))).scalar_one_or_none()
+        if da:
+            cur = (
+                await db.execute(select(Area).where(Area.id == da.curated_area_id))
+            ).scalar_one_or_none() if da.curated_area_id else None
+            return da, cur
+        return None
+
+    # string slug → DldArea by name_norm, then canonical slug, then dash→space
+    low = raw.lower().strip()
+    da = (await db.execute(select(DldArea).where(DldArea.name_norm == low))).scalar_one_or_none()
+    if da is None:
+        canon = (await db.execute(
+            select(DldCanonicalArea).where(DldCanonicalArea.area_name_slug == low)
+        )).scalar_one_or_none()
+        if canon is not None:
+            da = (await db.execute(
+                select(DldArea).where(DldArea.name_norm == canon.area_name.strip().lower())
+            )).scalar_one_or_none()
+    if da is None:
+        spaced = low.replace("-", " ").strip()
+        if spaced and spaced != low:
+            da = (await db.execute(
+                select(DldArea).where(DldArea.name_norm == spaced)
+            )).scalar_one_or_none()
+    if da is None:
+        # Curated Area by name-slug (e.g. "dubai-hills-estate") → cadastral twin.
+        import re as _re
+        slug_form = _re.sub(r"[\s_-]+", "-", low).strip("-")
+        cur = (await db.execute(
+            select(Area).where(
+                func.regexp_replace(func.lower(Area.name), r"[\s_-]+", "-", "g") == slug_form
+            )
+        )).scalar_one_or_none() if slug_form else None
+        if cur:
+            da = await _dld_for_curated(db, cur)
+            return (da, cur) if da else None
+        return None
+    cur = (
+        await db.execute(select(Area).where(Area.id == da.curated_area_id))
+    ).scalar_one_or_none() if da.curated_area_id else None
+    return da, cur
 
 
 @router.get("/compare", response_model=CompareResponse)
@@ -25,230 +165,108 @@ async def compare_areas(
     ids: str = Query(..., description="Comma-separated area slugs (UUIDs or name_norm) 2-4"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Side-by-side comparison of 2-4 areas with 12-month history + DLD overlay.
-
-    Slugs can be:
-      - a curated Area UUID → full comparison with snapshot history
-      - a DLD area name_norm or DLD UUID → resolves to its curated link
-        if any, otherwise returns a DLD-only row with `coverage_tier=limited`
-    """
+    """Side-by-side comparison of 2-4 areas — all numbers from real DLD."""
     raw_slugs = [s.strip() for s in ids.split(",") if s.strip()]
     if not 2 <= len(raw_slugs) <= 4:
         raise HTTPException(400, "Provide 2 to 4 area IDs/slugs")
 
-    # Resolve each slug to either a curated Area or a DLD-only area
-    curated_ids: list[UUID] = []
-    dld_only_ids: list[UUID] = []  # DldArea.id values that have no curated link
-    # Preserve input order so the response reflects what the user asked for
-    resolution: list[tuple[str, Optional[UUID], Optional[UUID]]] = []  # (slug, curated_id, dld_id)
+    cohort_median = await _global_cohort_median(db)
+    result: List[CompareAreaData] = []
 
     for raw in raw_slugs:
-        # Try UUID parse
-        try:
-            as_uuid = UUID(raw)
-        except ValueError:
-            as_uuid = None
-
-        if as_uuid:
-            # Could be a curated UUID
-            row = (await db.execute(select(Area).where(Area.id == as_uuid))).scalar_one_or_none()
-            if row:
-                curated_ids.append(as_uuid)
-                resolution.append((raw, as_uuid, None))
-                continue
-            # Or a DldArea UUID
-            dld_row = (await db.execute(select(DldArea).where(DldArea.id == as_uuid))).scalar_one_or_none()
-            if dld_row:
-                if dld_row.curated_area_id:
-                    curated_ids.append(dld_row.curated_area_id)
-                    resolution.append((raw, dld_row.curated_area_id, None))
-                else:
-                    dld_only_ids.append(dld_row.id)
-                    resolution.append((raw, None, dld_row.id))
-                continue
+        resolved = await _resolve_to_dld(db, raw)
+        if resolved is None:
             raise HTTPException(404, f"Area '{raw}' not found")
+        da, cur = resolved
+        own_norm = da.name_norm
+        hist_norm = cadastral_data_norm(own_norm)  # cadastral twin for history
 
-        # Otherwise treat as DLD name_norm first (e.g. "business bay"), then
-        # as a canonical-area slug (e.g. "business-bay" → matches
-        # dld_canonical_areas.area_name_slug, then mapped to dld_areas via
-        # lowercased area_name).
-        raw_lower = raw.lower()
-        dld_row = (await db.execute(
-            select(DldArea).where(DldArea.name_norm == raw_lower)
-        )).scalar_one_or_none()
-        if dld_row is None:
-            # Slug fallback: dld_canonical_areas.area_name_slug → area_name
-            # → dld_areas.name_norm. Spaces in the canonical area_name become
-            # dashes in the slug.
-            canon = (await db.execute(
-                select(DldCanonicalArea).where(
-                    DldCanonicalArea.area_name_slug == raw_lower
-                )
-            )).scalar_one_or_none()
-            if canon is not None:
-                canon_name_lower = canon.area_name.strip().lower()
-                dld_row = (await db.execute(
-                    select(DldArea).where(DldArea.name_norm == canon_name_lower)
-                )).scalar_one_or_none()
-        if dld_row is None:
-            # Dash → space fallback so community names that live in
-            # dld_areas but not dld_canonical_areas (e.g. JVC, Majan,
-            # Dubai Land Residence Complex) still resolve when the
-            # frontend sends a slug-style id.
-            dashed_to_space = raw_lower.replace("-", " ").strip()
-            if dashed_to_space and dashed_to_space != raw_lower:
-                dld_row = (await db.execute(
-                    select(DldArea).where(DldArea.name_norm == dashed_to_space)
-                )).scalar_one_or_none()
-        if dld_row is None:
-            raise HTTPException(404, f"Area '{raw}' not found")
-        if dld_row.curated_area_id:
-            curated_ids.append(dld_row.curated_area_id)
-            resolution.append((raw, dld_row.curated_area_id, None))
-        else:
-            dld_only_ids.append(dld_row.id)
-            resolution.append((raw, None, dld_row.id))
+        row = (
+            await db.execute(_AREA_DLD_SQL, {"own_norm": own_norm, "hist_norm": hist_norm})
+        ).mappings().first()
+        if row is None:
+            # No 2026 metrics → minimal row so the column still renders
+            result.append(CompareAreaData(
+                id=str(cur.id if cur else da.id),
+                name=cur.name if cur else da.name_display,
+                name_arabic=cur.name_arabic if cur else None,
+                area_type=cur.area_type if cur else "residential",
+                coverage_tier="none",
+            ))
+            continue
 
-    areas: list[Area] = []
-    if curated_ids:
-        areas = (await db.execute(
-            select(Area).where(Area.id.in_(curated_ids))
-        )).scalars().all()
-    areas_by_id = {a.id: a for a in areas}
+        sales = int(row["sales_count"] or 0)
+        rents = int(row["rent_count"] or 0)
+        gated_yield = (
+            cap_yield(float(row["rental_yield_pct"]))
+            if (row["rental_yield_pct"] is not None and sales >= MIN_RELIABLE_SAMPLES and rents >= MIN_RELIABLE_SAMPLES)
+            else None
+        )
 
-    # Pull the DLD-only rows we'll need for partial comparison
-    dld_only_rows = {}
-    if dld_only_ids:
-        rows = (await db.execute(
-            select(DldArea, DldAreaMetrics)
-            .outerjoin(
-                DldAreaMetrics,
-                (DldAreaMetrics.dld_area_id == DldArea.id)
-                & (DldAreaMetrics.period == "2026-ytd"),
+        # Score with the same engine as /opportunities → consistent numbers.
+        inp = DldAreaInput(
+            area_id=str(da.id),
+            area_name=cur.name if cur else da.name_display,
+            area_name_arabic=cur.name_arabic if cur else None,
+            area_type=cur.area_type if cur else "residential",
+            latitude=None,
+            longitude=None,
+            rental_yield=gated_yield,
+            price_per_sqft=float(row["median_price_per_sqft"]) if row["median_price_per_sqft"] is not None else None,
+            appreciation_1y=float(row["appreciation_1y_pct"]) if row["appreciation_1y_pct"] is not None else None,
+            appreciation_3y=float(row["appreciation_3y_pct"]) if row["appreciation_3y_pct"] is not None else None,
+            sales_count=sales,
+            rent_count=rents,
+            offplan_pct=float(row["offplan_pct"]) if row["offplan_pct"] is not None else None,
+        )
+        rep = build_report_dld(inp, cohort_median)
+        km = rep.key_metrics
+
+        # Real yearly history (cadastral twin) for the chart.
+        hist_rows = (
+            await db.execute(_HISTORY_SQL, {"hist_norm": hist_norm})
+        ).mappings().all()
+        history = [
+            CompareSnapshotPoint(
+                snapshot_date=date(int(h["year"]), 7, 1),
+                avg_price_per_sqft=float(h["avg_ppsf_all"]) if h["avg_ppsf_all"] is not None else 0.0,
+                rental_yield=float(h["gross_yield_pct"]) if h["gross_yield_pct"] is not None else 0.0,
+                avg_sale_price=float(h["median_deal_size"]) if h["median_deal_size"] is not None else 0.0,
             )
-            .where(DldArea.id.in_(dld_only_ids))
-        )).all()
-        for da, dm in rows:
-            dld_only_rows[da.id] = (da, dm)
+            for h in hist_rows
+            if h["avg_ppsf_all"] is not None
+        ]
 
-    snaps_q = (
-        select(MarketSnapshot)
-        .where(MarketSnapshot.area_id.in_(curated_ids))
-        .order_by(MarketSnapshot.snapshot_date)
-    ) if curated_ids else None
-    by_area: dict = {}
-    if snaps_q is not None:
-        all_snaps = (await db.execute(snaps_q)).scalars().all()
-        for s in all_snaps:
-            by_area.setdefault(s.area_id, []).append(s)
-
-    # DLD overlay for curated areas (matched by curated_area_id)
-    dld_by_curated: dict = {}
-    if curated_ids:
-        dld_rows = (
-            await db.execute(
-                select(DldArea, DldAreaMetrics)
-                .outerjoin(
-                    DldAreaMetrics,
-                    (DldAreaMetrics.dld_area_id == DldArea.id)
-                    & (DldAreaMetrics.period == "2026-ytd"),
-                )
-                .where(DldArea.curated_area_id.in_(curated_ids))
-            )
-        ).all()
-        for da, dm in dld_rows:
-            dld_by_curated[da.curated_area_id] = (da, dm)
-
-    def _dld_block_for(da, dm) -> Optional[CompareDldBlock]:
-        sales = int(dm.sales_count or 0) if dm else 0
-        rents = int(dm.rent_count_2026 or 0) if dm else 0
-        show_yield = None
-        if (dm and dm.rental_yield_pct is not None
-                and sales >= MIN_RELIABLE_SAMPLES
-                and rents >= MIN_RELIABLE_SAMPLES):
-            show_yield = cap_yield(float(dm.rental_yield_pct))
-        return CompareDldBlock(
+        dld_block = CompareDldBlock(
             dld_area_id=da.id,
             dld_name=da.name_display,
-            median_price_per_sqft=float(dm.median_price_per_sqft) if dm and dm.median_price_per_sqft is not None else None,
-            median_annual_rent=float(dm.median_annual_rent) if dm and dm.median_annual_rent is not None else None,
-            median_rent_per_sqft=float(dm.median_rent_per_sqft) if dm and dm.median_rent_per_sqft is not None else None,
-            rental_yield_pct=show_yield,
-            rent_growth_yoy_pct=float(dm.rent_growth_yoy_pct) if dm and dm.rent_growth_yoy_pct is not None else None,
+            median_price_per_sqft=float(row["median_price_per_sqft"]) if row["median_price_per_sqft"] is not None else None,
+            median_annual_rent=float(row["median_annual_rent"]) if row["median_annual_rent"] is not None else None,
+            median_rent_per_sqft=float(row["median_rent_per_sqft"]) if row["median_rent_per_sqft"] is not None else None,
+            rental_yield_pct=gated_yield,
+            rent_growth_yoy_pct=float(row["rent_growth_yoy_pct"]) if row["rent_growth_yoy_pct"] is not None else None,
             sales_count=sales,
             rent_count_2026=rents,
             confidence=confidence_for(max(sales, rents)),
         )
 
-    result: List[CompareAreaData] = []
-    # Iterate in input order so the response matches the caller's slug list
-    for slug, curated_id, dld_only_id in resolution:
-        if curated_id is not None:
-            area = areas_by_id.get(curated_id)
-            if area is None:
-                continue
-            snaps = by_area.get(area.id, [])
-            latest = snaps[-1] if snaps else None
-            history = [
-                CompareSnapshotPoint(
-                    snapshot_date=s.snapshot_date,
-                    avg_price_per_sqft=float(s.avg_price_per_sqft),
-                    rental_yield=float(s.rental_yield),
-                    avg_sale_price=float(s.avg_sale_price),
-                )
-                for s in snaps
-            ]
-            dld_block = (
-                _dld_block_for(*dld_by_curated[area.id])
-                if area.id in dld_by_curated else None
-            )
-
-            result.append(CompareAreaData(
-                id=str(area.id),
-                name=area.name,
-                name_arabic=area.name_arabic,
-                area_type=area.area_type,
-                latest_price_per_sqft=float(latest.avg_price_per_sqft) if latest else None,
-                latest_yield=float(latest.rental_yield) if latest else None,
-                latest_sale_price=float(latest.avg_sale_price) if latest else None,
-                appreciation_1y=float(latest.appreciation_1y) if latest and latest.appreciation_1y else None,
-                appreciation_3y=float(latest.appreciation_3y) if latest and latest.appreciation_3y else None,
-                occupancy_rate=float(latest.occupancy_rate) if latest and latest.occupancy_rate else None,
-                demand_score=float(latest.demand_score) if latest and latest.demand_score else None,
-                risk_score=float(latest.risk_score) if latest and latest.risk_score else None,
-                investment_score=float(latest.investment_score) if latest and latest.investment_score else None,
-                history=history,
-                dld=dld_block,
-                coverage_tier="full" if latest else "partial",
-            ))
-        elif dld_only_id is not None:
-            # DLD-only: build a partial-comparison row from DLD metrics only
-            tup = dld_only_rows.get(dld_only_id)
-            if not tup:
-                continue
-            da, dm = tup
-            dld_block = _dld_block_for(da, dm) if dm else None
-            # Surface median PPSF as latest_price_per_sqft so the comparison
-            # table can show a number for this area instead of all dashes.
-            latest_ppsf = (
-                float(dm.median_price_per_sqft)
-                if dm and dm.median_price_per_sqft is not None
-                else None
-            )
-            sales = int(dm.sales_count or 0) if dm else 0
-            rents = int(dm.rent_count_2026 or 0) if dm else 0
-            tier = "limited" if (sales + rents) > 0 else "none"
-            result.append(CompareAreaData(
-                id=str(da.id),
-                name=da.name_display,
-                name_arabic=None,
-                area_type="residential",
-                latest_price_per_sqft=latest_ppsf,
-                latest_yield=dld_block.rental_yield_pct if dld_block else None,
-                latest_sale_price=None,
-                history=[],
-                dld=dld_block,
-                coverage_tier=tier,
-            ))
+        result.append(CompareAreaData(
+            id=str(cur.id if cur else da.id),
+            name=cur.name if cur else da.name_display,
+            name_arabic=cur.name_arabic if cur else None,
+            area_type=cur.area_type if cur else "residential",
+            latest_price_per_sqft=km.price_per_sqft,
+            latest_yield=km.rental_yield,
+            latest_sale_price=None,
+            appreciation_1y=km.appreciation_1y,
+            appreciation_3y=km.appreciation_3y,
+            occupancy_rate=None,
+            demand_score=km.demand_score,
+            risk_score=km.risk_score,
+            investment_score=km.investment_score,
+            history=history,
+            dld=dld_block,
+            coverage_tier="full" if history else ("partial" if (sales + rents) > 0 else "limited"),
+        ))
 
     return CompareResponse(areas=result)
