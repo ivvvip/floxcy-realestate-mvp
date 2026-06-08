@@ -77,8 +77,8 @@ class NearbyArea:
 
 @dataclass
 class KeyMetrics:
-    rental_yield: float
-    price_per_sqft: float
+    rental_yield: Optional[float]
+    price_per_sqft: Optional[float]
     appreciation_1y: Optional[float]
     appreciation_3y: Optional[float]
     investment_score: Optional[float]
@@ -474,3 +474,171 @@ def compute_cohort_median(snapshots: list[MarketSnapshot]) -> float:
     if not prices:
         return 1500.0
     return float(median(prices))
+
+
+# =============================================================================
+# DLD-native scoring (Phase 1 — World B retired).
+#
+# The legacy path above scored the 70 curated areas off `market_snapshots`,
+# whose appreciation/risk/demand/occupancy columns were NULL (→ hardcoded
+# fallbacks of 0/5.0/0.85) or seeded ("Aggregated public sources Q1 2026").
+# Everything below scores the real DLD universe (~230 areas with a median
+# price + meaningful activity) entirely from `dld_area_metrics` +
+# `dld_area_appreciation` + `dld_price_history.offplan_pct`. No synthetic
+# fills: a component whose source data is genuinely absent is DROPPED and the
+# remaining weights are renormalized, so every number traces to DLD.
+#   - yield       → dld_area_metrics.rental_yield_pct (≥30 sales & ≥30 rents, capped)
+#   - appreciation→ dld_area_appreciation.appreciation_1y_pct
+#   - value       → median price vs cohort (Dubai) median
+#   - demand      → dld_area_metrics.sales_count + rent_count_2026 (real volume)
+#   - risk        → dld_price_history.offplan_pct (supply pipeline) + liquidity
+# =============================================================================
+
+UAE_BENCHMARK_YIELD = 6.5
+
+
+@dataclass
+class DldAreaInput:
+    area_id: str
+    area_name: str
+    area_name_arabic: Optional[str]
+    area_type: str
+    latitude: Optional[float]
+    longitude: Optional[float]
+    rental_yield: Optional[float]     # gated + capped, or None
+    price_per_sqft: Optional[float]   # median ppsf (2026 YTD)
+    appreciation_1y: Optional[float]  # real, or None
+    appreciation_3y: Optional[float]
+    sales_count: int
+    rent_count: int
+    offplan_pct: Optional[float]      # latest year, or None
+
+
+def _derive_demand(sales: int, rents: int) -> float:
+    """0..1 liquidity/demand from real DLD transaction + rent-contract volume."""
+    d_sales = min(1.0, sales / 1000.0)
+    d_rents = min(1.0, rents / 3000.0)
+    return _clamp(0.5 * d_sales + 0.5 * d_rents)
+
+
+def _derive_risk(offplan_pct: float, sales: int) -> float:
+    """0..1 risk from real DLD signals: off-plan supply share + thin liquidity.
+
+    Higher off-plan share = more handover/supply pressure; thinner liquidity =
+    harder exit. Caller only invokes this when off-plan data exists — there is
+    no neutral default, and an area with no supply signal simply drops the risk
+    component (renormalized) rather than being scored as "zero risk".
+    """
+    r_liq = 1.0 - min(1.0, sales / 300.0)
+    r_supply = _clamp(float(offplan_pct) / 100.0)
+    return _clamp(0.6 * r_supply + 0.4 * r_liq)
+
+
+def build_report_dld(inp: DldAreaInput, cohort_median_price: float) -> OpportunityReport:
+    """Score one area from real DLD inputs, renormalizing over present components."""
+    # --- components (None where the real source is absent) ---
+    yield_c = _clamp((float(inp.rental_yield) - 3.0) / 7.0) if inp.rental_yield is not None else None
+    appr_c = _clamp((float(inp.appreciation_1y) + 5.0) / 25.0) if inp.appreciation_1y is not None else None
+    value_c = (
+        _clamp((cohort_median_price - float(inp.price_per_sqft)) / cohort_median_price + 0.5)
+        if cohort_median_price and inp.price_per_sqft is not None
+        else None
+    )
+    demand01 = _derive_demand(inp.sales_count, inp.rent_count)
+    # Risk is real only when off-plan supply data exists (the user-specified
+    # source). No supply signal → drop the risk component (renormalized);
+    # never fabricate a neutral 5.0 or a misleading "zero risk".
+    if inp.offplan_pct is not None:
+        risk01 = _derive_risk(inp.offplan_pct, inp.sales_count)
+        risk_c = _clamp(1.0 - risk01)
+        risk_score = round(10.0 * risk01, 1)
+    else:
+        risk01 = None
+        risk_c = None
+        risk_score = None
+
+    present: dict[str, float] = {"demand": demand01}
+    if value_c is not None:
+        present["value"] = value_c
+    if yield_c is not None:
+        present["yield"] = yield_c
+    if appr_c is not None:
+        present["appreciation"] = appr_c
+    if risk_c is not None:
+        present["risk"] = risk_c
+
+    total_w = sum(COMPONENT_WEIGHTS[k] for k in present) or 1.0
+    raw = 100.0 * sum(COMPONENT_WEIGHTS[k] * present[k] for k in present) / total_w
+    score = int(round(_clamp(raw, 0.0, 100.0)))
+
+    components = OpportunityComponents(
+        yield_c=yield_c if yield_c is not None else 0.0,
+        appr_c=appr_c if appr_c is not None else 0.0,
+        value_c=value_c if value_c is not None else 0.0,
+        demand_c=demand01,
+        risk_c=risk_c if risk_c is not None else 0.0,
+    )
+
+    demand_score = round(10.0 * demand01, 1)
+
+    opp_type = classify_type(
+        score=score,
+        rental_yield=float(inp.rental_yield) if inp.rental_yield is not None else 0.0,
+        appreciation_1y=inp.appreciation_1y,
+        components=components,
+        demand_score=demand_score,
+        risk_score=risk_score,
+    )
+
+    # confidence: data completeness (how much of the 1.0 weight was real) +
+    # sample size. No synthetic component contributes.
+    completeness = total_w  # 0..1 (weights sum to 1.0 when all present)
+    sample = min(1.0, (inp.sales_count + inp.rent_count) / 1000.0)
+    confidence = round(_clamp(0.40 + 0.40 * completeness + 0.20 * sample, 0.0, 0.99), 2)
+
+    why, risks, best_for, strategy = _build_why_risks_bestfor_strategy(
+        area_name=inp.area_name,
+        opp_type=opp_type,
+        components=components,
+        rental_yield=float(inp.rental_yield) if inp.rental_yield is not None else 0.0,
+        appreciation_1y=inp.appreciation_1y,
+        price_per_sqft=float(inp.price_per_sqft) if inp.price_per_sqft is not None else 0.0,
+        cohort_median_price=cohort_median_price,
+        risk_score=risk_score,
+        demand_score=demand_score,
+        occupancy_rate=None,
+        transaction_volume=inp.sales_count,
+    )
+    if inp.offplan_pct is not None and float(inp.offplan_pct) >= 60.0:
+        risks.append(
+            f"High off-plan share ({float(inp.offplan_pct):.0f}%) — handover supply "
+            f"could pressure rents/prices over the next 24 months."
+        )
+
+    return OpportunityReport(
+        area_id=inp.area_id,
+        area_name=inp.area_name,
+        area_name_arabic=inp.area_name_arabic,
+        area_type=inp.area_type,
+        opportunity_score=score,
+        opportunity_type=opp_type,
+        confidence_level=confidence,
+        components=components,
+        key_metrics=KeyMetrics(
+            rental_yield=float(inp.rental_yield) if inp.rental_yield is not None else None,
+            price_per_sqft=float(inp.price_per_sqft) if inp.price_per_sqft is not None else None,
+            appreciation_1y=inp.appreciation_1y,
+            appreciation_3y=inp.appreciation_3y,
+            investment_score=round(score / 10.0, 1),
+            risk_score=risk_score,
+            demand_score=demand_score,
+            transaction_volume=inp.sales_count,
+            occupancy_rate=None,
+        ),
+        why=why,
+        risks=risks,
+        best_for=best_for,
+        strategy=strategy,
+        snapshot_date="2026-06-01",
+        last_updated=datetime.now(timezone.utc).isoformat(),
+    )

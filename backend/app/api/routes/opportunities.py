@@ -16,7 +16,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,20 +24,18 @@ from app.api.routes.consultations import _create_lead_and_consultation, SUCCESS_
 from app.core.dependencies import AuthPrincipal, require_admin
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
-from app.models.area import Area
 from app.models.dld import DldArea, DldBuildingDerived
 from app.models.investment_opportunity import InvestmentOpportunity
-from app.models.market_snapshot import MarketSnapshot
 from app.redis_client import redis_client
 from app.schemas.consultation import ConsultationOut, ConsultationRequestResponse
+from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield
 from app.schemas.investor_lead import LeadCreate, LeadOut
 from app.schemas.opportunity_deal import DealOut
-from app.services.confidence import build_confidence_report, confidence_to_dict
 from app.services.insights import opportunity_explanation
 from app.services.opportunity_engine import (
+    DldAreaInput,
     attach_nearby,
-    build_report,
-    compute_cohort_median,
+    build_report_dld,
     report_to_dict,
 )
 
@@ -49,50 +47,108 @@ router = APIRouter(
 )
 
 
-async def _load_universe(
-    db: AsyncSession,
-) -> tuple[list[Area], dict[UUID, list[MarketSnapshot]]]:
-    """Load all areas + their full snapshot history (sorted ascending)."""
-    areas = (await db.execute(select(Area).order_by(Area.name))).scalars().all()
-    history_by_id: dict[UUID, list[MarketSnapshot]] = {}
-    for a in areas:
-        snaps = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == a.id)
-                .order_by(MarketSnapshot.snapshot_date)
-            )
-        ).scalars().all()
-        history_by_id[a.id] = list(snaps)
-    return list(areas), history_by_id
+# Real-DLD universe: every area with a median price + meaningful activity
+# (≥50 sales+rents), scored entirely from dld_area_metrics +
+# dld_area_appreciation + dld_price_history.offplan_pct. Replaces the seeded
+# market_snapshots path (World B, retired in Phase 1 / FLOXCY-REPLAN-2026).
+_UNIVERSE_SQL = text(
+    """
+    WITH latest_offplan AS (
+        SELECT DISTINCT ON (area_name_norm) area_name_norm, offplan_pct
+        FROM dld_price_history
+        WHERE offplan_pct IS NOT NULL
+        ORDER BY area_name_norm, year DESC
+    )
+    SELECT a.id::text                       AS area_id,
+           a.name_display                   AS name_display,
+           a.name_norm                      AS name_norm,
+           COALESCE(cur.area_type, 'residential') AS area_type,
+           c.area_name_ar                   AS area_name_ar,
+           c.latitude                       AS latitude,
+           c.longitude                      AS longitude,
+           m.median_price_per_sqft          AS median_ppsf,
+           m.rental_yield_pct               AS rental_yield_pct,
+           COALESCE(m.sales_count, 0)       AS sales_count,
+           COALESCE(m.rent_count_2026, 0)   AS rent_count,
+           ap.appreciation_1y_pct           AS appr_1y,
+           ap.appreciation_3y_pct           AS appr_3y,
+           lo.offplan_pct                   AS offplan_pct
+    FROM dld_areas a
+    JOIN dld_area_metrics m
+          ON m.dld_area_id = a.id AND m.period = '2026-ytd'
+    LEFT JOIN areas cur                ON cur.id = a.curated_area_id
+    LEFT JOIN dld_canonical_areas c    ON lower(c.area_name) = a.name_norm
+    LEFT JOIN dld_area_appreciation ap ON ap.area_name_norm = a.name_norm
+    LEFT JOIN latest_offplan lo        ON lo.area_name_norm = a.name_norm
+    WHERE m.median_price_per_sqft IS NOT NULL
+      AND (COALESCE(m.sales_count, 0) + COALESCE(m.rent_count_2026, 0)) >= 50
+    """
+)
 
 
-def _score_all(
-    areas: list[Area], history_by_id: dict[UUID, list[MarketSnapshot]]
-) -> list:
-    """Build OpportunityReports for every area with at least one snapshot."""
-    latest_prices: list[float] = []
-    for a in areas:
-        hist = history_by_id.get(a.id) or []
-        if hist:
-            latest_prices.append(float(hist[-1].avg_price_per_sqft))
-    cohort_median = float(median(latest_prices)) if latest_prices else 1500.0
-
-    reports = []
-    for a in areas:
-        hist = history_by_id.get(a.id) or []
-        if not hist:
-            continue
-        latest = hist[-1]
-        reports.append(
-            build_report(
-                area=a,
-                latest=latest,
-                history=hist,
-                cohort_median_price=cohort_median,
+async def _load_universe_dld(db: AsyncSession) -> list[DldAreaInput]:
+    """Load the real-DLD scoreable universe (one row per area, all real metrics)."""
+    rows = (await db.execute(_UNIVERSE_SQL)).mappings().all()
+    out: list[DldAreaInput] = []
+    for r in rows:
+        sales = int(r["sales_count"] or 0)
+        rents = int(r["rent_count"] or 0)
+        y = r["rental_yield_pct"]
+        # Yield only counts when it clears the reliability gate (≥30 sales &
+        # ≥30 rents) and is display-capped — otherwise it's dropped, not faked.
+        ry = (
+            cap_yield(float(y))
+            if (y is not None and sales >= MIN_RELIABLE_SAMPLES and rents >= MIN_RELIABLE_SAMPLES)
+            else None
+        )
+        out.append(
+            DldAreaInput(
+                area_id=r["area_id"],
+                area_name=r["name_display"] or (r["name_norm"] or "").title(),
+                area_name_arabic=r["area_name_ar"],
+                area_type=r["area_type"] or "residential",
+                latitude=float(r["latitude"]) if r["latitude"] is not None else None,
+                longitude=float(r["longitude"]) if r["longitude"] is not None else None,
+                rental_yield=ry,
+                price_per_sqft=float(r["median_ppsf"]) if r["median_ppsf"] is not None else None,
+                appreciation_1y=float(r["appr_1y"]) if r["appr_1y"] is not None else None,
+                appreciation_3y=float(r["appr_3y"]) if r["appr_3y"] is not None else None,
+                sales_count=sales,
+                rent_count=rents,
+                offplan_pct=float(r["offplan_pct"]) if r["offplan_pct"] is not None else None,
             )
         )
-    return reports
+    return out
+
+
+def _score_all_dld(inputs: list[DldAreaInput]) -> list:
+    """Score the DLD universe. Cohort (Dubai) median is taken over the FULL
+    price-bearing set, but only areas with at least one real RETURN signal
+    (gated yield OR real appreciation) are surfaced as opportunities — a cheap,
+    liquid area with neither isn't an investment signal, just a busy market."""
+    prices = [i.price_per_sqft for i in inputs if i.price_per_sqft is not None]
+    cohort_median = float(median(prices)) if prices else 1500.0
+    scoreable = [
+        i for i in inputs
+        if i.rental_yield is not None or i.appreciation_1y is not None
+    ]
+    return [build_report_dld(i, cohort_median) for i in scoreable]
+
+
+async def _resolve_dld_area_id(db: AsyncSession, area_id: UUID) -> Optional[str]:
+    """Map a curated Area.id OR a dld_areas.id to the dld_areas.id used as the
+    opportunity report key. Curated areas link via dld_areas.curated_area_id."""
+    via_curated = (
+        await db.execute(
+            select(DldArea.id).where(DldArea.curated_area_id == area_id)
+        )
+    ).scalar_one_or_none()
+    if via_curated:
+        return str(via_curated)
+    direct = (
+        await db.execute(select(DldArea.id).where(DldArea.id == area_id))
+    ).scalar_one_or_none()
+    return str(direct) if direct else None
 
 
 def _deal_to_card(d: InvestmentOpportunity) -> dict:
@@ -170,16 +226,15 @@ async def list_opportunities(
     # ---- Category filter: pre-compute the set of areas that have buildings
     # in the requested category set. Mixed-use areas appear in every
     # category they host (no scoring change — see Step 7 spec). ----
-    allowed_curated_area_ids: Optional[set[str]] = None
+    allowed_dld_area_ids: Optional[set[str]] = None
     allowed_area_name_norms: Optional[set[str]] = None
     if category:
         cats = [c.strip() for c in category.split(",") if c.strip()]
         if cats:
-            # Join dld_buildings_derived → dld_areas → curated areas. The
-            # area_signal endpoint keys on curated `Area.id`; broker deals
-            # match by area name. Resolve both sets in one round-trip.
+            # Join dld_buildings_derived → dld_areas. Area signals now key on
+            # dld_areas.id (DLD-native); broker deals match by area name.
             stmt = (
-                select(DldArea.name_norm, DldArea.curated_area_id)
+                select(DldArea.id, DldArea.name_norm)
                 .join(
                     DldBuildingDerived,
                     DldBuildingDerived.dld_area_id == DldArea.id,
@@ -188,34 +243,27 @@ async def list_opportunities(
                 .distinct()
             )
             rows = (await db.execute(stmt)).all()
-            allowed_area_name_norms = {r[0] for r in rows if r[0]}
-            allowed_curated_area_ids = {
-                str(r[1]) for r in rows if r[1] is not None
-            }
+            allowed_dld_area_ids = {str(r[0]) for r in rows if r[0] is not None}
+            allowed_area_name_norms = {r[1] for r in rows if r[1]}
 
-    # ---- Area signals ----
+    # ---- Area signals (real DLD universe) ----
     if kind in ("all", "signals"):
-        areas, history_by_id = await _load_universe(db)
-        if areas:
-            reports = _score_all(areas, history_by_id)
-            areas_by_id = {a.id: a for a in areas}
-            attach_nearby(reports, {str(k): v for k, v in areas_by_id.items()}, k=3)
+        inputs = await _load_universe_dld(db)
+        if inputs:
+            reports = _score_all_dld(inputs)
+            # attach_nearby reads .latitude/.longitude — DldAreaInput carries
+            # both (sourced from dld_canonical_areas).
+            attach_nearby(reports, {i.area_id: i for i in inputs}, k=3)
             filtered = [r for r in reports if r.opportunity_score >= min_score]
             if type:
                 filtered = [r for r in filtered if r.opportunity_type == type]
-            if allowed_curated_area_ids is not None:
+            if allowed_dld_area_ids is not None:
                 filtered = [
-                    r for r in filtered if str(r.area_id) in allowed_curated_area_ids
+                    r for r in filtered if str(r.area_id) in allowed_dld_area_ids
                 ]
             for r in filtered:
-                history = history_by_id.get(UUID(r.area_id))
-                confidence = build_confidence_report(
-                    areas_by_id.get(UUID(r.area_id)),
-                    list(history) if history else [],
-                )
                 signal = report_to_dict(r)
                 signal["kind"] = "area_signal"
-                signal["data_confidence"] = confidence_to_dict(confidence)
                 items.append(signal)
 
     # ---- Broker deals ----
@@ -332,25 +380,18 @@ async def explain_opportunity(
 
     Returns {why, risks, best_for, strategy, model, tokens, cached}. If the LLM
     call fails, returns the rules-based fallback from the engine."""
-    areas, history_by_id = await _load_universe(db)
-    target = next((a for a in areas if a.id == area_id), None)
-    if not target:
-        raise HTTPException(status_code=404, detail="Area not found")
-    history = history_by_id.get(area_id) or []
-    if not history:
-        raise HTTPException(status_code=404, detail="No snapshots for area")
-    latest = history[-1]
-
-    cohort = compute_cohort_median(
-        [h[-1] for h in history_by_id.values() if h]
-    )
-    report = build_report(
-        area=target, latest=latest, history=history, cohort_median_price=cohort
-    )
+    inputs = await _load_universe_dld(db)
+    target_id = await _resolve_dld_area_id(db, area_id)
+    inp = next((i for i in inputs if i.area_id == target_id), None)
+    if inp is None:
+        raise HTTPException(status_code=404, detail="No DLD data for area")
+    prices = [i.price_per_sqft for i in inputs if i.price_per_sqft is not None]
+    cohort = float(median(prices)) if prices else 1500.0
+    report = build_report_dld(inp, cohort)
 
     structured = await opportunity_explanation(
-        area_id=str(area_id),
-        area_name=target.name,
+        area_id=inp.area_id,
+        area_name=inp.area_name,
         opportunity_score=report.opportunity_score,
         opportunity_type=report.opportunity_type,
         rental_yield=report.key_metrics.rental_yield,
@@ -367,8 +408,8 @@ async def explain_opportunity(
     if structured is None:
         # Fallback to rules-based fields already in the report
         return {
-            "area_id": str(area_id),
-            "area_name": target.name,
+            "area_id": inp.area_id,
+            "area_name": inp.area_name,
             "why": report.why,
             "risks": report.risks,
             "best_for": report.best_for,
@@ -379,7 +420,7 @@ async def explain_opportunity(
             "fallback_used": True,
         }
 
-    return {"area_id": str(area_id), "area_name": target.name, **structured}
+    return {"area_id": inp.area_id, "area_name": inp.area_name, **structured}
 
 
 @router.post("/recompute")

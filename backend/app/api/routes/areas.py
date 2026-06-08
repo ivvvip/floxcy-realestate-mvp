@@ -409,21 +409,24 @@ async def area_undervaluation(area_id: UUID, db: AsyncSession = Depends(get_db))
     """Opportunity Engine report for a single area, including nearby-3 comparison.
 
     Endpoint name retained for backward compat with existing frontend imports;
-    payload now uses the new opportunity_score/opportunity_type contract.
+    payload now scores from the real DLD universe (Phase 1, World B retired).
     """
-    from app.api.routes.opportunities import _load_universe, _score_all
+    from app.api.routes.opportunities import (
+        _load_universe_dld,
+        _score_all_dld,
+        _resolve_dld_area_id,
+    )
     from app.services.opportunity_engine import attach_nearby, report_to_dict
 
-    area = (await db.execute(select(Area).where(Area.id == area_id))).scalar_one_or_none()
-    if not area:
+    inputs = await _load_universe_dld(db)
+    target_id = await _resolve_dld_area_id(db, area_id)
+    if target_id is None:
         raise HTTPException(status_code=404, detail="Area not found")
-    areas, history_by_id = await _load_universe(db)
-    reports = _score_all(areas, history_by_id)
-    areas_by_id = {str(a.id): a for a in areas}
-    attach_nearby(reports, areas_by_id, k=3)
-    target = next((r for r in reports if r.area_id == str(area_id)), None)
+    reports = _score_all_dld(inputs)
+    attach_nearby(reports, {i.area_id: i for i in inputs}, k=3)
+    target = next((r for r in reports if r.area_id == target_id), None)
     if not target:
-        raise HTTPException(status_code=404, detail="No snapshots for area")
+        raise HTTPException(status_code=404, detail="No DLD data for area")
     return report_to_dict(target)
 
 
