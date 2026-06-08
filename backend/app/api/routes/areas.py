@@ -1,5 +1,7 @@
 """Areas API endpoints."""
 import re
+from datetime import date
+from statistics import median
 from uuid import UUID
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,7 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
-from app.models.dld import DldArea, DldAreaLandSummary, DldAreaMetrics, DldCanonicalArea
+from app.models.dld import (
+    DldArea,
+    DldAreaAppreciation,
+    DldAreaLandSummary,
+    DldAreaMetrics,
+    DldCanonicalArea,
+    DldPriceHistory,
+    DldYieldHistory,
+)
 from app.models.market_snapshot import MarketSnapshot
 from app.schemas.area import (
     AreaResponse,
@@ -632,41 +642,10 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
             )
 
     area_id = area.id
-
-    snaps_q = (
-        select(MarketSnapshot)
-        .where(MarketSnapshot.area_id == area_id)
-        .order_by(MarketSnapshot.snapshot_date)
-    )
-    snaps = (await db.execute(snaps_q)).scalars().all()
-
-    latest = None
+    # `latest` (KPI strip) + `history` (chart) are built from real DLD after
+    # the DLD block is resolved below (World B / market_snapshots retired).
+    latest: Optional[AreaLatestSnapshot] = None
     history: List[AreaSnapshotPoint] = []
-    if snaps:
-        last = snaps[-1]
-        latest = AreaLatestSnapshot(
-            snapshot_date=last.snapshot_date.isoformat(),
-            avg_sale_price=float(last.avg_sale_price),
-            avg_price_per_sqft=float(last.avg_price_per_sqft),
-            avg_annual_rent=float(last.avg_annual_rent),
-            rental_yield=float(last.rental_yield),
-            occupancy_rate=float(last.occupancy_rate) if last.occupancy_rate else None,
-            appreciation_1y=float(last.appreciation_1y) if last.appreciation_1y else None,
-            appreciation_3y=float(last.appreciation_3y) if last.appreciation_3y else None,
-            transaction_volume=last.transaction_volume,
-            demand_score=float(last.demand_score) if last.demand_score else None,
-            risk_score=float(last.risk_score) if last.risk_score else None,
-            investment_score=float(last.investment_score) if last.investment_score else None,
-        )
-        history = [
-            AreaSnapshotPoint(
-                snapshot_date=s.snapshot_date.isoformat(),
-                avg_price_per_sqft=float(s.avg_price_per_sqft),
-                avg_sale_price=float(s.avg_sale_price),
-                rental_yield=float(s.rental_yield),
-            )
-            for s in snaps
-        ]
 
     # DLD overlay (matched by dld_areas.curated_area_id, 2026-ytd period)
     dld_row = (
@@ -775,6 +754,100 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
                 total_parcels=int(c_land.total_parcels) if c_land else None,
                 land_type_mix=dict(c_land.land_type_mix) if c_land and c_land.land_type_mix else None,
             )
+
+    # KPI strip `latest` + chart `history` from real DLD (cadastral twin via
+    # history_name_norm). demand/risk/investment reuse the Opportunity Engine
+    # so the area page agrees with /opportunities. No seeded snapshots.
+    if dld_block is not None:
+        from app.services.opportunity_engine import DldAreaInput, build_report_dld
+
+        hn = dld_block.history_name_norm or (dld_block.dld_name or "").strip().lower()
+        hist_rows = (
+            await db.execute(
+                select(
+                    DldPriceHistory.year,
+                    DldPriceHistory.avg_ppsf_all,
+                    DldPriceHistory.median_deal_size,
+                    DldYieldHistory.gross_yield_pct,
+                )
+                .outerjoin(
+                    DldYieldHistory,
+                    (DldYieldHistory.area_name_norm == DldPriceHistory.area_name_norm)
+                    & (DldYieldHistory.year == DldPriceHistory.year),
+                )
+                .where(DldPriceHistory.area_name_norm == hn)
+                .order_by(DldPriceHistory.year)
+            )
+        ).all()
+        history = [
+            AreaSnapshotPoint(
+                snapshot_date=date(int(yr), 7, 1).isoformat(),
+                avg_price_per_sqft=float(ppsf) if ppsf is not None else None,
+                avg_sale_price=float(deal) if deal is not None else None,
+                rental_yield=float(gy) if gy is not None else None,
+            )
+            for yr, ppsf, deal, gy in hist_rows
+            if ppsf is not None
+        ]
+        latest_deal = next(
+            (float(deal) for yr, ppsf, deal, gy in reversed(hist_rows) if deal is not None),
+            None,
+        )
+        appr = (
+            await db.execute(
+                select(DldAreaAppreciation).where(DldAreaAppreciation.area_name_norm == hn)
+            )
+        ).scalar_one_or_none()
+        off = (
+            await db.execute(
+                select(DldPriceHistory.offplan_pct)
+                .where(DldPriceHistory.area_name_norm == hn, DldPriceHistory.offplan_pct.isnot(None))
+                .order_by(DldPriceHistory.year.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        cohort_prices = (
+            await db.execute(
+                select(DldAreaMetrics.median_price_per_sqft).where(
+                    DldAreaMetrics.period == "2026-ytd",
+                    DldAreaMetrics.median_price_per_sqft.isnot(None),
+                )
+            )
+        ).scalars().all()
+        cohort = float(median([float(p) for p in cohort_prices])) if cohort_prices else 1500.0
+        rep = build_report_dld(
+            DldAreaInput(
+                area_id=str(area.id),
+                area_name=area.name,
+                area_name_arabic=area.name_arabic,
+                area_type=area.area_type,
+                latitude=area.latitude,
+                longitude=area.longitude,
+                rental_yield=dld_block.rental_yield_pct,
+                price_per_sqft=dld_block.median_price_per_sqft,
+                appreciation_1y=float(appr.appreciation_1y_pct) if appr and appr.appreciation_1y_pct is not None else None,
+                appreciation_3y=float(appr.appreciation_3y_pct) if appr and appr.appreciation_3y_pct is not None else None,
+                sales_count=dld_block.sales_count,
+                rent_count=dld_block.rent_count_2026,
+                offplan_pct=float(off) if off is not None else None,
+            ),
+            cohort,
+        )
+        km = rep.key_metrics
+        latest = AreaLatestSnapshot(
+            snapshot_date="2026-06-01",
+            avg_sale_price=latest_deal,
+            avg_price_per_sqft=dld_block.median_price_per_sqft,
+            avg_annual_rent=dld_block.median_annual_rent,
+            rental_yield=dld_block.rental_yield_pct,
+            occupancy_rate=None,
+            appreciation_1y=km.appreciation_1y,
+            appreciation_3y=km.appreciation_3y,
+            transaction_volume=dld_block.sales_count,
+            demand_score=km.demand_score,
+            risk_score=km.risk_score,
+            investment_score=km.investment_score,
+        )
 
     return AreaDetailResponse(
         id=area.id,

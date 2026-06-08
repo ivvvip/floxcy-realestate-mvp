@@ -65,20 +65,21 @@ class AreaStatsResponse(BaseModel):
 
 
 class AreaSnapshotPoint(BaseModel):
-    """One point in an area's price/yield history."""
+    """One point in an area's price/yield history (DLD yearly series)."""
     snapshot_date: str  # YYYY-MM-DD
-    avg_price_per_sqft: float
-    avg_sale_price: float
-    rental_yield: float
+    avg_price_per_sqft: Optional[float] = None
+    avg_sale_price: Optional[float] = None
+    rental_yield: Optional[float] = None
 
 
 class AreaLatestSnapshot(BaseModel):
-    """Latest snapshot metrics for an area."""
+    """Latest area metrics. Fields optional — sourced from real DLD, which may
+    not have every metric for every area (no synthetic fill)."""
     snapshot_date: str
-    avg_sale_price: float
-    avg_price_per_sqft: float
-    avg_annual_rent: float
-    rental_yield: float
+    avg_sale_price: Optional[float] = None
+    avg_price_per_sqft: Optional[float] = None
+    avg_annual_rent: Optional[float] = None
+    rental_yield: Optional[float] = None
     occupancy_rate: Optional[float] = None
     appreciation_1y: Optional[float] = None
     appreciation_3y: Optional[float] = None
