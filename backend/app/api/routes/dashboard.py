@@ -1,105 +1,100 @@
-"""Dashboard summary endpoint."""
+"""Dashboard summary endpoint — real DLD only (World B retired, Phase 1).
+
+Market-wide aggregates + top areas come from the same DLD universe and scoring
+as /opportunities (no seeded market_snapshots). The price trend is the real
+DLD yearly series aggregated across areas.
+"""
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.area import Area
-from app.models.market_snapshot import MarketSnapshot
+from app.models.dld import DldAreaMetrics
 from app.schemas.dashboard import DashboardSummary, TopAreaItem, TrendPoint
+from app.api.routes.opportunities import _load_universe_dld, _score_all_dld
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+
+# Yearly market trend across all areas (real DLD): avg area-median ppsf + avg
+# derived gross yield per year. Replaces the monthly seeded snapshot trend.
+_TREND_SQL = text(
+    """
+    SELECT p.year AS year,
+           AVG(p.avg_ppsf_all) AS avg_ppsf,
+           (SELECT AVG(y.gross_yield_pct) FROM dld_yield_history y WHERE y.year = p.year) AS avg_yield
+    FROM dld_price_history p
+    WHERE p.avg_ppsf_all IS NOT NULL
+    GROUP BY p.year
+    ORDER BY p.year
+    """
+)
 
 
 @router.get("/summary", response_model=DashboardSummary)
 async def dashboard_summary(db: AsyncSession = Depends(get_db)):
-    """Market-wide aggregates derived from the latest snapshot per area."""
-    total_areas = await db.scalar(select(func.count()).select_from(Area)) or 0
-
-    # Latest snapshot per area via correlated subquery
-    latest_date_subq = (
-        select(
-            MarketSnapshot.area_id,
-            func.max(MarketSnapshot.snapshot_date).label("latest_date"),
+    """Market-wide aggregates derived from real DLD area metrics + scoring."""
+    total_areas = await db.scalar(
+        select(func.count()).select_from(DldAreaMetrics).where(
+            DldAreaMetrics.period == "2026-ytd"
         )
-        .group_by(MarketSnapshot.area_id)
-        .subquery()
-    )
+    ) or 0
 
-    latest_q = (
-        select(Area, MarketSnapshot)
-        .join(MarketSnapshot, MarketSnapshot.area_id == Area.id)
-        .join(
-            latest_date_subq,
-            (latest_date_subq.c.area_id == MarketSnapshot.area_id)
-            & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
-        )
-    )
-    rows = (await db.execute(latest_q)).all()
-
-    if not rows:
+    inputs = await _load_universe_dld(db)
+    if not inputs:
         return DashboardSummary(
-            total_areas=total_areas,
-            avg_yield=0,
-            avg_price_per_sqft=0,
-            top_performer=None,
-            total_transaction_volume=0,
-            top_areas=[],
-            price_trend=[],
+            total_areas=int(total_areas), avg_yield=0, avg_price_per_sqft=0,
+            top_performer=None, total_transaction_volume=0, top_areas=[], price_trend=[],
         )
+    reports = _score_all_dld(inputs)
 
-    yields = [float(s.rental_yield) for _, s in rows]
-    prices = [float(s.avg_price_per_sqft) for _, s in rows]
-    volumes = [int(s.transaction_volume or 0) for _, s in rows]
-
-    avg_yield = round(sum(yields) / len(yields), 2)
-    avg_pps = round(sum(prices) / len(prices), 2)
-    total_vol = sum(volumes)
-
-    # Build top areas by investment_score (or yield if missing)
-    items = [
-        TopAreaItem(
-            id=str(area.id),
-            name=area.name,
-            name_arabic=area.name_arabic,
-            area_type=area.area_type,
-            avg_price_per_sqft=float(snap.avg_price_per_sqft),
-            rental_yield=float(snap.rental_yield),
-            appreciation_1y=float(snap.appreciation_1y) if snap.appreciation_1y else None,
-            investment_score=float(snap.investment_score) if snap.investment_score else None,
-        )
-        for area, snap in rows
+    yields = [
+        float(r.key_metrics.rental_yield)
+        for r in reports if r.key_metrics.rental_yield is not None
     ]
-    items.sort(key=lambda x: x.investment_score or x.rental_yield, reverse=True)
-    top_5 = items[:5]
+    prices = [i.price_per_sqft for i in inputs if i.price_per_sqft is not None]
+    total_vol = sum(i.sales_count for i in inputs)
+
+    avg_yield = round(sum(yields) / len(yields), 2) if yields else 0
+    avg_pps = round(sum(prices) / len(prices), 2) if prices else 0
+
+    # Top areas by opportunity score; TopAreaItem requires non-null price+yield,
+    # so restrict to scored areas that carry a real (gated) yield.
+    ranked = sorted(
+        [r for r in reports
+         if r.key_metrics.rental_yield is not None and r.key_metrics.price_per_sqft is not None],
+        key=lambda r: r.opportunity_score, reverse=True,
+    )
+    top_5 = [
+        TopAreaItem(
+            id=r.area_id,
+            name=r.area_name,
+            name_arabic=r.area_name_arabic,
+            area_type=r.area_type,
+            avg_price_per_sqft=float(r.key_metrics.price_per_sqft),
+            rental_yield=float(r.key_metrics.rental_yield),
+            appreciation_1y=r.key_metrics.appreciation_1y,
+            investment_score=r.key_metrics.investment_score,
+        )
+        for r in ranked[:5]
+    ]
     top_performer = top_5[0] if top_5 else None
 
-    # Price trend: aggregate avg price_per_sqft and yield per month across all areas
-    trend_q = (
-        select(
-            MarketSnapshot.snapshot_date,
-            func.avg(MarketSnapshot.avg_price_per_sqft).label("avg_pps"),
-            func.avg(MarketSnapshot.rental_yield).label("avg_yield"),
-        )
-        .group_by(MarketSnapshot.snapshot_date)
-        .order_by(MarketSnapshot.snapshot_date)
-    )
-    trend_rows = (await db.execute(trend_q)).all()
+    trend_rows = (await db.execute(_TREND_SQL)).mappings().all()
     price_trend = [
         TrendPoint(
-            month=row.snapshot_date.strftime("%Y-%m"),
-            avg_price_per_sqft=round(float(row.avg_pps), 2),
-            avg_yield=round(float(row.avg_yield), 2),
+            month=str(int(row["year"])),
+            avg_price_per_sqft=round(float(row["avg_ppsf"]), 2) if row["avg_ppsf"] is not None else 0.0,
+            avg_yield=round(float(row["avg_yield"]), 2) if row["avg_yield"] is not None else 0.0,
         )
         for row in trend_rows
     ]
 
     return DashboardSummary(
-        total_areas=total_areas,
+        total_areas=int(total_areas),
         avg_yield=avg_yield,
         avg_price_per_sqft=avg_pps,
         top_performer=top_performer,
-        total_transaction_volume=total_vol,
+        total_transaction_volume=int(total_vol),
         top_areas=top_5,
         price_trend=price_trend,
     )
