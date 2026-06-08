@@ -120,6 +120,10 @@ export interface AreaDldBlock {
   // Null for canonical-only areas (no current-snapshot row in dld_areas)
   dld_area_id: string | null;
   dld_name: string;
+  // Cadastral name_norm holding this area's multi-year history when it differs
+  // from the displayed (marketing) name — JVC, Dubai Marina, Dubai Hills, etc.
+  // Use it (falling back to dld_name) for all /dld/areas/* history fetches.
+  history_name_norm?: string | null;
   median_price_per_sqft: number | null;
   median_annual_rent: number | null;
   median_rent_per_sqft: number | null;

@@ -104,6 +104,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   }
   const area = raw;
 
+  // Marketing→cadastral resolution: areas whose data lives under a different
+  // (cadastral) DLD name expose `history_name_norm`. Drive every /dld/areas/*
+  // history fetch off it so marketing-named areas (JVC, Dubai Marina, Dubai
+  // Hills) show real data; falls back to dld_name when no alias applies.
+  const histName = (
+    area.dld?.history_name_norm ?? area.dld?.dld_name ?? ''
+  ).toLowerCase();
+  const histSlug = histName.replace(/\s+/g, '-');
+
   let confidence: ConfidenceReport | null = null;
   let undervaluation: OpportunityResult | null = null;
   try {
@@ -121,7 +130,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // Soft-fail: many community-named areas have 0 mapped buildings (admin
   // sector mismatch — known taxonomy gap), so we hide the section quietly.
   const topBuildings = area.dld?.dld_name
-    ? await getDldAreaTopBuildings(area.dld.dld_name.toLowerCase(), 6).catch(
+    ? await getDldAreaTopBuildings(histName, 6).catch(
         () => null
       )
     : null;
@@ -129,7 +138,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // 5-year price history from etl_dld_history.py — hidden when the area
   // has no qualifying Sales-of-Unit rows in the 2009–2026 export.
   const priceHistory = area.dld?.dld_name
-    ? await getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaPriceHistory(histName).catch(
         () => null
       )
     : null;
@@ -137,12 +146,12 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // Rent + yield history from etl_dld_rent_history.py — both hidden cleanly
   // when no data is available for the area.
   const rentHistory = area.dld?.dld_name
-    ? await getDldAreaRentHistory(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaRentHistory(histName).catch(
         () => null
       )
     : null;
   const yieldHistory = area.dld?.dld_name
-    ? await getDldAreaYieldHistory(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaYieldHistory(histName).catch(
         () => null
       )
     : null;
@@ -151,7 +160,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // Hidden when the area has no Person residential leases ending in the window.
   const upcomingAvailability = area.dld?.dld_name
     ? await getDldAreaUpcomingAvailability(
-        area.dld.dld_name.toLowerCase(),
+        histName,
         90,
       ).catch(() => null)
     : null;
@@ -160,7 +169,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // for this area (typically because the rent stream has no nearest_*
   // values for it).
   const lifestyle = area.dld?.dld_name
-    ? await getDldAreaLifestyleScore(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaLifestyleScore(histName).catch(
         () => null,
       )
     : null;
@@ -170,7 +179,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // communities that DLD files under master_project_en).
   const categoryBreakdown = area.dld?.dld_name
     ? await getDldAreaCategoryBreakdown(
-        area.dld.dld_name.toLowerCase(),
+        histName,
       ).catch(() => null)
     : null;
 
@@ -208,7 +217,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // Per-bedroom sale benchmarks (Studio / 1BR / 2BR / …). Hidden when DLD
   // has no bedroom-tagged transactions for the area.
   const bedroomPrices = area.dld?.dld_name
-    ? await getDldAreaBedroomPrices(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaBedroomPrices(histName).catch(
         () => null,
       )
     : null;
@@ -217,7 +226,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // matched=false (cheap object, soft-fail) when the area isn't in the
   // PDF roster (e.g. industrial zones, off-plan masterplans pre-build).
   const communityProfile = area.dld?.dld_name
-    ? await getDldAreaCommunityProfile(area.dld.dld_name.toLowerCase()).catch(
+    ? await getDldAreaCommunityProfile(histName).catch(
         () => null,
       )
     : null;
@@ -227,7 +236,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   // transactions stream.
   const activeDevelopment = area.dld?.dld_name
     ? await getOffplanProjects({
-        area_slug: area.dld.dld_name.toLowerCase().replace(/\s+/g, '-'),
+        area_slug: histName.replace(/\s+/g, '-'),
         sort: 'units',
         limit: 8,
       }).catch(() => null)
@@ -804,7 +813,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
             tile deep-links into /buildings with the matching tab + area
             pre-filtered. */}
         {categoryBreakdown && categoryBreakdown.total_buildings > 0 && (() => {
-          const areaSlug = area.dld?.dld_name?.toLowerCase() ?? '';
+          const areaSlug = histName;
           const buckets: Array<{
             key: 'buildings' | 'villas' | 'commercial';
             emoji: string;
@@ -942,7 +951,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 🏗️ Active development in this area
               </span>
               <Link
-                href={`/offplan?area_slug=${area.dld?.dld_name?.toLowerCase().replace(/\s+/g, '-') ?? ''}`}
+                href={`/offplan?area_slug=${histSlug}`}
                 className="text-[11px] text-accent hover:underline"
               >
                 See all
@@ -1061,7 +1070,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
                 Top buildings in {topBuildings.area_name} · DLD Ejari
               </span>
               <Link
-                href={`/buildings?area=${encodeURIComponent(area.dld?.dld_name?.toLowerCase() ?? '')}`}
+                href={`/buildings?area=${encodeURIComponent(histName)}`}
                 className="text-[11px] font-medium text-accent hover:text-accent/80"
               >
                 See all →

@@ -32,9 +32,14 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
   // tower-density empty-states; here we just consume whatever it returns.
   // Price history fetch runs in parallel; AreaPriceHistorySection soft-fails
   // (renders nothing) when the area has no qualifying Sales-of-Unit rows.
+  // Query the cadastral twin (history_name_norm) for history/buildings when the
+  // displayed area is a marketing name; fall back to its own DLD name.
+  const histName = (
+    area.dld.history_name_norm ?? area.dld.dld_name
+  ).toLowerCase();
   const [topBuildings, priceHistory] = await Promise.all([
-    getDldAreaTopBuildings(area.dld.dld_name.toLowerCase(), 6).catch(() => null),
-    getDldAreaPriceHistory(area.dld.dld_name.toLowerCase()).catch(() => null),
+    getDldAreaTopBuildings(histName, 6).catch(() => null),
+    getDldAreaPriceHistory(histName).catch(() => null),
   ]);
 
   const d = area.dld;
@@ -265,7 +270,7 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
                   Top buildings in {topBuildings.area_name} · DLD Ejari
                 </span>
                 <Link
-                  href={`/buildings?area=${encodeURIComponent(d.dld_name.toLowerCase())}`}
+                  href={`/buildings?area=${encodeURIComponent(histName)}`}
                   className="text-[11px] font-medium text-accent hover:text-accent/80"
                 >
                   See all →

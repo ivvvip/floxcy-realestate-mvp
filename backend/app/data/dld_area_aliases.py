@@ -177,3 +177,94 @@ TOWER_DENSITY_COMMUNITIES: frozenset[str] = frozenset({
 
 def is_tower_density(name_norm: str) -> bool:
     return _norm(name_norm) in TOWER_DENSITY_COMMUNITIES
+
+
+# -----------------------------------------------------------------------------
+# Marketing community  →  PRIMARY cadastral area that holds the multi-year
+# history (price / rent / yield / bedroom / lifestyle / buildings).
+#
+# Background: DLD's current-snapshot export (transactions-2026-06-01.csv) files
+# many communities under their marketing names (Dubai Marina, JVC, Dubai Hills),
+# but the historical exports (2009–2026) file the SAME physical areas under
+# their cadastral / admin-sector names (Marsa Dubai, Al Barsha South Fourth,
+# Hadaeq Sheikh Mohammed Bin Rashid). The history tables (dld_price_history etc.)
+# are keyed on the cadastral name, so a /areas/<marketing> page found nothing.
+#
+# This map lets the resolver DISPLAY the marketing name while QUERYING the
+# cadastral twin for history. Every target below was validated against the
+# production DB to actually hold history (see Phase 2 of FLOXCY-REPLAN-2026.md);
+# the only exception is `tilal al ghaf` (al yelayiss 5 has buildings but no
+# multi-year history yet) — it resolves but renders an honest empty-state.
+#
+# Derivation: curated COMMUNITY_TO_ADMIN_SECTORS (primary = the sector with the
+# most history) + high-confidence tower / spelling pairs from
+# docs/area-alias-table.csv, each cross-checked against dld_buildings to confirm
+# the cadastral home (e.g. all "Dubai Hills" buildings sit in Hadaeq SMBR).
+MARKETING_TO_CADASTRAL_PRIMARY: dict[str, str] = {
+    "akoya": "al hebiah fifth",
+    "akoya oxygen": "al hebiah fifth",
+    "al jaddaf": "al jadaf",
+    "arabian ranches": "wadi al safa 5",
+    "arabian ranches 2": "wadi al safa 5",
+    "arabian ranches 3": "wadi al safa 5",
+    "arabian ranches iii": "wadi al safa 5",
+    "arjan": "al barshaa south third",
+    "city walk": "al wasl",
+    "creek harbour": "al khairan first",
+    "damac hills": "al hebiah fourth",
+    "damac hills 2": "al hebiah fifth",
+    "deira islands": "palm deira",
+    "difc": "zaabeel second",
+    "dip": "dubai investment park second",
+    "district one": "hadaeq sheikh mohammed bin rashid",
+    "downtown": "burj khalifa",
+    "downtown dubai": "burj khalifa",
+    "dubai creek harbour": "al khairan first",
+    "dubai hills": "hadaeq sheikh mohammed bin rashid",
+    "dubai hills estate": "hadaeq sheikh mohammed bin rashid",
+    "dubai investment park": "dubai investment park second",
+    "dubai islands": "madinat dubai almelaheyah",
+    "dubai marina": "marsa dubai",
+    "dubai maritime city": "madinat dubai almelaheyah",
+    "dubai south": "madinat al mataar",
+    "dubailand": "madinat hind 4",
+    "emaar beachfront": "marsa dubai",
+    "expo city": "madinat al mataar",
+    "expo city dubai": "madinat al mataar",
+    "international city": "warsan fourth",
+    "jaddaf": "al jadaf",
+    "jbr": "marsa dubai",
+    "jumeirah beach residence": "marsa dubai",
+    "jumeirah village circle": "al barsha south fourth",
+    "jumeirah village triangle": "al barshaa south third",
+    "jvc": "al barsha south fourth",
+    "jvt": "al barshaa south third",
+    "majan": "wadi al safa 7",
+    "marina": "marsa dubai",
+    "maritime city": "madinat dubai almelaheyah",
+    "mbr city": "hadaeq sheikh mohammed bin rashid",
+    "meydan": "nad al shiba first",
+    "mira": "me'aisem first",
+    "mohammed bin rashid city": "hadaeq sheikh mohammed bin rashid",
+    "nad al sheba": "nad al shiba first",
+    "palm jebel ali": "palm jabal ali",
+    "reem": "me'aisem first",
+    "sobha hartland": "hadaeq sheikh mohammed bin rashid",
+    "the villa": "nad al shiba first",
+    "tilal al ghaf": "al yelayiss 5",
+    "town square": "al yelayiss 2",
+    "town square dubai": "al yelayiss 2",
+    "za'abeel": "zaabeel second",
+}
+
+
+def cadastral_data_norm(name_norm: str) -> str:
+    """Resolve a (possibly marketing) area name to the cadastral name_norm
+    where the multi-year DLD history lives.
+
+    Returns the input unchanged when no alias applies — i.e. the area already
+    carries its own history, or it is unknown. This keeps every already-working
+    area byte-for-byte identical; only aliased marketing names are redirected.
+    """
+    n = _norm(name_norm)
+    return MARKETING_TO_CADASTRAL_PRIMARY.get(n, n)

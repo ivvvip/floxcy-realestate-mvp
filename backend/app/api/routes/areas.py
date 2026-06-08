@@ -26,6 +26,26 @@ from app.schemas.area import (
 )
 from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield, confidence_for
 from app.services.confidence import build_confidence_report, confidence_to_dict
+from app.data.dld_area_aliases import cadastral_data_norm
+
+
+def _history_norm(*names: Optional[str]) -> Optional[str]:
+    """Resolve the cadastral name_norm that holds an area's multi-year history.
+
+    Tries each candidate name in order (display/community name first, then the
+    DLD snapshot name); returns the cadastral twin for the first one that has a
+    marketing→cadastral alias. Returns None when no alias applies — i.e. the
+    area already carries its own history under its own name, so behaviour is
+    unchanged. See FLOXCY-REPLAN-2026.md Phase 2.
+    """
+    for raw in names:
+        if not raw:
+            continue
+        n = raw.strip().lower()
+        cad = cadastral_data_norm(n)
+        if cad != n:
+            return cad
+    return None
 
 
 def _coverage_tier(
@@ -569,6 +589,7 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
             dld_block = AreaDldBlock(
                 dld_area_id=dld_area.id,
                 dld_name=dld_area.name_display,
+                history_name_norm=_history_norm(dld_area.name_norm),
                 median_price_per_sqft=float(metrics.median_price_per_sqft) if metrics and metrics.median_price_per_sqft is not None else None,
                 median_annual_rent=float(metrics.median_annual_rent) if metrics and metrics.median_annual_rent is not None else None,
                 median_rent_per_sqft=float(metrics.median_rent_per_sqft) if metrics and metrics.median_rent_per_sqft is not None else None,
@@ -663,6 +684,7 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
         dld_block = AreaDldBlock(
             dld_area_id=dld_area.id,
             dld_name=dld_area.name_display,
+            history_name_norm=_history_norm(area.name, dld_area.name_norm),
             median_price_per_sqft=float(dm.median_price_per_sqft) if dm and dm.median_price_per_sqft is not None else None,
             median_annual_rent=float(dm.median_annual_rent) if dm and dm.median_annual_rent is not None else None,
             median_rent_per_sqft=float(dm.median_rent_per_sqft) if dm and dm.median_rent_per_sqft is not None else None,
@@ -680,6 +702,60 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
             total_parcels=int(land.total_parcels) if land else None,
             land_type_mix=dict(land.land_type_mix) if land and land.land_type_mix else None,
         )
+
+    # Fallback: curated area with NO linked DLD snapshot row (e.g. Downtown
+    # Dubai, Dubai Hills Estate, Damac Hills 2). Resolve the cadastral twin
+    # that actually holds the data so the page shows the DLD overlay + history
+    # instead of an empty section. Display name stays the curated area.name.
+    if dld_block is None:
+        cad = _history_norm(area.name)
+        cad_area = (
+            await db.execute(select(DldArea).where(DldArea.name_norm == cad))
+        ).scalar_one_or_none() if cad else None
+        if cad_area:
+            cdm = (
+                await db.execute(
+                    select(DldAreaMetrics).where(
+                        DldAreaMetrics.dld_area_id == cad_area.id,
+                        DldAreaMetrics.period == "2026-ytd",
+                    )
+                )
+            ).scalar_one_or_none()
+            c_sales = int(cdm.sales_count or 0) if cdm else 0
+            c_rents = int(cdm.rent_count_2026 or 0) if cdm else 0
+            c_show_yield = None
+            if (cdm and cdm.rental_yield_pct is not None
+                    and c_sales >= MIN_RELIABLE_SAMPLES
+                    and c_rents >= MIN_RELIABLE_SAMPLES):
+                c_show_yield = cap_yield(float(cdm.rental_yield_pct))
+            c_land = (
+                await db.execute(
+                    select(DldAreaLandSummary).where(
+                        DldAreaLandSummary.area_name_norm == cad_area.name_norm
+                    )
+                )
+            ).scalar_one_or_none()
+            dld_block = AreaDldBlock(
+                dld_area_id=cad_area.id,
+                dld_name=cad_area.name_display,
+                history_name_norm=cad_area.name_norm,
+                median_price_per_sqft=float(cdm.median_price_per_sqft) if cdm and cdm.median_price_per_sqft is not None else None,
+                median_annual_rent=float(cdm.median_annual_rent) if cdm and cdm.median_annual_rent is not None else None,
+                median_rent_per_sqft=float(cdm.median_rent_per_sqft) if cdm and cdm.median_rent_per_sqft is not None else None,
+                avg_price_per_sqft=float(cdm.avg_price_per_sqft) if cdm and cdm.avg_price_per_sqft is not None else None,
+                avg_annual_rent=float(cdm.avg_annual_rent) if cdm and cdm.avg_annual_rent is not None else None,
+                avg_rent_per_sqft=float(cdm.avg_rent_per_sqft) if cdm and cdm.avg_rent_per_sqft is not None else None,
+                rental_yield_pct=c_show_yield,
+                rent_growth_yoy_pct=float(cdm.rent_growth_yoy_pct) if cdm and cdm.rent_growth_yoy_pct is not None else None,
+                sales_count=c_sales,
+                rent_count_2026=c_rents,
+                building_count=cad_area.building_count,
+                confidence=confidence_for(max(c_sales, c_rents)),
+                freehold_pct=float(c_land.freehold_pct) if c_land and c_land.freehold_pct is not None else None,
+                registered_pct=float(c_land.registered_pct) if c_land and c_land.registered_pct is not None else None,
+                total_parcels=int(c_land.total_parcels) if c_land else None,
+                land_type_mix=dict(c_land.land_type_mix) if c_land and c_land.land_type_mix else None,
+            )
 
     return AreaDetailResponse(
         id=area.id,

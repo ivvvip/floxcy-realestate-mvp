@@ -98,6 +98,12 @@ class AreaDldBlock(BaseModel):
     """
     dld_area_id: Optional[UUID] = None
     dld_name: str
+    # Cadastral name_norm that holds this area's multi-year history when it
+    # differs from the displayed area (marketing→cadastral split). The frontend
+    # fetches price/rent/yield/bedroom/lifestyle/buildings against this name so
+    # marketing-named areas (JVC, Dubai Marina, Dubai Hills) show real data
+    # instead of an empty page. None when the area carries its own history.
+    history_name_norm: Optional[str] = None
     median_price_per_sqft: Optional[float] = None
     median_annual_rent: Optional[float] = None
     median_rent_per_sqft: Optional[float] = None
