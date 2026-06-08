@@ -465,6 +465,22 @@ async def get_area(slug: str, db: AsyncSession = Depends(get_db)):
     if maybe_uuid:
         area = (await db.execute(select(Area).where(Area.id == maybe_uuid))).scalar_one_or_none()
 
+    # String slug → curated Area by name (e.g. "downtown-dubai" → "Downtown
+    # Dubai", "dubai-hills-estate" → "Dubai Hills Estate"). These marketing
+    # areas have no DldArea/canonical row under that exact name, so without this
+    # they 404; resolving here routes them into the curated branch, which
+    # attaches the cadastral DLD twin via _history_norm. FLOXCY-REPLAN-2026 P2.
+    if not area and not maybe_uuid:
+        slug_form = re.sub(r"[\s_-]+", "-", slug.strip().lower()).strip("-")
+        if slug_form:
+            area = (await db.execute(
+                select(Area).where(
+                    func.regexp_replace(
+                        func.lower(Area.name), r"[\s_-]+", "-", "g"
+                    ) == slug_form
+                )
+            )).scalar_one_or_none()
+
     if not area:
         # Try DLD area lookup (by UUID first, then by name_norm)
         dld_area = None
