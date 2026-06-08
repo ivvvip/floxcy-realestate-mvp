@@ -4067,7 +4067,7 @@ async def get_area_community_profile(
 async def get_building_sales_history(
     building_id: UUID, db: AsyncSession = Depends(get_db),
 ):
-    """Aggregate sales benchmark for the building over 2021-2026. Source:
+    """Aggregate sales benchmark for the building over 2009-2026. Source:
     dld_buildings_sales (extracted from the transactions stream itself —
     parallel to the rents-side dld_buildings_derived)."""
     b = (
@@ -4451,7 +4451,7 @@ async def dashboard_pulse(db: AsyncSession = Depends(get_db)):
 
     # ---- Widget 7: Data freshness ----
     freshness = DataFreshness(
-        transactions_year_range=f"2021–{latest_year}",
+        transactions_year_range=f"2009–{latest_year}",
         rents_year_range="2021–2026",
         snapshot_date="2026-06-01",
         last_etl_run="2026-06-03",

@@ -72,7 +72,24 @@ Almost everything that looks "fake or broken" to an investor is World B leaking 
 
 ---
 
-## PHASE 2 — Fix the area name-split (biggest UX win)
+## PHASE 2 — Fix the area name-split (biggest UX win) — ✅ DONE (2026-06-09)
+
+> **Shipped & deployed** (commits `a06925a`, `6d91d1d`). Implemented as a
+> **resolver layer** (display marketing name, query cadastral twin) rather than
+> a destructive registry row-merge — lower risk, same outcome.
+> - `app/data/dld_area_aliases.py::cadastral_data_norm` + `MARKETING_TO_CADASTRAL_PRIMARY`
+>   (54 entries, each DB-validated to hold history; cross-checked via `dld_buildings`).
+> - `AreaDldBlock.history_name_norm` drives all frontend history/bedroom/lifestyle/
+>   buildings fetches; `get_area` sets it in both DLD-block branches + a fallback
+>   for curated areas with no linked DLD row (Downtown, Dubai Hills Estate, Damac Hills 2)
+>   + curated-Area name-slug resolution so `/areas/<marketing-slug>` resolves.
+> - **Result:** top 10 crowded areas went **0/0/0 → full** price/rent/yield (JVC 18/6/6,
+>   Marina 18/6/6, Dubai Hills 13/6/6, Downtown 18/6/6, …). Controls unchanged → zero regression.
+> - **STEP 2 (casing dups):** already handled at ingest (`name_norm` unique; Business Bay
+>   4128+378 merged to 4506) — verified, no action.
+> - **STEP 4/5 note:** the empty-data symptom existed only on the area detail page;
+>   compare/rent-check/map read 2026 metrics that exist on marketing rows or use
+>   AreaSelector synonyms. Slugs forward-only (nothing renamed).
 
 **Problem:** JVC, Dubai Marina, Dubai Hills (and ~12 more crowded areas) render **empty** because the marketing name in the registry ≠ the cadastral name the data is keyed on. The data fully exists under the cadastral twin.
 

@@ -179,7 +179,7 @@ class DldRentBenchmark(Base):
 
 
 class DldPriceHistory(Base):
-    """Per-(area, year) Sales-of-Unit aggregates from 2021–2026 DLD export.
+    """Per-(area, year) Sales-of-Unit aggregates from 2009–2026 DLD export.
 
     Populated by scripts/etl_dld_history.py. Idempotent rebuild: the ETL
     truncates and bulk-inserts. UNIQUE(area_name_norm, year).
