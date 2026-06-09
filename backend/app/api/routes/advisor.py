@@ -24,7 +24,6 @@ from app.models.dld import (
     DldAreaMetrics,
     DldPriceHistory,
 )
-from app.models.market_snapshot import MarketSnapshot
 from app.redis_client import redis_client
 from app.schemas.advisor import AdvisorQueryRequest, AdvisorQueryResponse
 from app.schemas.dld import MIN_RELIABLE_SAMPLES, cap_yield
@@ -102,22 +101,13 @@ async def advisor_query(
 
     The rules-based `recommendations[]` field is ALWAYS populated, so the
     response is useful even when the LLM call fails."""
-    # ---- 1. Rules-based recommendations (always computed) ----
-    # Pull curated MarketSnapshot + DLD area metrics + DLD appreciation +
-    # latest-year DLD price history (for off-plan share → supply_risk) in a
-    # single composite query. Real DLD numbers take precedence over curated
-    # snapshot values; the curated layer is only the fallback floor.
-    latest_date_subq = (
-        select(
-            MarketSnapshot.area_id,
-            func.max(MarketSnapshot.snapshot_date).label("latest_date"),
-        )
-        .group_by(MarketSnapshot.area_id)
-        .subquery()
-    )
-    # Latest year per area in dld_price_history — picks up 2026 YTD if it
-    # exists, else 2025, etc. We use this to source the off-plan share for
-    # supply_risk classification.
+    # ---- 1. Rules-based recommendations (real DLD only; World B retired) ----
+    # Rank curated areas that have a reliable gated DLD yield, sourced entirely
+    # from dld_area_metrics + appreciation + latest-year price-history off-plan
+    # share. risk/investment_score come from the same engine as /opportunities.
+    from app.api.routes.opportunities import _load_universe_dld, _score_all_dld
+    reports = {r.area_id: r for r in _score_all_dld(await _load_universe_dld(db))}
+
     latest_year_subq = (
         select(
             DldPriceHistory.dld_area_id,
@@ -128,57 +118,38 @@ async def advisor_query(
         .subquery()
     )
     q = (
-        select(
-            Area, MarketSnapshot, DldAreaMetrics,
-            DldAreaAppreciation, DldPriceHistory,
-        )
-        .join(MarketSnapshot, MarketSnapshot.area_id == Area.id)
+        select(Area, DldArea, DldAreaMetrics, DldAreaAppreciation, DldPriceHistory)
+        .join(DldArea, DldArea.curated_area_id == Area.id)
         .join(
-            latest_date_subq,
-            (latest_date_subq.c.area_id == MarketSnapshot.area_id)
-            & (latest_date_subq.c.latest_date == MarketSnapshot.snapshot_date),
-        )
-        .outerjoin(DldArea, DldArea.curated_area_id == Area.id)
-        .outerjoin(
             DldAreaMetrics,
             (DldAreaMetrics.dld_area_id == DldArea.id)
             & (DldAreaMetrics.period == "2026-ytd"),
         )
-        .outerjoin(
-            DldAreaAppreciation,
-            DldAreaAppreciation.dld_area_id == DldArea.id,
-        )
-        .outerjoin(
-            latest_year_subq,
-            latest_year_subq.c.dld_area_id == DldArea.id,
-        )
+        .outerjoin(DldAreaAppreciation, DldAreaAppreciation.dld_area_id == DldArea.id)
+        .outerjoin(latest_year_subq, latest_year_subq.c.dld_area_id == DldArea.id)
         .outerjoin(
             DldPriceHistory,
             (DldPriceHistory.dld_area_id == DldArea.id)
             & (DldPriceHistory.year == latest_year_subq.c.latest_year),
         )
+        .where(DldAreaMetrics.median_price_per_sqft.isnot(None))
     )
     rows = (await db.execute(q)).all()
     snapshots = []
-    for area, snap, dld, appr, ph in rows:
-        ppsf = float(snap.avg_price_per_sqft)
-        yld = float(snap.rental_yield)
-        gross_yield_pct: Optional[float] = None
-        rent_growth: Optional[float] = None
-        if dld:
-            if dld.median_price_per_sqft is not None:
-                ppsf = float(dld.median_price_per_sqft)
-            if (dld.rental_yield_pct is not None
-                    and (dld.sales_count or 0) >= MIN_RELIABLE_SAMPLES
-                    and (dld.rent_count_2026 or 0) >= MIN_RELIABLE_SAMPLES):
-                capped = cap_yield(float(dld.rental_yield_pct))
-                if capped is not None:
-                    yld = capped
-                    gross_yield_pct = capped
-            if dld.rent_growth_yoy_pct is not None:
-                rent_growth = float(dld.rent_growth_yoy_pct)
+    for area, dld_obj, dld, appr, ph in rows:
+        ppsf = float(dld.median_price_per_sqft)
+        # Require a reliable gated yield — the advisor ranks on income/growth.
+        if not (dld.rental_yield_pct is not None
+                and (dld.sales_count or 0) >= MIN_RELIABLE_SAMPLES
+                and (dld.rent_count_2026 or 0) >= MIN_RELIABLE_SAMPLES):
+            continue
+        yld = cap_yield(float(dld.rental_yield_pct))
+        if yld is None:
+            continue
+        gross_yield_pct = yld
+        rent_growth = float(dld.rent_growth_yoy_pct) if dld.rent_growth_yoy_pct is not None else None
 
-        # 5y appreciation — only trust when we have enough underlying years
+        appr_1y = float(appr.appreciation_1y_pct) if appr and appr.appreciation_1y_pct is not None else None
         appr_5y_pct: Optional[float] = None
         cagr_5y_pct: Optional[float] = None
         if appr is not None and (appr.years_of_data or 0) >= 4:
@@ -187,7 +158,6 @@ async def advisor_query(
             if appr.cagr_5y_pct is not None:
                 cagr_5y_pct = float(appr.cagr_5y_pct)
 
-        # Supply risk — needs latest-year price history with enough volume
         supply_risk = None
         supply_offplan_pct: Optional[float] = None
         dld_year_latest: Optional[int] = None
@@ -197,15 +167,16 @@ async def advisor_query(
                 supply_risk = classify_supply_risk(supply_offplan_pct)
             dld_year_latest = int(ph.year)
 
+        rep = reports.get(str(dld_obj.id))
         snapshots.append({
             "area_id": area.id,
             "area_name": area.name,
             "area_name_arabic": area.name_arabic,
             "avg_price_per_sqft": ppsf,
             "rental_yield": yld,
-            "appreciation_1y": float(snap.appreciation_1y) if snap.appreciation_1y else None,
-            "risk_score": float(snap.risk_score) if snap.risk_score else None,
-            "investment_score": float(snap.investment_score) if snap.investment_score else None,
+            "appreciation_1y": appr_1y,
+            "risk_score": rep.key_metrics.risk_score if rep else None,
+            "investment_score": rep.key_metrics.investment_score if rep else None,
             # ---- DLD-grounded signals ----
             "gross_yield_pct": gross_yield_pct,
             "rent_growth_yoy_pct": rent_growth,

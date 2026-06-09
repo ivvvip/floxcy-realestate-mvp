@@ -1,25 +1,29 @@
-"""Market-level + per-area AI insight endpoints (P2)."""
-from typing import Optional
+"""Market-level + per-area AI insight endpoints (P2) — real DLD only.
+
+World B retired: every input comes from the same DLD universe + scoring as
+/opportunities (no seeded market_snapshots).
+"""
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import ai_rate_limit_dependency
 from app.database import get_db
 from app.models.area import Area
-from app.models.market_snapshot import MarketSnapshot
+from app.models.dld import DldArea
+from app.data.dld_area_aliases import cadastral_data_norm
 from app.services.insights import (
     compute_trends,
     market_brief,
     structured_area_insight,
 )
-from app.services.opportunity_engine import (
-    build_report,
-    compute_cohort_median,
+from app.api.routes.opportunities import (
+    _load_universe_dld,
+    _score_all_dld,
+    _resolve_dld_area_id,
 )
-
 
 router = APIRouter(
     prefix="/api/v1/insights",
@@ -28,83 +32,38 @@ router = APIRouter(
 )
 
 
-async def _all_latest(db: AsyncSession) -> list[tuple[Area, MarketSnapshot]]:
-    """Each area + its most-recent snapshot. Areas with no snapshot are skipped."""
-    areas = (await db.execute(select(Area).order_by(Area.name))).scalars().all()
-    out: list[tuple[Area, MarketSnapshot]] = []
-    for a in areas:
-        snap = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == a.id)
-                .order_by(MarketSnapshot.snapshot_date.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if snap is not None:
-            out.append((a, snap))
-    return out
-
-
 @router.get("/market-brief")
 async def get_market_brief(db: AsyncSession = Depends(get_db)) -> dict:
     """3-5 LLM-generated bullets summarizing today's UAE market. Cached daily."""
-    pairs = await _all_latest(db)
-    if not pairs:
+    reports = _score_all_dld(await _load_universe_dld(db))
+    if not reports:
         raise HTTPException(status_code=503, detail="No data")
 
-    # Aggregate inputs
-    yields = [float(s.rental_yield) for _, s in pairs]
-    prices = [float(s.avg_price_per_sqft) for _, s in pairs]
-    avg_yield = sum(yields) / len(yields)
-    avg_price = sum(prices) / len(prices)
+    yields = [r.key_metrics.rental_yield for r in reports if r.key_metrics.rental_yield is not None]
+    prices = [r.key_metrics.price_per_sqft for r in reports if r.key_metrics.price_per_sqft is not None]
+    avg_yield = sum(yields) / len(yields) if yields else 0.0
+    avg_price = sum(prices) / len(prices) if prices else 0.0
 
-    # Top opportunities via the Opportunity Engine
-    universe_areas = [a for a, _ in pairs]
-    universe_full: list[tuple[Area, list[MarketSnapshot]]] = []
-    for a in universe_areas:
-        hist = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == a.id)
-                .order_by(MarketSnapshot.snapshot_date)
-            )
-        ).scalars().all()
-        universe_full.append((a, list(hist)))
-
-    cohort_median = compute_cohort_median(
-        [h[-1] for _, h in universe_full if h]
-    )
-    opps: list[dict] = []
-    for a, hist in universe_full:
-        if not hist:
-            continue
-        report = build_report(
-            area=a,
-            latest=hist[-1],
-            history=hist,
-            cohort_median_price=cohort_median,
-        )
-        opps.append(
-            {
-                "name": a.name,
-                "score": report.opportunity_score,
-                "tier": report.opportunity_type,
-                "yield": report.key_metrics.rental_yield,
-                "price": report.key_metrics.price_per_sqft,
-            }
-        )
-    opps.sort(key=lambda r: r["score"], reverse=True)
-
-    # Top movers (1Y appreciation, latest snapshot)
-    movers = sorted(
+    opps = sorted(
         [
             {
-                "name": a.name,
-                "metric": "1Y appreciation",
-                "change_pct": float(s.appreciation_1y) if s.appreciation_1y else 0.0,
+                "name": r.area_name,
+                "score": r.opportunity_score,
+                "tier": r.opportunity_type,
+                "yield": r.key_metrics.rental_yield,
+                "price": r.key_metrics.price_per_sqft,
             }
-            for a, s in pairs
+            for r in reports
+        ],
+        key=lambda x: x["score"],
+        reverse=True,
+    )
+    movers = sorted(
+        [
+            {"name": r.area_name, "metric": "1Y appreciation",
+             "change_pct": float(r.key_metrics.appreciation_1y)}
+            for r in reports
+            if r.key_metrics.appreciation_1y is not None
         ],
         key=lambda m: m["change_pct"],
         reverse=True,
@@ -113,12 +72,11 @@ async def get_market_brief(db: AsyncSession = Depends(get_db)) -> dict:
     payload = await market_brief(
         avg_yield=avg_yield,
         avg_price_per_sqft=avg_price,
-        total_areas=len(pairs),
+        total_areas=len(reports),
         top_opportunities=opps[:5],
         top_movers=movers[:5],
     )
     if payload is None:
-        # Lightweight fallback so the dashboard always has SOMETHING to render
         return {
             "as_of": "",
             "brief": [
@@ -138,47 +96,30 @@ async def get_market_brief(db: AsyncSession = Depends(get_db)) -> dict:
 
 
 @router.get("/area/{area_id}")
-async def get_area_insight(
-    area_id: UUID,
-    db: AsyncSession = Depends(get_db),
-) -> dict:
+async def get_area_insight(area_id: UUID, db: AsyncSession = Depends(get_db)) -> dict:
     """Structured insight for one area. Cached 24h per (area, score, tier)."""
     area = (await db.execute(select(Area).where(Area.id == area_id))).scalar_one_or_none()
     if not area:
         raise HTTPException(status_code=404, detail="Area not found")
 
-    history = (
-        await db.execute(
-            select(MarketSnapshot)
-            .where(MarketSnapshot.area_id == area_id)
-            .order_by(MarketSnapshot.snapshot_date)
-        )
-    ).scalars().all()
-    if not history:
-        raise HTTPException(status_code=404, detail="No snapshots for area")
-    latest = history[-1]
-
-    # Need cohort median + opportunity score so cache key invalidates on data drift.
-    pairs = await _all_latest(db)
-    cohort_median = compute_cohort_median([s for _, s in pairs])
-    report = build_report(
-        area=area,
-        latest=latest,
-        history=list(history),
-        cohort_median_price=cohort_median,
-    )
+    dld_id = await _resolve_dld_area_id(db, area_id)
+    reports = {r.area_id: r for r in _score_all_dld(await _load_universe_dld(db))}
+    report = reports.get(dld_id) if dld_id else None
+    if report is None:
+        raise HTTPException(status_code=404, detail="No DLD data for area")
+    km = report.key_metrics
 
     payload = await structured_area_insight(
         area_id=str(area_id),
         area_name=area.name,
-        rental_yield=float(latest.rental_yield),
-        price_per_sqft=float(latest.avg_price_per_sqft),
-        appreciation_1y=float(latest.appreciation_1y) if latest.appreciation_1y else None,
-        appreciation_3y=float(latest.appreciation_3y) if latest.appreciation_3y else None,
-        risk_score=float(latest.risk_score) if latest.risk_score else None,
-        demand_score=float(latest.demand_score) if latest.demand_score else None,
-        occupancy=float(latest.occupancy_rate) if latest.occupancy_rate else None,
-        transaction_volume=latest.transaction_volume,
+        rental_yield=km.rental_yield,
+        price_per_sqft=km.price_per_sqft,
+        appreciation_1y=km.appreciation_1y,
+        appreciation_3y=km.appreciation_3y,
+        risk_score=km.risk_score,
+        demand_score=km.demand_score,
+        occupancy=None,
+        transaction_volume=km.transaction_volume,
         score=report.opportunity_score,
         tier=report.opportunity_type,
     )
@@ -195,31 +136,45 @@ async def get_area_insight(
 
 @router.get("/trends")
 async def get_trends(db: AsyncSession = Depends(get_db)) -> dict:
-    """Movers + LLM narrative. Cached 24h."""
-    areas = (await db.execute(select(Area).order_by(Area.name))).scalars().all()
-    universe: list[dict] = []
-    for a in areas:
-        snaps = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == a.id)
-                .order_by(MarketSnapshot.snapshot_date)
+    """Movers + LLM narrative from the real DLD yearly series. Cached 24h."""
+    reports = _score_all_dld(await _load_universe_dld(db))
+    # DLD yearly price⋈yield history grouped by cadastral name (one query).
+    hist_rows = (
+        await db.execute(
+            text(
+                """
+                SELECT p.area_name_norm AS norm, p.year AS year,
+                       p.avg_ppsf_all AS ppsf, y.gross_yield_pct AS gy,
+                       p.transaction_count AS tc
+                FROM dld_price_history p
+                LEFT JOIN dld_yield_history y
+                       ON y.area_name_norm = p.area_name_norm AND y.year = p.year
+                WHERE p.avg_ppsf_all IS NOT NULL
+                ORDER BY p.area_name_norm, p.year
+                """
             )
-        ).scalars().all()
-        if not snaps:
-            continue
-        universe.append(
-            {
-                "area_id": str(a.id),
-                "name": a.name,
-                "history": [
-                    {
-                        "avg_price_per_sqft": float(s.avg_price_per_sqft),
-                        "rental_yield": float(s.rental_yield),
-                        "transaction_volume": s.transaction_volume or 0,
-                    }
-                    for s in snaps
-                ],
-            }
         )
+    ).mappings().all()
+    by_norm: dict[str, list[dict]] = {}
+    for h in hist_rows:
+        by_norm.setdefault(h["norm"], []).append({
+            "avg_price_per_sqft": float(h["ppsf"]),
+            "rental_yield": float(h["gy"]) if h["gy"] is not None else 0.0,
+            "transaction_volume": int(h["tc"] or 0),
+        })
+
+    # Map each scored area (dld_area.id) → its cadastral name_norm for history.
+    id_to_norm = {
+        str(i): n for i, n in
+        (await db.execute(select(DldArea.id, DldArea.name_norm))).all()
+    }
+    universe: list[dict] = []
+    for r in reports:
+        own = id_to_norm.get(r.area_id)
+        if not own:
+            continue
+        hist = by_norm.get(cadastral_data_norm(own))
+        if not hist:
+            continue
+        universe.append({"area_id": r.area_id, "name": r.area_name, "history": hist})
     return await compute_trends(universe=universe)

@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.area import Area
 from app.models.investment_opportunity import InvestmentOpportunity
-from app.models.market_snapshot import MarketSnapshot
 
 
 WEIGHTS = {
@@ -182,43 +181,36 @@ async def load_area_context(db: AsyncSession, area_name: str) -> AreaContext:
         )
         area = res.scalar_one_or_none()
 
-    # Cohort median PPS — taken across the latest snapshot of every area.
-    # Small N (70 areas) → no need to cache.
-    all_areas = (await db.execute(select(Area))).scalars().all()
-    latest_pps: list[float] = []
-    for a in all_areas:
-        last = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == a.id)
-                .order_by(MarketSnapshot.snapshot_date.desc())
-                .limit(1)
+    # Cohort median PPS — Dubai-wide median of real DLD area median-ppsf
+    # (World B retired; no more seeded snapshots).
+    from app.models.dld import DldAreaMetrics
+    from app.api.routes.opportunities import (
+        _load_universe_dld, _score_all_dld, _resolve_dld_area_id,
+    )
+    prices = (
+        await db.execute(
+            select(DldAreaMetrics.median_price_per_sqft).where(
+                DldAreaMetrics.period == "2026-ytd",
+                DldAreaMetrics.median_price_per_sqft.isnot(None),
             )
-        ).scalar_one_or_none()
-        if last:
-            latest_pps.append(float(last.avg_price_per_sqft))
-    cohort_median = float(median(latest_pps)) if latest_pps else 1500.0
+        )
+    ).scalars().all()
+    cohort_median = float(median([float(p) for p in prices])) if prices else 1500.0
 
     area_pps: Optional[float] = None
     area_investment_score: Optional[float] = None
     area_momentum: Optional[float] = None
     if area is not None:
-        last_snap = (
-            await db.execute(
-                select(MarketSnapshot)
-                .where(MarketSnapshot.area_id == area.id)
-                .order_by(MarketSnapshot.snapshot_date.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if last_snap:
-            area_pps = float(last_snap.avg_price_per_sqft)
-            if last_snap.investment_score is not None:
-                area_investment_score = float(last_snap.investment_score)
-            if last_snap.appreciation_1y is not None:
-                # Map appreciation 1y from -5% .. +20% onto [0, 1].
-                appr = float(last_snap.appreciation_1y)
-                area_momentum = max(0.0, min(1.0, (appr + 5.0) / 25.0))
+        dld_id = await _resolve_dld_area_id(db, area.id)
+        if dld_id:
+            reps = {r.area_id: r for r in _score_all_dld(await _load_universe_dld(db))}
+            rep = reps.get(dld_id)
+            if rep:
+                area_pps = rep.key_metrics.price_per_sqft
+                area_investment_score = rep.key_metrics.investment_score
+                if rep.key_metrics.appreciation_1y is not None:
+                    appr = float(rep.key_metrics.appreciation_1y)
+                    area_momentum = max(0.0, min(1.0, (appr + 5.0) / 25.0))
 
     return AreaContext(
         cohort_median_pps=cohort_median,
