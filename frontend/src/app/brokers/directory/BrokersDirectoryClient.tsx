@@ -25,6 +25,7 @@ import {
 } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { AreaSelector } from '@/components/AreaSelector';
+import { ClaimProfileButton } from '@/components/ClaimProfileButton';
 import type {
   BrokerGoal,
   BrokerMatchItem,
@@ -683,6 +684,15 @@ function SimpleBrokerCard({
       >
         Request Consultation
       </button>
+      <div className="mt-2 text-center">
+        <ClaimProfileButton
+          claimType="broker"
+          targetId={broker.broker_number}
+          targetName={broker.full_name}
+          variant="link"
+          label="Are you this broker? Claim this profile"
+        />
+      </div>
     </div>
   );
 }

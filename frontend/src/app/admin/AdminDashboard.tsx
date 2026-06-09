@@ -177,6 +177,26 @@ export function AdminDashboard() {
         </button>
       </div>
 
+      {/* Quick nav */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { href: '/admin/leads', label: 'Leads' },
+          { href: '/admin/brokers', label: 'Brokers' },
+          { href: '/admin/opportunities', label: 'Opportunities' },
+          { href: '/admin/accounts', label: 'Accounts' },
+          { href: '/admin/subscriptions', label: 'Subscriptions' },
+          { href: '/admin/claims', label: 'Claims' },
+        ].map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            className="inline-flex h-8 items-center rounded-md border border-border bg-bg-elev/40 px-3 text-xs text-fg-muted hover:text-fg hover:border-accent/40 transition-colors"
+          >
+            {l.label}
+          </a>
+        ))}
+      </div>
+
       {error && (
         <div className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-negative">
           {error}

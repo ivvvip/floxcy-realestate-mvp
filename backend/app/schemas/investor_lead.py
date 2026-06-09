@@ -59,5 +59,11 @@ class LeadOut(BaseModel):
     message: Optional[str]
     lead_score: Optional[float]
     status: str
+    # Lead routing (monetization foundation)
+    lead_type: Optional[str] = None
+    lead_status: str = "new"
+    assigned_broker_number: Optional[str] = None
+    assigned_developer_number: Optional[str] = None
+    assigned_agency_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime

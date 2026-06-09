@@ -2109,3 +2109,121 @@ export interface RegisterInterestResponse {
   status: string;
   message: string;
 }
+
+// ---------- Monetization foundation (claims + admin accounts) ----------
+
+export type ClaimType = 'broker' | 'agency' | 'developer';
+export type ClaimStatusType = 'pending' | 'approved' | 'rejected';
+
+export interface ClaimCreateRequest {
+  claim_type: ClaimType;
+  target_id: string;
+  target_name?: string | null;
+  claimant_name: string;
+  claimant_email?: string | null;
+  claimant_phone?: string | null;
+  claimant_company?: string | null;
+  message?: string | null;
+}
+
+export interface ClaimCreateResponse {
+  claim_id: string;
+  status: string;
+  message: string;
+}
+
+export interface AccountClaim {
+  id: string;
+  claim_type: ClaimType;
+  target_id: string;
+  target_name: string | null;
+  claimant_name: string;
+  claimant_email: string | null;
+  claimant_phone: string | null;
+  claimant_company: string | null;
+  message: string | null;
+  status: ClaimStatusType;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+}
+
+export interface BrokerProfile {
+  id: string;
+  broker_number: string;
+  user_id: string | null;
+  photo_url: string | null;
+  bio: string | null;
+  years_experience: number | null;
+  specialties: string[] | null;
+  languages: string[] | null;
+  areas_covered: string[] | null;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  is_verified: boolean;
+  is_featured: boolean;
+  subscription_tier: string;
+  claimed_at: string | null;
+  created_at: string;
+}
+
+export interface AgencyProfile {
+  id: string;
+  real_estate_number: string | null;
+  agency_name: string;
+  user_id: string | null;
+  logo_url: string | null;
+  description: string | null;
+  license_number: string | null;
+  broker_numbers: string[] | null;
+  is_verified: boolean;
+  is_featured: boolean;
+  subscription_tier: string;
+  claimed_at: string | null;
+  created_at: string;
+}
+
+export interface DeveloperAccount {
+  id: string;
+  developer_number: string;
+  developer_name: string | null;
+  user_id: string | null;
+  logo_url: string | null;
+  description: string | null;
+  claimed_projects: string[] | null;
+  is_verified: boolean;
+  subscription_tier: string;
+  lead_access: boolean;
+  claimed_at: string | null;
+  created_at: string;
+}
+
+export interface AccountsOverview {
+  brokers: BrokerProfile[];
+  agencies: AgencyProfile[];
+  developers: DeveloperAccount[];
+  counts: Record<string, number>;
+}
+
+export interface SubscriptionRow {
+  kind: 'user' | 'broker' | 'agency' | 'developer';
+  id: string;
+  name: string;
+  account_or_tier: string;
+  status: string;
+  is_paid: boolean;
+  subscription_end: string | null;
+}
+
+export interface SubscriptionsOverview {
+  rows: SubscriptionRow[];
+  counts: Record<string, number>;
+}
+
+export interface ProfilePatchRequest {
+  is_verified?: boolean;
+  is_featured?: boolean;
+  subscription_tier?: string;
+  lead_access?: boolean;
+}

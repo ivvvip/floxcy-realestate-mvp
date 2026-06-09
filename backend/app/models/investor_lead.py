@@ -41,6 +41,21 @@ class InvestorLead(Base):
     message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     lead_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="new", nullable=False, index=True)
+    # --- Lead routing (monetization foundation; not gated yet) ---
+    # lead_type = which supply side this lead targets; lead_status = routing
+    # lifecycle (new/sent/contacted/closed). The legacy `status` above is kept
+    # for the existing /admin/leads view; lead_status is the new routing axis.
+    lead_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)
+    lead_status: Mapped[str] = mapped_column(String(16), default="new", nullable=False, index=True)
+    assigned_broker_number: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("dld_rera_brokers.broker_number", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    assigned_developer_number: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("dld_developers.developer_number", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    assigned_agency_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("agency_profiles.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

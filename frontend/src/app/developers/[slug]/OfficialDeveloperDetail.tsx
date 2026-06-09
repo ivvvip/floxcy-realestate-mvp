@@ -4,6 +4,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { formatNumber, formatLargeAED } from '@/lib/format';
 import { completionStage, statusPill, formatHandover } from '@/lib/offplanOfficial';
+import { ClaimProfileButton } from '@/components/ClaimProfileButton';
 import type { OfficialDeveloperDetail as Detail, OfficialProjectCard } from '@/lib/types';
 
 export function OfficialDeveloperDetail({ detail }: { detail: Detail }) {
@@ -23,6 +24,12 @@ export function OfficialDeveloperDetail({ detail }: { detail: Detail }) {
                   <Building2 className="h-4 w-4 text-fg-muted" strokeWidth={2} />
                   <h1 className="text-xl font-semibold text-fg tracking-tight truncate">{dev.developer_name}</h1>
                   <span className="pill border-positive/40 text-positive bg-positive/5">✅ Official DLD Data</span>
+                  <ClaimProfileButton
+                    claimType="developer"
+                    targetId={dev.developer_number}
+                    targetName={dev.developer_name}
+                    variant="link"
+                  />
                 </div>
                 <p className="mt-1 flex items-center gap-2 flex-wrap text-xs text-fg-muted">
                   {dev.has_license_record ? (

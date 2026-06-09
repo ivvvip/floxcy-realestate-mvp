@@ -95,6 +95,15 @@ import type {
   OfficialProjectDetail,
   OfficialDeveloperListResponse,
   OfficialDeveloperDetail,
+  ClaimCreateRequest,
+  ClaimCreateResponse,
+  AccountClaim,
+  AccountsOverview,
+  SubscriptionsOverview,
+  ProfilePatchRequest,
+  BrokerProfile as BrokerProfileT,
+  AgencyProfile as AgencyProfileT,
+  DeveloperAccount as DeveloperAccountT,
 } from './types';
 import { getBrokerToken } from './brokerAuth';
 
@@ -657,6 +666,70 @@ export async function adminUpdateLead(
     body: JSON.stringify(payload),
     revalidate: false,
     withCredentials: true,
+  });
+}
+
+// ---------- Monetization: public claim flow ----------
+
+export async function submitClaim(payload: ClaimCreateRequest): Promise<ClaimCreateResponse> {
+  return request<ClaimCreateResponse>('/api/v1/claims', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    revalidate: false,
+  });
+}
+
+// ---------- Monetization: admin accounts / subscriptions / claims ----------
+
+export async function adminListAccounts(): Promise<AccountsOverview> {
+  return request<AccountsOverview>('/api/v1/admin/accounts', { revalidate: false, withCredentials: true });
+}
+
+export async function adminListSubscriptions(): Promise<SubscriptionsOverview> {
+  return request<SubscriptionsOverview>('/api/v1/admin/subscriptions', { revalidate: false, withCredentials: true });
+}
+
+export async function adminListClaims(status?: string): Promise<AccountClaim[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return request<AccountClaim[]>(`/api/v1/admin/claims${q}`, { revalidate: false, withCredentials: true });
+}
+
+export async function adminApproveClaim(id: string, note?: string): Promise<AccountClaim> {
+  return request<AccountClaim>(`/api/v1/admin/claims/${id}/approve`, {
+    method: 'POST', body: JSON.stringify({ note: note ?? null }), revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminRejectClaim(id: string, note?: string): Promise<AccountClaim> {
+  return request<AccountClaim>(`/api/v1/admin/claims/${id}/reject`, {
+    method: 'POST', body: JSON.stringify({ note: note ?? null }), revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminPatchBrokerProfile(id: string, patch: ProfilePatchRequest): Promise<BrokerProfileT> {
+  return request<BrokerProfileT>(`/api/v1/admin/broker-profiles/${id}`, {
+    method: 'PATCH', body: JSON.stringify(patch), revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminPatchAgencyProfile(id: string, patch: ProfilePatchRequest): Promise<AgencyProfileT> {
+  return request<AgencyProfileT>(`/api/v1/admin/agency-profiles/${id}`, {
+    method: 'PATCH', body: JSON.stringify(patch), revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminPatchDeveloperAccount(id: string, patch: ProfilePatchRequest): Promise<DeveloperAccountT> {
+  return request<DeveloperAccountT>(`/api/v1/admin/developer-accounts/${id}`, {
+    method: 'PATCH', body: JSON.stringify(patch), revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminPatchUserSubscription(
+  id: string,
+  patch: { account_type?: string; subscription_status?: string; is_paid?: boolean; subscription_start?: string; subscription_end?: string }
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(`/api/v1/admin/users/${id}/subscription`, {
+    method: 'PATCH', body: JSON.stringify(patch), revalidate: false, withCredentials: true,
   });
 }
 

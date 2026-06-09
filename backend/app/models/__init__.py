@@ -31,6 +31,12 @@ from app.models.dld import (
 from app.models.dld_project import DldDeveloper, DldProject, ProjectEnrichment
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
+from app.models.monetization import (
+    AccountClaim,
+    AgencyProfile,
+    BrokerProfile,
+    DeveloperAccount,
+)
 from app.models.rent_alert import RentAlert
 from app.models.user import User
 
@@ -67,6 +73,10 @@ __all__ = [
     "DldYieldHistory",
     "InvestmentOpportunity",
     "InvestorLead",
+    "AccountClaim",
+    "AgencyProfile",
+    "BrokerProfile",
+    "DeveloperAccount",
     "RentAlert",
     "User",
 ]
