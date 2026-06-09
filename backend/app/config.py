@@ -64,9 +64,12 @@ class Settings(BaseSettings):
 
     # OpenRouter (LLM advisor)
     OPENROUTER_API_KEY: Optional[str] = None
-    OPENROUTER_DEFAULT_MODEL: str = "openrouter/free"
-    OPENROUTER_PREMIUM_MODEL: str = "anthropic/claude-sonnet-4.6"
-    OPENROUTER_FALLBACK_MODEL: str = "deepseek/deepseek-v4-flash:free"
+    # Verified working on OpenRouter 2026-06-09 (the old openrouter/free auto-
+    # router + deepseek-v4-flash:free both 404'd). Free strong primary with a
+    # cheap-paid reliable fallback so the analyst always generates.
+    OPENROUTER_DEFAULT_MODEL: str = "openai/gpt-oss-120b:free"
+    OPENROUTER_PREMIUM_MODEL: str = "anthropic/claude-3.5-sonnet"
+    OPENROUTER_FALLBACK_MODEL: str = "meta-llama/llama-3.1-8b-instruct"
     OPENROUTER_APP_NAME: str = "floxcy"
     OPENROUTER_APP_URL: str = "https://floxcy.com"
     OPENROUTER_MAX_TOKENS: int = 1000
