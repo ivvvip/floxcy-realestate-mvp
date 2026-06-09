@@ -1969,12 +1969,139 @@ export interface OffplanProjectDetail extends OffplanProjectCard {
 
 export interface RegisterInterestRequest {
   project_slug: string;
+  project_name?: string | null;
   full_name: string;
   whatsapp?: string | null;
   email?: string | null;
   budget_aed?: number | null;
   timeline?: string | null;
   message?: string | null;
+}
+
+// ---------- Official DLD off-plan registry (Phase 3, TIER 1) ----------
+// Keyed on the numeric project_number / developer_number — distinct from the
+// transaction-derived OffplanProjectCard above (text master-project slugs).
+
+export type OfficialProjectStatus = 'ACTIVE' | 'PENDING' | 'PENDING_COMING_SOON';
+
+export interface OfficialProjectCard {
+  project_number: string;
+  project_name: string | null;
+  developer_number: string | null;
+  developer_name: string | null;
+  project_status: OfficialProjectStatus | string | null;
+  percent_completed: number | null;
+  has_escrow: boolean;
+  expected_handover: string | null;   // END_DATE (planned), 255/255
+  handover_date: string | null;        // COMPLETION_DATE (actual), rarely set
+  area: string | null;
+  area_name_norm: string | null;
+  unit_count: number | null;
+  project_value_aed: number | null;
+  source: string;
+}
+
+export interface OfficialProjectListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  source: string;
+  items: OfficialProjectCard[];
+}
+
+export interface OfficialDeveloperRef {
+  developer_number: string;
+  developer_name: string;
+  legal_status: string | null;
+  license_type: string | null;
+  license_number: string | null;
+  webpage: string | null;
+  phone: string | null;
+  source: string;
+}
+
+export interface OfficialPriceContext {
+  avg_ppsf_offplan: number | null;
+  avg_ppsf_ready: number | null;
+  delta_pct: number | null;
+  sample_offplan_sales: number;
+  sample_ready_sales: number;
+  source: string;
+}
+
+export interface OfficialProjectEnrichment {
+  label: string;
+  is_official_source: boolean;
+  enrichment_source: string | null;
+  enrichment_date: string | null;
+  payment_plan: string | null;
+  starting_price_aed: number | null;
+  price_per_sqft_range: (number | null)[];
+  bedroom_types: string | null;
+}
+
+export interface OfficialProjectDetail {
+  official: OfficialProjectCard & {
+    escrow_account_number: string | null;
+    project_type: string | null;
+    zone: string | null;
+    master_project: string | null;
+    description: string | null;
+    counts: { land: number | null; building: number | null; villa: number | null; unit: number | null };
+    timeline: { start: string | null; end: string | null; handover: string | null; inspection: string | null };
+    google_maps_url: string | null;
+  };
+  developer: OfficialDeveloperRef | null;
+  price_context: OfficialPriceContext | null;
+  enrichment: OfficialProjectEnrichment | null;
+}
+
+export interface OfficialDeveloperTrackRecord {
+  project_count: number;
+  active_count: number;
+  pending_count: number;
+  total_units: number;
+  total_value_aed: number | null;
+  avg_percent_completed: number | null;
+  areas_served: number;
+  top_areas: string[];
+}
+
+export interface OfficialDeveloperCard extends OfficialDeveloperTrackRecord {
+  developer_number: string;
+  developer_name: string;
+  has_license_record: boolean;
+  legal_status: string | null;
+  license_type: string | null;
+  source: string;
+}
+
+export interface OfficialDeveloperListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  source: string;
+  items: OfficialDeveloperCard[];
+}
+
+export interface OfficialDeveloperProfile {
+  developer_number: string;
+  developer_name: string;
+  has_license_record: boolean;
+  legal_status: string | null;
+  license_type: string | null;
+  license_number: string | null;
+  license_expiry: string | null;
+  registration_date: string | null;
+  webpage: string | null;
+  phone: string | null;
+  source: string;
+}
+
+export interface OfficialDeveloperDetail {
+  developer: OfficialDeveloperProfile;
+  track_record: OfficialDeveloperTrackRecord;
+  projects: OfficialProjectCard[];
 }
 
 export interface RegisterInterestResponse {

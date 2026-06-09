@@ -31,6 +31,7 @@ export function RegisterInterestForm({ projectSlug, projectName }: Props) {
     try {
       await registerOffplanInterest({
         project_slug: projectSlug,
+        project_name: projectName,
         full_name: fullName.trim(),
         whatsapp: whatsapp.trim() || null,
         email: email.trim() || null,

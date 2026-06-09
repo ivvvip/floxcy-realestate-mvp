@@ -2,87 +2,125 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Filter as FilterIcon } from 'lucide-react';
-import { formatNumber } from '@/lib/format';
+import { ArrowRight, Filter as FilterIcon, ShieldCheck, BadgeCheck } from 'lucide-react';
+import { formatNumber, formatLargeAED } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import type { OffplanProjectCard, DeveloperCard, OffplanStatusKey } from '@/lib/types';
+import { completionStage, statusPill, formatHandover } from '@/lib/offplanOfficial';
+import type { OfficialProjectCard } from '@/lib/types';
 
 interface Props {
-  initialProjects: OffplanProjectCard[];
-  developers: DeveloperCard[];
-  dataSource: string;
-  counts: Record<string, number>;
+  projects: OfficialProjectCard[];
 }
 
-type SortKey = 'units' | 'newest' | 'oldest' | 'name';
-type StatusTab = OffplanStatusKey | 'all';
+type SortKey = 'completion' | 'value' | 'units' | 'handover' | 'name';
+type StatusTab = 'ACTIVE' | 'PENDING' | 'all';
 
 const STATUS_TABS: { key: StatusTab; label: string }[] = [
-  { key: 'active',      label: 'Under Construction' },
-  { key: 'completed',   label: 'Completed' },
-  { key: 'coming_soon', label: 'Coming Soon' },
-  { key: 'all',         label: 'All' },
+  { key: 'ACTIVE',  label: 'Active' },
+  { key: 'PENDING', label: 'Pending' },
+  { key: 'all',     label: 'All' },
 ];
 
-export function OffplanExplorer({ initialProjects, developers, dataSource, counts }: Props) {
-  const [devFilter, setDevFilter] = useState<string>('');
-  const [sort, setSort] = useState<SortKey>('units');
+// Construction-stage filter buckets (by percent_completed).
+const STAGE_BUCKETS: { key: string; label: string; test: (p: number | null) => boolean }[] = [
+  { key: 'all',      label: 'Any stage',        test: () => true },
+  { key: 'launched', label: '📋 Just Launched',  test: (p) => p === 0 },
+  { key: 'early',    label: '🏗️ Early (1–25%)',  test: (p) => p != null && p > 0 && p < 25 },
+  { key: 'under',    label: '🏗️ Under (25–50%)', test: (p) => p != null && p >= 25 && p < 50 },
+  { key: 'mid',      label: '🔨 Mid (50–75%)',    test: (p) => p != null && p >= 50 && p < 75 },
+  { key: 'near',     label: '🔨 Near (75–99%)',   test: (p) => p != null && p >= 75 && p < 100 },
+];
+
+export function OffplanExplorer({ projects }: Props) {
+  const [statusTab, setStatusTab] = useState<StatusTab>('ACTIVE');
+  const [devFilter, setDevFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [sort, setSort] = useState<SortKey>('completion');
   const [search, setSearch] = useState('');
-  const [statusTab, setStatusTab] = useState<StatusTab>('active');
+
+  const developers = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) {
+      if (p.developer_number && p.developer_name) m.set(p.developer_number, p.developer_name);
+    }
+    return [...m.entries()].map(([number, name]) => ({ number, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
+
+  const areas = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) {
+      if (p.area_name_norm && p.area) m.set(p.area_name_norm, p.area);
+    }
+    return [...m.entries()].map(([norm, name]) => ({ norm, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
+
+  const counts = useMemo(() => {
+    const c = { ACTIVE: 0, PENDING: 0, all: projects.length } as Record<string, number>;
+    for (const p of projects) {
+      const s = (p.project_status || '').toUpperCase();
+      if (s === 'ACTIVE') c.ACTIVE++;
+      else if (s.startsWith('PENDING')) c.PENDING++;
+    }
+    return c;
+  }, [projects]);
+
+  const stageTest = STAGE_BUCKETS.find((b) => b.key === stageFilter)?.test ?? (() => true);
 
   const filtered = useMemo(() => {
-    let rows = initialProjects;
-    if (statusTab !== 'all') rows = rows.filter((p) => p.status_key === statusTab);
-    if (devFilter) rows = rows.filter((p) => p.developer_slug === devFilter);
+    let rows = projects;
+    if (statusTab !== 'all') {
+      rows = rows.filter((p) =>
+        statusTab === 'ACTIVE'
+          ? (p.project_status || '').toUpperCase() === 'ACTIVE'
+          : (p.project_status || '').toUpperCase().startsWith('PENDING')
+      );
+    }
+    if (devFilter) rows = rows.filter((p) => p.developer_number === devFilter);
+    if (areaFilter) rows = rows.filter((p) => p.area_name_norm === areaFilter);
+    rows = rows.filter((p) => stageTest(p.percent_completed));
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter(
         (p) =>
-          p.master_project.toLowerCase().includes(q) ||
-          (p.area_name ?? '').toLowerCase().includes(q) ||
-          p.developer_name.toLowerCase().includes(q)
+          (p.project_name ?? '').toLowerCase().includes(q) ||
+          (p.area ?? '').toLowerCase().includes(q) ||
+          (p.developer_name ?? '').toLowerCase().includes(q)
       );
     }
     const out = [...rows];
     out.sort((a, b) => {
-      if (sort === 'units') return b.total_units - a.total_units;
-      if (sort === 'newest') return (b.latest_year ?? 0) - (a.latest_year ?? 0);
-      if (sort === 'oldest') return (a.earliest_year ?? 9999) - (b.earliest_year ?? 9999);
-      return a.master_project.localeCompare(b.master_project);
+      if (sort === 'completion') return (b.percent_completed ?? -1) - (a.percent_completed ?? -1);
+      if (sort === 'value') return (b.project_value_aed ?? 0) - (a.project_value_aed ?? 0);
+      if (sort === 'units') return (b.unit_count ?? 0) - (a.unit_count ?? 0);
+      if (sort === 'handover') return (a.expected_handover ?? '9999').localeCompare(b.expected_handover ?? '9999');
+      return (a.project_name ?? '').localeCompare(b.project_name ?? '');
     });
     return out;
-  }, [initialProjects, devFilter, sort, search, statusTab]);
+  }, [projects, statusTab, devFilter, areaFilter, stageTest, search, sort]);
 
   return (
     <div className="space-y-4">
       {/* Status tabs */}
       <div className="flex items-center gap-1 flex-wrap border-b border-border pb-2">
-        {STATUS_TABS.map((t) => {
-          const n = counts[t.key] ?? 0;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setStatusTab(t.key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                statusTab === t.key
-                  ? 'bg-accent text-bg'
-                  : 'text-fg-muted hover:text-fg hover:bg-bg-elev/40'
-              )}
-            >
-              {t.label}
-              <span
-                className={cn(
-                  'tabular text-[10px]',
-                  statusTab === t.key ? 'text-bg/70' : 'text-fg-subtle'
-                )}
-              >
-                {n}
-              </span>
-            </button>
-          );
-        })}
+        {STATUS_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setStatusTab(t.key)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+              statusTab === t.key ? 'bg-accent text-bg' : 'text-fg-muted hover:text-fg hover:bg-bg-elev/40'
+            )}
+          >
+            {t.label}
+            <span className={cn('tabular text-[10px]', statusTab === t.key ? 'text-bg/70' : 'text-fg-subtle')}>
+              {counts[t.key] ?? 0}
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="surface-card p-3 flex flex-wrap items-center gap-2">
@@ -95,121 +133,112 @@ export function OffplanExplorer({ initialProjects, developers, dataSource, count
           className="flex-1 min-w-[180px] bg-bg-elev/60 border border-border rounded-md px-3 py-1.5 text-xs text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent/60"
         />
         <select
+          value={areaFilter}
+          onChange={(e) => setAreaFilter(e.target.value)}
+          className="bg-bg-elev/60 border border-border rounded-md px-2 py-1.5 text-xs text-fg focus:outline-none focus:border-accent/60"
+        >
+          <option value="">All areas</option>
+          {areas.map((a) => <option key={a.norm} value={a.norm}>{a.name}</option>)}
+        </select>
+        <select
           value={devFilter}
           onChange={(e) => setDevFilter(e.target.value)}
           className="bg-bg-elev/60 border border-border rounded-md px-2 py-1.5 text-xs text-fg focus:outline-none focus:border-accent/60"
         >
           <option value="">All developers</option>
-          {developers.map((d) => (
-            <option key={d.slug} value={d.slug}>{d.name}</option>
-          ))}
+          {developers.map((d) => <option key={d.number} value={d.number}>{d.name}</option>)}
+        </select>
+        <select
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value)}
+          className="bg-bg-elev/60 border border-border rounded-md px-2 py-1.5 text-xs text-fg focus:outline-none focus:border-accent/60"
+        >
+          {STAGE_BUCKETS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
         </select>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
           className="bg-bg-elev/60 border border-border rounded-md px-2 py-1.5 text-xs text-fg focus:outline-none focus:border-accent/60"
         >
+          <option value="completion">Most complete</option>
+          <option value="value">Project value</option>
           <option value="units">Most units</option>
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
+          <option value="handover">Soonest handover</option>
           <option value="name">A → Z</option>
         </select>
         <span className="ml-auto text-[11px] text-fg-subtle tabular">
-          {filtered.length} of {initialProjects.length}
+          {filtered.length} of {projects.length}
         </span>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="surface-card p-6 text-center text-fg-muted text-sm">
-          No matching projects.
-        </div>
+        <div className="surface-card p-6 text-center text-fg-muted text-sm">No matching projects.</div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => (
-            <ProjectCard key={p.slug} p={p} />
-          ))}
+          {filtered.map((p) => <ProjectCard key={p.project_number} p={p} />)}
         </div>
       )}
 
-      {dataSource && (
-        <p className="text-[11px] text-fg-subtle italic">{dataSource}</p>
-      )}
+      <p className="text-[11px] text-fg-subtle italic">
+        ✅ Official DLD Data — Dubai Land Department projects registry (2026 snapshot).
+      </p>
     </div>
   );
 }
 
-function statusEmoji(s: OffplanStatusKey): string {
-  if (s === 'completed') return '✅';
-  if (s === 'coming_soon') return '📋';
-  return '🏗️';
-}
+function ProjectCard({ p }: { p: OfficialProjectCard }) {
+  const stage = completionStage(p.percent_completed);
+  const pill = statusPill(p.project_status);
+  const handover = formatHandover(p.expected_handover);
+  const pct = p.percent_completed ?? 0;
 
-function statusPillClass(s: OffplanStatusKey): string {
-  if (s === 'completed') return 'border-positive/40 text-positive bg-positive/5';
-  if (s === 'coming_soon') return 'border-accent/40 text-accent bg-accent/5';
-  return 'pill-accent';
-}
-
-function ProjectCard({ p }: { p: OffplanProjectCard }) {
   return (
     <Link
-      href={`/offplan/${p.slug}`}
+      href={`/offplan/${p.project_number}`}
       className="surface-card p-4 hover:border-accent/40 transition-colors block group"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-fg group-hover:text-accent truncate">
-            {p.master_project}
+            {p.project_name ?? `Project ${p.project_number}`}
           </div>
-          <div className="mt-0.5 text-[11px] text-fg-muted truncate">
-            {p.area_name ?? '—'} · {p.developer_name}
+          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-fg-muted truncate">
+            <BadgeCheck className="h-3 w-3 text-positive shrink-0" strokeWidth={2.5} />
+            <span className="truncate">{p.developer_name ?? '—'}</span>
           </div>
+          <div className="mt-0.5 text-[11px] text-fg-subtle truncate">{p.area ?? '—'}</div>
         </div>
-        <span
-          className={cn(
-            'shrink-0 inline-flex items-center gap-1 text-[10px] tabular border rounded px-1.5 py-0.5',
-            statusPillClass(p.status_key)
-          )}
-          title={p.status_label}
-        >
-          {statusEmoji(p.status_key)}{' '}
-          {p.status_key === 'completed'
-            ? 'Completed'
-            : p.status_key === 'coming_soon'
-            ? 'Coming Soon'
-            : 'Under construction'}
+        <span className={cn('shrink-0 inline-flex items-center text-[10px] tabular border rounded px-1.5 py-0.5', pill.className)}>
+          {pill.label}
         </span>
       </div>
 
-      <div className="mt-2 text-[11px] text-fg-muted">{p.status_label}</div>
-
-      {p.status_key === 'completed' && p.price_gain_pct != null && p.offplan_ppsf && p.ready_ppsf && (
-        <div className="mt-2 rounded border border-positive/30 bg-positive/5 px-2 py-1.5 text-[11px] tabular text-positive">
-          Bought off-plan at {formatNumber(p.offplan_ppsf, 0)} AED/sqft → ready market {formatNumber(p.ready_ppsf, 0)} AED/sqft
-          <span className="ml-1 font-semibold">
-            {p.price_gain_pct >= 0 ? '+' : ''}{p.price_gain_pct.toFixed(1)}%
-          </span>
+      {/* Construction stage + % bar */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className={cn('font-medium', stage.tone)}>{stage.emoji} {stage.label}</span>
+          <span className="tabular text-fg-muted">{pct.toFixed(pct % 1 === 0 ? 0 : 1)}%</span>
         </div>
-      )}
-
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-        <Stat label="Buildings" value={formatNumber(p.buildings_count)} />
-        <Stat label="Units" value={formatNumber(p.total_units)} accent />
-        <Stat
-          label="Years"
-          value={
-            p.earliest_year && p.latest_year
-              ? p.earliest_year === p.latest_year
-                ? `${p.earliest_year}`
-                : `${p.earliest_year}–${p.latest_year}`
-              : '—'
-          }
-        />
+        <div className="mt-1 h-1.5 rounded-full bg-bg-elev overflow-hidden">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(2, pct))}%` }} />
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-1 text-[11px] text-accent">
-        {p.status_key === 'completed' ? 'See ready market' : 'View details'}{' '}
-        <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+        <Stat label="Units" value={p.unit_count != null ? formatNumber(p.unit_count) : '—'} accent />
+        <Stat label="Handover" value={handover ?? '—'} />
+        <Stat label="Value" value={p.project_value_aed != null ? formatLargeAED(p.project_value_aed) : '—'} />
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        {p.has_escrow && (
+          <span className="inline-flex items-center gap-1 text-[10px] text-positive border border-positive/30 bg-positive/5 rounded px-1.5 py-0.5">
+            <ShieldCheck className="h-3 w-3" strokeWidth={2.5} /> Escrow Protected
+          </span>
+        )}
+        <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-accent">
+          View details <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
+        </span>
       </div>
     </Link>
   );

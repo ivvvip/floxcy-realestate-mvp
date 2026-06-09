@@ -91,6 +91,10 @@ import type {
   OffplanProjectDetail,
   RegisterInterestRequest,
   RegisterInterestResponse,
+  OfficialProjectListResponse,
+  OfficialProjectDetail,
+  OfficialDeveloperListResponse,
+  OfficialDeveloperDetail,
 } from './types';
 import { getBrokerToken } from './brokerAuth';
 
@@ -1176,6 +1180,62 @@ export async function registerOffplanInterest(
     body: JSON.stringify(payload),
     revalidate: false,
   });
+}
+
+// ---------- Official DLD off-plan registry (Phase 3, TIER 1) ----------
+
+export async function getOfficialProjects(opts?: {
+  status?: string;
+  area?: string;
+  developer_number?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<OfficialProjectListResponse> {
+  const p = new URLSearchParams();
+  if (opts?.status) p.set('status', opts.status);
+  if (opts?.area) p.set('area', opts.area);
+  if (opts?.developer_number) p.set('developer_number', opts.developer_number);
+  if (opts?.q) p.set('q', opts.q);
+  if (opts?.limit) p.set('limit', String(opts.limit));
+  if (opts?.offset) p.set('offset', String(opts.offset));
+  const qs = p.toString();
+  return request<OfficialProjectListResponse>(
+    `/api/v1/dld/official/projects${qs ? `?${qs}` : ''}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getOfficialProject(projectNumber: string): Promise<OfficialProjectDetail> {
+  return request<OfficialProjectDetail>(
+    `/api/v1/dld/official/projects/${encodeURIComponent(projectNumber)}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getOfficialDevelopers(opts?: {
+  sort?: 'projects' | 'value' | 'units' | 'name';
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<OfficialDeveloperListResponse> {
+  const p = new URLSearchParams();
+  if (opts?.sort) p.set('sort', opts.sort);
+  if (opts?.q) p.set('q', opts.q);
+  if (opts?.limit) p.set('limit', String(opts.limit));
+  if (opts?.offset) p.set('offset', String(opts.offset));
+  const qs = p.toString();
+  return request<OfficialDeveloperListResponse>(
+    `/api/v1/dld/official/developers${qs ? `?${qs}` : ''}`,
+    { revalidate: 300 }
+  );
+}
+
+export async function getOfficialDeveloper(developerNumber: string): Promise<OfficialDeveloperDetail> {
+  return request<OfficialDeveloperDetail>(
+    `/api/v1/dld/official/developers/${encodeURIComponent(developerNumber)}`,
+    { revalidate: 300 }
+  );
 }
 
 export { ApiError };

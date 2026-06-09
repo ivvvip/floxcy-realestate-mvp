@@ -118,6 +118,10 @@ class OffplanProjectDetail(BaseModel):
 
 class RegisterInterestRequest(BaseModel):
     project_slug: str
+    # Optional human-readable name. Official off-plan projects key on a numeric
+    # project_number (not a master-project slug), so the page passes the name
+    # through directly rather than relying on slug→master_project resolution.
+    project_name: Optional[str] = Field(default=None, max_length=300)
     full_name: str = Field(..., min_length=2, max_length=200)
     whatsapp: Optional[str] = Field(default=None, max_length=64)
     email: Optional[EmailStr] = None
@@ -499,18 +503,21 @@ async def register_interest(
             422, "At least one contact channel (whatsapp or email) is required"
         )
 
-    project_name = payload.project_slug
-    mps = (
-        await db.execute(
-            select(DldBuildingsSales.master_project_en)
-            .where(DldBuildingsSales.master_project_en.is_not(None))
-            .distinct()
-        )
-    ).scalars().all()
-    for mp in mps:
-        if _slugify(mp) == payload.project_slug.lower():
-            project_name = mp
-            break
+    # Prefer the explicit name (official projects pass it through); otherwise
+    # resolve the transaction-derived slug back to its master_project name.
+    project_name = (payload.project_name or "").strip() or payload.project_slug
+    if not (payload.project_name or "").strip():
+        mps = (
+            await db.execute(
+                select(DldBuildingsSales.master_project_en)
+                .where(DldBuildingsSales.master_project_en.is_not(None))
+                .distinct()
+            )
+        ).scalars().all()
+        for mp in mps:
+            if _slugify(mp) == payload.project_slug.lower():
+                project_name = mp
+                break
 
     lead = InvestorLead(
         full_name=payload.full_name.strip(),
