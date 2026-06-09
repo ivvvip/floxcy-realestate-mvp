@@ -20,9 +20,12 @@
     "rent_check": "Rent Check",
     "brokers": "Brokers",
     "roi": "ROI",
+    "roi_calculator": "ROI Calculator",
     "learn": "Learn",
+    "tools": "أدوات",
+    "more": "المزيد",
     "calculate_roi": "Calculate ROI",
-    "brand_tag": "Dubai · Beta"
+    "brand_tag": "Dubai"
   },
 
   "common": {

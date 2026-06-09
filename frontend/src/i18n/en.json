@@ -13,16 +13,19 @@
     "buildings": "Properties",
     "opportunities": "Opportunities",
     "offplan": "Off-Plan",
-    "timing": "Timing",
+    "timing": "Market Timing",
     "visa": "Golden Visa",
     "compare": "Compare",
     "ai_analyst": "AI Analyst",
     "rent_check": "Rent Check",
     "brokers": "Brokers",
     "roi": "ROI",
+    "roi_calculator": "ROI Calculator",
     "learn": "Learn",
+    "tools": "Tools",
+    "more": "More",
     "calculate_roi": "Calculate ROI",
-    "brand_tag": "Dubai · Beta"
+    "brand_tag": "Dubai"
   },
 
   "common": {

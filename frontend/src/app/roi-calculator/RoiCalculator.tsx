@@ -106,7 +106,7 @@ export function RoiCalculator({ areaOptions }: Props) {
 
             <div>
               <Label>Property type</Label>
-              <div className="mt-1.5 grid grid-cols-5 gap-1">
+              <div className="mt-1.5 grid grid-cols-3 sm:grid-cols-5 gap-1">
                 {PROPERTY_TYPES.map((p) => (
                   <button
                     key={p.value}

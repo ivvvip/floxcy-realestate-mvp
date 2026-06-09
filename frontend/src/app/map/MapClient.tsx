@@ -27,7 +27,7 @@ export function MapClient({
       buildings={buildings}
       showAreasInitially
       showBuildingsInitially
-      heightClass="h-[680px]"
+      heightClass="h-[65vh] min-h-[420px] sm:h-[680px]"
     />
   );
 }
