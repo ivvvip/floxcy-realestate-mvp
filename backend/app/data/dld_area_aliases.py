@@ -255,6 +255,45 @@ MARKETING_TO_CADASTRAL_PRIMARY: dict[str, str] = {
     "town square": "al yelayiss 2",
     "town square dubai": "al yelayiss 2",
     "za'abeel": "zaabeel second",
+    # --- CSV-scan additions (yield-bottleneck fix). Derived from the 1.7M-row
+    # transactions scan: master_project_en (community) → dominant area_name_en
+    # for Unit sales, each validated to hold the full price+rent+yield triad
+    # (docs/community-cadastral-map.csv). These un-empty the busiest community
+    # pages whose apartment data is filed under a different cadastral sector. ---
+    "dubai sports city": "al hebiah fourth",
+    "sports city": "al hebiah fourth",
+    "silicon oasis": "nadd hessa",
+    "dubai silicon oasis": "nadd hessa",
+    "dso": "nadd hessa",
+    "motor city": "al hebiah first",
+    "al furjan": "jabal ali first",
+    "discovery gardens": "jabal ali first",
+    "dmcc-ez2": "jabal ali first",
+    "dubai land residence complex": "wadi al safa 5",
+    "the greens": "al thanyah third",
+    "dubai harbour": "marsa dubai",
+    "remraam": "al hebiah fifth",
+    "dubai science park": "al barshaa south second",
+    "barsha heights": "al thanyah first",
+    "tecom": "al thanyah first",
+    "jaddaf waterfront": "al jadaf",
+    "sama al jadaf": "al jadaf",
+    "dubai studio city": "al hebiah second",
+    "dubai water canal": "al wasl",
+    "down town jabal ali": "jabal ali industrial second",
+    "sufouh gardens": "al safouh first",
+    "living legends": "wadi al safa 3",
+    "al barari": "wadi al safa 3",
+    "city of arabia": "wadi al safa 4",
+    "business park": "zaabeel second",
+    "mudon": "al hebiah sixth",
+    # name-formatting mismatches (master_project_en != registry name_norm):
+    "jumeirah lakes towers": "al thanyah fifth",
+    "jlt": "al thanyah fifth",
+    "dubai production city": "me'aisem first",
+    "impz": "me'aisem first",
+    "international city ph 1": "al warsan first",
+    "international city phase 1": "al warsan first",
 }
 
 
