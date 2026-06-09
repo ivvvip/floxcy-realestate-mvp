@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, Noto_Sans_Arabic } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { dirFor } from '@/i18n';
 import { getLocale } from '@/i18n/server';
 
@@ -73,6 +74,7 @@ export default function RootLayout({
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />
+        <FeedbackWidget />
       </body>
     </html>
   );

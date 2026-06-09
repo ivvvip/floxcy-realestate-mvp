@@ -739,6 +739,29 @@ export async function getCityMarketTiming(): Promise<import('./types').MarketTim
   return request<import('./types').MarketTiming>('/api/v1/dld/market-timing', { revalidate: 3600 });
 }
 
+// ---------- User feedback ----------
+
+export async function submitFeedback(
+  payload: import('./types').FeedbackCreateRequest
+): Promise<import('./types').FeedbackCreateResponse> {
+  return request<import('./types').FeedbackCreateResponse>('/api/v1/feedback', {
+    method: 'POST', body: JSON.stringify(payload), revalidate: false,
+  });
+}
+
+export async function adminListFeedback(minRating?: number): Promise<import('./types').UserFeedbackItem[]> {
+  const q = minRating ? `?min_rating=${minRating}` : '';
+  return request<import('./types').UserFeedbackItem[]>(`/api/v1/admin/feedback${q}`, {
+    revalidate: false, withCredentials: true,
+  });
+}
+
+export async function adminFeedbackStats(): Promise<import('./types').FeedbackStats> {
+  return request<import('./types').FeedbackStats>('/api/v1/admin/feedback/stats', {
+    revalidate: false, withCredentials: true,
+  });
+}
+
 // ---------- DLD data layer ----------
 
 export async function getDldStats(): Promise<DldStatsResponse> {

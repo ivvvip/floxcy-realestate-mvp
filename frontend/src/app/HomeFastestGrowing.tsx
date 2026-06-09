@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { getTopAppreciation } from '@/lib/api';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatAppreciation } from '@/lib/format';
 import { toAreaSlug } from '@/lib/slugs';
 import { cn } from '@/lib/cn';
 
@@ -51,7 +51,6 @@ export async function HomeFastestGrowing() {
 
           <ol className="border border-border rounded-lg overflow-hidden bg-bg-card divide-y divide-border/60">
             {data.items.map((it, i) => {
-              const sign = it.appreciation_5y_pct >= 0 ? '+' : '';
               const oneYearTone =
                 it.appreciation_1y_pct == null
                   ? 'text-fg-subtle'
@@ -82,16 +81,16 @@ export async function HomeFastestGrowing() {
                       className={cn(
                         'rounded bg-positive/15 px-2 py-0.5 text-[12px] font-mono text-positive whitespace-nowrap text-center',
                       )}
+                      title={`${it.appreciation_5y_pct.toFixed(1)}% cumulative over 5 years`}
                     >
-                      {sign}
-                      {it.appreciation_5y_pct.toFixed(1)}% 5y
+                      {it.cagr_5y_pct != null
+                        ? `+${it.cagr_5y_pct.toFixed(1)}%/yr`
+                        : `${formatAppreciation(it.appreciation_5y_pct)} 5y`}
                     </span>
                     <span className="hidden sm:flex items-center justify-end gap-2 text-[11px] font-mono">
-                      {it.cagr_5y_pct != null && (
-                        <span className="text-fg-muted">
-                          CAGR {it.cagr_5y_pct.toFixed(1)}%
-                        </span>
-                      )}
+                      <span className="text-fg-muted">
+                        {formatAppreciation(it.appreciation_5y_pct)} 5y
+                      </span>
                       {it.appreciation_1y_pct != null && (
                         <span className={oneYearTone}>
                           {it.appreciation_1y_pct >= 0 ? '+' : ''}
@@ -106,9 +105,10 @@ export async function HomeFastestGrowing() {
           </ol>
 
           <p className="mt-3 text-[10px] text-fg-subtle">
-            Source: {data.data_source} · Updated {data.last_updated}.
-            Appreciation = (latest year avg PPSF − base year avg PPSF) ÷ base
-            year × 100, computed on the all-units blended series.
+            Source: {data.data_source} · Updated {data.last_updated}. Headline is the
+            annualised 5-year CAGR; 5y/1y are cumulative. Emerging areas can show very
+            high cumulative growth off a low starting base — cumulative figures are
+            capped at ≥200% for readability; hover for the exact value.
           </p>
         </div>
       </Container>

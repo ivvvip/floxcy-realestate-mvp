@@ -39,6 +39,7 @@ from app.models.monetization import (
 )
 from app.models.rent_alert import RentAlert
 from app.models.user import User
+from app.models.user_feedback import UserFeedback
 
 __all__ = [
     "Alert",

@@ -186,6 +186,7 @@ export function AdminDashboard() {
           { href: '/admin/accounts', label: 'Accounts' },
           { href: '/admin/subscriptions', label: 'Subscriptions' },
           { href: '/admin/claims', label: 'Claims' },
+          { href: '/admin/feedback', label: 'Feedback' },
         ].map((l) => (
           <a
             key={l.href}

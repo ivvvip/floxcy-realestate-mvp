@@ -23,7 +23,6 @@ export default function AdvisorPage() {
                   <h1 className="text-xl font-semibold text-fg tracking-tight">
                     AI Investment Analyst
                   </h1>
-                  <span className="pill pill-accent">Beta</span>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted">
                   Multi-factor ranking engine · budget &middot; goal &middot; risk &rarr; ranked UAE areas with rationale

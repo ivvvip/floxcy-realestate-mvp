@@ -7,6 +7,7 @@
 import { Info } from 'lucide-react';
 import { MetricTile } from '@/components/data/MetricTile';
 import { PriceTrend } from '@/components/charts/PriceTrend';
+import { formatAppreciation } from '@/lib/format';
 import type { DldPriceHistoryResponse } from '@/lib/types';
 
 interface Props {
@@ -39,22 +40,18 @@ export function AreaPriceHistorySection({ priceHistory }: Props) {
         {has10y ? (
           <MetricTile
             label="10-year growth"
-            tooltip="5Y Appreciation"
-            value={`${priceHistory.appreciation_10y_pct! >= 0 ? '+' : ''}${priceHistory.appreciation_10y_pct!.toFixed(1)}%`}
-            hint={`${lastYear - 10} → ${lastYear}`}
+            tooltip="Cumulative growth, capped at ≥200% for readability"
+            value={formatAppreciation(priceHistory.appreciation_10y_pct)}
+            hint={`${lastYear - 10} → ${lastYear} · cumulative`}
             tone={priceHistory.appreciation_10y_pct! >= 0 ? 'positive' : 'negative'}
             mono
           />
         ) : (
           <MetricTile
             label="5-year growth"
-            tooltip="5Y Appreciation"
-            value={
-              priceHistory.appreciation_5y_pct != null
-                ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
-                : '—'
-            }
-            hint={`${lastYear - 5} → ${lastYear}`}
+            tooltip="Cumulative growth, capped at ≥200% for readability"
+            value={formatAppreciation(priceHistory.appreciation_5y_pct)}
+            hint={`${lastYear - 5} → ${lastYear} · cumulative`}
             tone={
               priceHistory.appreciation_5y_pct == null
                 ? 'default'
@@ -88,12 +85,8 @@ export function AreaPriceHistorySection({ priceHistory }: Props) {
           label={has10y ? '5-year growth' : '3-year growth'}
           value={
             has10y
-              ? priceHistory.appreciation_5y_pct != null
-                ? `${priceHistory.appreciation_5y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_5y_pct.toFixed(1)}%`
-                : '—'
-              : priceHistory.appreciation_3y_pct != null
-                ? `${priceHistory.appreciation_3y_pct >= 0 ? '+' : ''}${priceHistory.appreciation_3y_pct.toFixed(1)}%`
-                : '—'
+              ? formatAppreciation(priceHistory.appreciation_5y_pct)
+              : formatAppreciation(priceHistory.appreciation_3y_pct)
           }
           hint={has10y ? `${lastYear - 5} → ${lastYear}` : `${lastYear - 3} → ${lastYear}`}
           mono

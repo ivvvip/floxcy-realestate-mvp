@@ -61,6 +61,26 @@ export function formatPercent(value: number, digits = 2) {
 // number is bounded — raw DLD yields above 20% are nearly always artefacts.
 export const YIELD_DISPLAY_CAP = 20.0;
 
+// Cumulative appreciation can run very high for emerging/low-base areas
+// (e.g. a 34%/yr CAGR compounds to 331% over 5 years). The raw number is real
+// but reads as implausible to investors, so cumulative figures are presented
+// capped as "≥200%". Annualised CAGR (which stays sane) should be shown
+// alongside as the comparable metric.
+export const APPRECIATION_DISPLAY_CAP = 200.0;
+
+export function formatAppreciation(
+  value: number | null | undefined,
+  digits = 1,
+): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  if (value >= APPRECIATION_DISPLAY_CAP) return `≥${APPRECIATION_DISPLAY_CAP.toFixed(0)}%`;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`;
+}
+
+export function isAppreciationCapped(value: number | null | undefined): boolean {
+  return value != null && Number.isFinite(value) && value >= APPRECIATION_DISPLAY_CAP;
+}
+
 export function formatYield(value: number | null | undefined, digits = 2): string {
   if (value == null || !Number.isFinite(value)) return '—';
   if (value >= YIELD_DISPLAY_CAP) return `≥${YIELD_DISPLAY_CAP.toFixed(0)}%`;

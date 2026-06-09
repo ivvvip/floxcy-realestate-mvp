@@ -151,7 +151,7 @@ export default function ApiPage() {
           <section className="border border-border rounded-lg bg-bg-card p-5">
             <h2 className="text-sm font-medium text-fg">Getting an API key</h2>
             <p className="mt-2 text-xs text-fg-muted">
-              For the public beta, request an API key by reaching out via the
+              To request an API key, reach out via the
               channel in{' '}
               <Link href="/about" className="text-accent hover:underline">
                 About

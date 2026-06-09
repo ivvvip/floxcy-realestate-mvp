@@ -33,7 +33,6 @@ export default async function MapPage() {
                   <h1 className="text-xl font-semibold text-fg tracking-tight">
                     Dubai Map
                   </h1>
-                  <span className="pill pill-accent">Beta</span>
                 </div>
                 <p className="mt-1 text-xs text-fg-muted max-w-2xl">
                   {areas?.count ?? 0} canonical areas (

@@ -23,7 +23,7 @@ import type {
   DldStatsResponse,
   MarketOverviewResponse,
 } from '@/lib/types';
-import { formatAED, formatAEDFull, formatLargeAED, formatPercent, formatNumber } from '@/lib/format';
+import { formatAED, formatAEDFull, formatLargeAED, formatPercent, formatNumber, formatAppreciation } from '@/lib/format';
 import { Container } from '@/components/Container';
 import { MetricTile } from '@/components/data/MetricTile';
 import { DataBadge } from '@/components/data/DataBadge';
@@ -236,7 +236,7 @@ export default async function HomePage() {
                 {market.top_appreciation_area && market.top_appreciation_pct != null && (
                   <PicksTile
                     label="Top 5y appreciation"
-                    value={`+${market.top_appreciation_pct.toFixed(0)}%`}
+                    value={formatAppreciation(market.top_appreciation_pct, 0)}
                     sub={market.top_appreciation_area}
                     tone="positive"
                   />

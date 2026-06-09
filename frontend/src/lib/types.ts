@@ -2242,6 +2242,38 @@ export interface MarketTimingMonth {
   price_years_below: number;
 }
 
+// ---------- User feedback ----------
+
+export interface FeedbackCreateRequest {
+  page_url?: string | null;
+  rating?: number | null;
+  looking_for?: string | null;
+  missing?: string | null;
+  email?: string | null;
+}
+
+export interface FeedbackCreateResponse {
+  id: string;
+  status: string;
+  message: string;
+}
+
+export interface UserFeedbackItem {
+  id: string;
+  page_url: string | null;
+  rating: number | null;
+  looking_for: string | null;
+  missing: string | null;
+  email: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface FeedbackStats {
+  total: number;
+  avg_rating: number | null;
+}
+
 export interface MarketTiming {
   meta: { window: string; total_sales: number; source: string; note: string };
   months: MarketTimingMonth[];

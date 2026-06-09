@@ -171,19 +171,27 @@ export default async function TimingPage() {
 }
 
 function DemandChart({ months, high, low }: { months: MarketTimingMonth[]; high: Set<string>; low: Set<string> }) {
-  const maxPct = Math.max(...months.map((m) => m.pct));
+  const maxPct = Math.max(...months.map((m) => m.pct), 0.1);
   return (
-    <div className="flex items-end gap-1.5 h-40">
+    <div className="flex items-end gap-1 sm:gap-1.5">
       {months.map((m) => {
-        const h = (m.pct / maxPct) * 100;
+        // Bar height is a % of the fixed-height track below — a min of 4% keeps
+        // even the smallest month visible.
+        const h = Math.max(4, (m.pct / maxPct) * 100);
         const color = high.has(m.name) ? 'bg-positive' : low.has(m.name) ? 'bg-fg-subtle' : 'bg-accent';
         return (
-          <div key={m.m} className="flex-1 flex flex-col items-center justify-end gap-1 group">
-            <span className="text-[9px] tabular text-fg-subtle opacity-0 group-hover:opacity-100 transition-opacity">
+          <div key={m.m} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+            <span className="text-[8px] sm:text-[9px] tabular text-fg-subtle">
               {m.demand_index.toFixed(2)}
             </span>
-            <div className={`w-full rounded-t ${color}`} style={{ height: `${h}%` }} title={`${m.name}: ${formatNumber(m.sales)} sales (${m.pct}%) · demand ${m.demand_index.toFixed(2)}`} />
-            <span className="text-[9px] tabular text-fg-muted">{m.name}</span>
+            <div className="w-full h-28 sm:h-32 flex items-end">
+              <div
+                className={`w-full rounded-t ${color} transition-all`}
+                style={{ height: `${h}%` }}
+                title={`${m.name}: ${formatNumber(m.sales)} sales (${m.pct}%) · demand index ${m.demand_index.toFixed(2)}`}
+              />
+            </div>
+            <span className="text-[8px] sm:text-[9px] tabular text-fg-muted">{m.name}</span>
           </div>
         );
       })}
