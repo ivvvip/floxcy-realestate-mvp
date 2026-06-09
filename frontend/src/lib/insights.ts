@@ -27,7 +27,7 @@ export interface InvestmentSummary {
 }
 
 interface MetricsLike {
-  rental_yield: number;
+  rental_yield: number | null;
   appreciation_1y: number | null;
   appreciation_3y: number | null;
   risk_score: number | null;
@@ -87,7 +87,7 @@ export function interpretRisk(score: number | null): RiskInterpretation {
 
 export function describeOpportunity(m: MetricsLike): OpportunityInterpretation {
   const score = m.investment_score ?? 0;
-  const yieldEdge = m.rental_yield - MARKET_YIELD;
+  const yieldEdge = (m.rental_yield ?? 0) - MARKET_YIELD;
   const apprEdge = (m.appreciation_1y ?? 0) - MARKET_APP_1Y;
 
   let tier: OpportunityTier;
@@ -142,7 +142,7 @@ export function buildInvestmentSummary(
 ): InvestmentSummary {
   const opp = describeOpportunity(m);
   const risk = interpretRisk(m.risk_score);
-  const yieldEdge = m.rental_yield - MARKET_YIELD;
+  const yieldEdge = (m.rental_yield ?? 0) - MARKET_YIELD;
 
   const profile =
     yieldEdge > 1
@@ -164,14 +164,14 @@ export function buildInvestmentSummary(
     opp.tier === 'standout'
       ? `Both cash flow and capital growth screen above peers, with ${risk.label.toLowerCase()} fundamentals. The investment score of ${m.investment_score?.toFixed(1) ?? '—'}/10 reflects multi-factor strength.`
       : opp.tier === 'strong'
-        ? `The combination of ${m.rental_yield.toFixed(2)}% yield and ${(m.appreciation_1y ?? 0).toFixed(2)}% 1Y appreciation lands above the UAE benchmark on at least one axis. Position sizing reflects ${risk.label.toLowerCase()}.`
+        ? `The combination of ${(m.rental_yield ?? 0).toFixed(2)}% yield and ${(m.appreciation_1y ?? 0).toFixed(2)}% 1Y appreciation lands above the UAE benchmark on at least one axis. Position sizing reflects ${risk.label.toLowerCase()}.`
         : opp.tier === 'fair'
-          ? `Yield (${m.rental_yield.toFixed(2)}%) and growth (${(m.appreciation_1y ?? 0).toFixed(2)}% 1Y) cluster around UAE averages. Suitable for diversification, not concentration.`
+          ? `Yield (${(m.rental_yield ?? 0).toFixed(2)}%) and growth (${(m.appreciation_1y ?? 0).toFixed(2)}% 1Y) cluster around UAE averages. Suitable for diversification, not concentration.`
           : `Underperformance versus the market on both yield and growth. Consider only with a specific thesis — e.g. infrastructure catalyst or distressed pricing.`;
 
   const bullets: string[] = [];
   bullets.push(
-    `Yield ${m.rental_yield.toFixed(2)}% ${yieldEdge >= 0 ? '+' : ''}${yieldEdge.toFixed(1)}pp vs UAE benchmark (${MARKET_YIELD}%)`
+    `Yield ${(m.rental_yield ?? 0).toFixed(2)}% ${yieldEdge >= 0 ? '+' : ''}${yieldEdge.toFixed(1)}pp vs UAE benchmark (${MARKET_YIELD}%)`
   );
   if (m.appreciation_1y != null) {
     const edge = m.appreciation_1y - MARKET_APP_1Y;

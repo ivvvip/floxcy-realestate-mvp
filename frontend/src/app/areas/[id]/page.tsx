@@ -245,31 +245,37 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
   const typeLabel = TYPE_LABEL[area.area_type] ?? area.area_type;
   const hasCoords = area.latitude != null && area.longitude != null;
 
-  const summary = area.latest
-    ? buildInvestmentSummary(area.name, {
-        rental_yield: area.latest.rental_yield,
-        appreciation_1y: area.latest.appreciation_1y,
-        appreciation_3y: area.latest.appreciation_3y,
-        risk_score: area.latest.risk_score,
-        demand_score: area.latest.demand_score,
-        investment_score: area.latest.investment_score,
-        occupancy_rate: area.latest.occupancy_rate,
-        avg_price_per_sqft: area.latest.avg_price_per_sqft,
-      })
-    : null;
+  // The AI Investment Analysis is yield-led; only build it when we have a real
+  // gated yield. Areas with price but no rent (rental_yield null) skip it
+  // rather than crash — the KPI strip, DLD overlay and history still render.
+  const ry = area.latest?.rental_yield;
+  const summary =
+    area.latest && ry != null
+      ? buildInvestmentSummary(area.name, {
+          rental_yield: ry,
+          appreciation_1y: area.latest.appreciation_1y,
+          appreciation_3y: area.latest.appreciation_3y,
+          risk_score: area.latest.risk_score,
+          demand_score: area.latest.demand_score,
+          investment_score: area.latest.investment_score,
+          occupancy_rate: area.latest.occupancy_rate,
+          avg_price_per_sqft: area.latest.avg_price_per_sqft,
+        })
+      : null;
   const risk = area.latest ? interpretRisk(area.latest.risk_score) : null;
-  const opp = area.latest
-    ? describeOpportunity({
-        rental_yield: area.latest.rental_yield,
-        appreciation_1y: area.latest.appreciation_1y,
-        appreciation_3y: area.latest.appreciation_3y,
-        risk_score: area.latest.risk_score,
-        demand_score: area.latest.demand_score,
-        investment_score: area.latest.investment_score,
-        occupancy_rate: area.latest.occupancy_rate,
-        avg_price_per_sqft: area.latest.avg_price_per_sqft,
-      })
-    : null;
+  const opp =
+    area.latest && ry != null
+      ? describeOpportunity({
+          rental_yield: ry,
+          appreciation_1y: area.latest.appreciation_1y,
+          appreciation_3y: area.latest.appreciation_3y,
+          risk_score: area.latest.risk_score,
+          demand_score: area.latest.demand_score,
+          investment_score: area.latest.investment_score,
+          occupancy_rate: area.latest.occupancy_rate,
+          avg_price_per_sqft: area.latest.avg_price_per_sqft,
+        })
+      : null;
 
   return (
     <div className="bg-bg">
