@@ -1,0 +1,521 @@
+{
+  "meta": {
+    "window": "2021\u20132026",
+    "source": "Estimated from DLD-published service-charge ranges, classified by area avg price/sqft (villa override).",
+    "note": "Service charges vary by building. Estimate only \u2014 verify exact figures via the DLD Service Charge Index / Mollak."
+  },
+  "bands": {
+    "villa": 5,
+    "budget_lt_1200": 14,
+    "mid_1200_2000": 18,
+    "luxury_gt_2000": 28
+  },
+  "default_rate": 18,
+  "vacancy_pct": 5,
+  "areas": [
+    {
+      "name_norm": "al barsha first",
+      "name": "Al Barsha First",
+      "avg_ppsf": 1442,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al barsha south fifth",
+      "name": "Al Barsha South Fifth",
+      "avg_ppsf": 1458,
+      "villa_share": 0.005,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al barsha south fourth",
+      "name": "Al Barsha South Fourth",
+      "avg_ppsf": 1266,
+      "villa_share": 0.022,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al barshaa south second",
+      "name": "Al Barshaa South Second",
+      "avg_ppsf": 1586,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al barshaa south third",
+      "name": "Al Barshaa South Third",
+      "avg_ppsf": 1266,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al goze fourth",
+      "name": "Al Goze Fourth",
+      "avg_ppsf": 700,
+      "villa_share": 0.097,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "al hebiah fifth",
+      "name": "Al Hebiah Fifth",
+      "avg_ppsf": 1325,
+      "villa_share": 0.055,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al hebiah first",
+      "name": "Al Hebiah First",
+      "avg_ppsf": 1539,
+      "villa_share": 0.031,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al hebiah fourth",
+      "name": "Al Hebiah Fourth",
+      "avg_ppsf": 1126,
+      "villa_share": 0.171,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "al hebiah second",
+      "name": "Al Hebiah Second",
+      "avg_ppsf": 1333,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al hebiah sixth",
+      "name": "Al Hebiah Sixth",
+      "avg_ppsf": 1275,
+      "villa_share": 0.936,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "al hebiah third",
+      "name": "Al Hebiah Third",
+      "avg_ppsf": 1305,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al jadaf",
+      "name": "Al Jadaf",
+      "avg_ppsf": 1705,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al khairan first",
+      "name": "Al Khairan First",
+      "avg_ppsf": 2202,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "al kheeran",
+      "name": "Al Kheeran",
+      "avg_ppsf": 1343,
+      "villa_share": 0.046,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al kifaf",
+      "name": "Al Kifaf",
+      "avg_ppsf": 1930,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al merkadh",
+      "name": "Al Merkadh",
+      "avg_ppsf": 1824,
+      "villa_share": 0.001,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al qusais industrial fifth",
+      "name": "Al Qusais Industrial Fifth",
+      "avg_ppsf": 589,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "al safouh first",
+      "name": "Al Safouh First",
+      "avg_ppsf": 1303,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al safouh second",
+      "name": "Al Safouh Second",
+      "avg_ppsf": 2658,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "al satwa",
+      "name": "Al Satwa",
+      "avg_ppsf": 2131,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "al thanayah fourth",
+      "name": "Al Thanayah Fourth",
+      "avg_ppsf": 1163,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "al thanyah fifth",
+      "name": "Al Thanyah Fifth",
+      "avg_ppsf": 1625,
+      "villa_share": 0.002,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al thanyah first",
+      "name": "Al Thanyah First",
+      "avg_ppsf": 1265,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al thanyah third",
+      "name": "Al Thanyah Third",
+      "avg_ppsf": 1510,
+      "villa_share": 0.083,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "al warsan first",
+      "name": "Al Warsan First",
+      "avg_ppsf": 600,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "al wasl",
+      "name": "Al Wasl",
+      "avg_ppsf": 2660,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "al yelayiss 1",
+      "name": "Al Yelayiss 1",
+      "avg_ppsf": 1495,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "al yelayiss 2",
+      "name": "Al Yelayiss 2",
+      "avg_ppsf": 1158,
+      "villa_share": 0.255,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "al yufrah 1",
+      "name": "Al Yufrah 1",
+      "avg_ppsf": 1157,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "bukadra",
+      "name": "Bukadra",
+      "avg_ppsf": 2408,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "burj khalifa",
+      "name": "Burj Khalifa",
+      "avg_ppsf": 2552,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "business bay",
+      "name": "Business Bay",
+      "avg_ppsf": 2146,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "dubai investment park first",
+      "name": "Dubai Investment Park First",
+      "avg_ppsf": 968,
+      "villa_share": 0.535,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "dubai investment park second",
+      "name": "Dubai Investment Park Second",
+      "avg_ppsf": 1535,
+      "villa_share": 0.384,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "hadaeq sheikh mohammed bin rashid",
+      "name": "Hadaeq Sheikh Mohammed Bin Rashid",
+      "avg_ppsf": 2033,
+      "villa_share": 0.11,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "hessyan first",
+      "name": "Hessyan First",
+      "avg_ppsf": 604,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "island 2",
+      "name": "Island 2",
+      "avg_ppsf": 7327,
+      "villa_share": 0.242,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "jabal ali first",
+      "name": "Jabal Ali First",
+      "avg_ppsf": 1351,
+      "villa_share": 0.043,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "jabal ali industrial second",
+      "name": "Jabal Ali Industrial Second",
+      "avg_ppsf": 1228,
+      "villa_share": 0.0,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "jumeirah first",
+      "name": "Jumeirah First",
+      "avg_ppsf": 2830,
+      "villa_share": 0.062,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "jumeirah second",
+      "name": "Jumeirah Second",
+      "avg_ppsf": 6928,
+      "villa_share": 0.011,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "madinat al mataar",
+      "name": "Madinat Al Mataar",
+      "avg_ppsf": 1405,
+      "villa_share": 0.313,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "madinat dubai almelaheyah",
+      "name": "Madinat Dubai Almelaheyah",
+      "avg_ppsf": 2617,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "madinat hind 4",
+      "name": "Madinat Hind 4",
+      "avg_ppsf": 1149,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "marsa dubai",
+      "name": "Marsa Dubai",
+      "avg_ppsf": 2513,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "me'aisem first",
+      "name": "Me'Aisem First",
+      "avg_ppsf": 1258,
+      "villa_share": 0.036,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "mirdif",
+      "name": "Mirdif",
+      "avg_ppsf": 1084,
+      "villa_share": 0.189,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "muhaisanah first",
+      "name": "Muhaisanah First",
+      "avg_ppsf": 1163,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "nad al hamar",
+      "name": "Nad Al Hamar",
+      "avg_ppsf": 1084,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "nad al shiba first",
+      "name": "Nad Al Shiba First",
+      "avg_ppsf": 2308,
+      "villa_share": 0.29,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "nadd hessa",
+      "name": "Nadd Hessa",
+      "avg_ppsf": 1078,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "palm deira",
+      "name": "Palm Deira",
+      "avg_ppsf": 2524,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "palm jabal ali",
+      "name": "Palm Jabal Ali",
+      "avg_ppsf": 3495,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "palm jumeirah",
+      "name": "Palm Jumeirah",
+      "avg_ppsf": 3088,
+      "villa_share": 0.007,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "ras al khor industrial first",
+      "name": "Ras Al Khor Industrial First",
+      "avg_ppsf": 2219,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "rega al buteen",
+      "name": "Rega Al Buteen",
+      "avg_ppsf": 739,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "saih shuaib 1",
+      "name": "Saih Shuaib 1",
+      "avg_ppsf": 2556,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "saih shuaib 2",
+      "name": "Saih Shuaib 2",
+      "avg_ppsf": 1297,
+      "villa_share": 0.07,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "trade center first",
+      "name": "Trade Center First",
+      "avg_ppsf": 3749,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "trade center second",
+      "name": "Trade Center Second",
+      "avg_ppsf": 4148,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "um suqaim third",
+      "name": "Um Suqaim Third",
+      "avg_ppsf": 2453,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "wadi al safa 2",
+      "name": "Wadi Al Safa 2",
+      "avg_ppsf": 1102,
+      "villa_share": 0.137,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "wadi al safa 3",
+      "name": "Wadi Al Safa 3",
+      "avg_ppsf": 1503,
+      "villa_share": 0.179,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "wadi al safa 4",
+      "name": "Wadi Al Safa 4",
+      "avg_ppsf": 1710,
+      "villa_share": 0.054,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "wadi al safa 5",
+      "name": "Wadi Al Safa 5",
+      "avg_ppsf": 1230,
+      "villa_share": 0.365,
+      "service_rate": 18
+    },
+    {
+      "name_norm": "wadi al safa 6",
+      "name": "Wadi Al Safa 6",
+      "avg_ppsf": 1066,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "wadi al safa 7",
+      "name": "Wadi Al Safa 7",
+      "avg_ppsf": 1060,
+      "villa_share": 0.81,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "warsan fourth",
+      "name": "Warsan Fourth",
+      "avg_ppsf": 915,
+      "villa_share": 0.0,
+      "service_rate": 14
+    },
+    {
+      "name_norm": "world islands",
+      "name": "World Islands",
+      "avg_ppsf": 2339,
+      "villa_share": 1.0,
+      "service_rate": 5
+    },
+    {
+      "name_norm": "zaabeel first",
+      "name": "Zaabeel First",
+      "avg_ppsf": 2898,
+      "villa_share": 0.0,
+      "service_rate": 28
+    },
+    {
+      "name_norm": "zaabeel second",
+      "name": "Zaabeel Second",
+      "avg_ppsf": 5242,
+      "villa_share": 0.0,
+      "service_rate": 28
+    }
+  ]
+}

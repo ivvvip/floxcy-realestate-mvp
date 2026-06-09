@@ -6,6 +6,7 @@ import { Plus, Search } from 'lucide-react';
 import { compareAreas } from '@/lib/api';
 import type { Area, CompareAreaData, CompareResponse } from '@/lib/types';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
+import { computeNetYield, serviceRateFor } from '@/lib/netYield';
 import { cn } from '@/lib/cn';
 import { ComparisonRadar } from '@/components/charts/ComparisonRadar';
 import { MultiLine } from '@/components/charts/MultiLine';
@@ -219,10 +220,25 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
           : '—',
     },
     {
-      label: 'Yield',
+      label: 'Gross yield',
       tooltip: 'Gross Yield',
       render: (a) =>
         a.latest_yield != null ? formatPercent(a.latest_yield, 2) : '—',
+    },
+    {
+      label: 'Net yield (est.)',
+      render: (a) => {
+        const ny = computeNetYield(
+          a.latest_yield,
+          a.latest_price_per_sqft,
+          serviceRateFor(a.latest_price_per_sqft),
+        );
+        return ny ? (
+          <span className="text-positive" title="Estimated net of service charge + 5% vacancy — verify via Mollak">
+            {ny.net.toFixed(1)}%
+          </span>
+        ) : '—';
+      },
     },
     {
       label: '1Y appreciation',

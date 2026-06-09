@@ -34,7 +34,8 @@ logger = logging.getLogger("floxcy.advisor.context")
 # Bump when the context shape changes — invalidates Redis cache transparently.
 # v3: appended the city-level Market Timing block (seasonal buy/sell guidance).
 # v4: appended UAE residence-visa thresholds + eligible-area guidance.
-CONTEXT_CACHE_KEY = "ai:advisor:context:v4"
+# v5: appended the net-yield explainer (gross vs net after service charges).
+CONTEXT_CACHE_KEY = "ai:advisor:context:v5"
 CONTEXT_CACHE_TTL_S = 3600  # 1 hour
 
 from pathlib import Path
@@ -291,6 +292,16 @@ async def build_dld_market_context(
         + "\n\n" + notes
         + _market_timing_block()
         + _visa_block()
+        + (
+            "\n\nGross vs NET yield (always steer the user to net): the yields in the table "
+            "above are GROSS. Net yield subtracts service charges and vacancy, and is what "
+            "actually hits the investor's account. Rule of thumb: net is ~1.5–2.5 points below "
+            "gross. Service-charge estimate = AED/sqft ÷ price-per-sqft (≈5/sqft villas, "
+            "14 budget, 18 mid, 28 luxury); vacancy ≈5% of gross. Example: a 7.6% gross at "
+            "~2,150 AED/sqft nets ≈6.0% after ~1.3% service + ~0.4% vacancy. Tell users to "
+            "verify exact service charges via the DLD Service Charge Index / Mollak, and to "
+            "compare areas on NET, not gross."
+        )
     )
 
     try:

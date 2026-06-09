@@ -21,11 +21,12 @@ import {
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
-import { getDldAreaTopBuildings, getDldAreaPriceHistory } from '@/lib/api';
+import { getDldAreaTopBuildings, getDldAreaPriceHistory, getServiceCharges } from '@/lib/api';
 import { formatAED, formatPercent, formatNumber } from '@/lib/format';
-import type { AreaLimitedDetail } from '@/lib/types';
+import type { AreaLimitedDetail, ServiceChargeArea } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { AreaPriceHistorySection } from './AreaPriceHistorySection';
+import { NetYieldBlock } from '@/components/NetYieldBlock';
 
 export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
   // The /dld/areas/{name_norm}/top-buildings endpoint handles aliases and
@@ -37,10 +38,13 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
   const histName = (
     area.dld.history_name_norm ?? area.dld.dld_name
   ).toLowerCase();
-  const [topBuildings, priceHistory] = await Promise.all([
+  const [topBuildings, priceHistory, serviceCharges] = await Promise.all([
     getDldAreaTopBuildings(histName, 6).catch(() => null),
     getDldAreaPriceHistory(histName).catch(() => null),
+    getServiceCharges().catch(() => null),
   ]);
+  const serviceArea: ServiceChargeArea | null =
+    serviceCharges?.areas.find((a) => a.name_norm === histName) ?? null;
 
   const d = area.dld;
   const isEmpty = area.coverage_tier === 'none';
@@ -228,6 +232,17 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
           {/* Long-term price history — only renders when we have ≥2 yearly
               points. Same component used by the curated detail page. */}
           <AreaPriceHistorySection priceHistory={priceHistory} />
+
+          {d.rental_yield_pct != null && d.rental_yield_pct > 0 && (
+            <div className="mt-5">
+              <NetYieldBlock
+                grossYield={d.rental_yield_pct}
+                ppsf={d.median_price_per_sqft ?? serviceArea?.avg_ppsf}
+                defaultRate={serviceArea?.service_rate}
+                isVilla={(serviceArea?.villa_share ?? 0) > 0.5}
+              />
+            </div>
+          )}
 
           {/* Why limited */}
           {!isEmpty && (

@@ -745,6 +745,12 @@ export async function getVisaEligibility(): Promise<import('./types').VisaEligib
   return request<import('./types').VisaEligibility>('/api/v1/dld/visa-eligibility', { revalidate: 3600 });
 }
 
+// ---------- Service-charge estimates ----------
+
+export async function getServiceCharges(): Promise<import('./types').ServiceCharges> {
+  return request<import('./types').ServiceCharges>('/api/v1/dld/service-charges', { revalidate: 3600 });
+}
+
 // ---------- User feedback ----------
 
 export async function submitFeedback(

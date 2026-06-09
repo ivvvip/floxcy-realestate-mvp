@@ -38,6 +38,7 @@ from app.api.routes import (
     market_timing,
     feedback,
     visa,
+    service_charges,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -156,6 +157,7 @@ app.include_router(market_timing.router)
 app.include_router(feedback.public_router)
 app.include_router(feedback.admin_router)
 app.include_router(visa.router)
+app.include_router(service_charges.router)
 
 
 @app.get("/")

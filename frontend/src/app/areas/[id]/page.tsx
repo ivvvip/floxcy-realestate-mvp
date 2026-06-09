@@ -24,8 +24,9 @@ import { AreaBedroomBreakdown } from './AreaBedroomBreakdown';
 import { AreaCommunityProfile } from './AreaCommunityProfile';
 import { AreaPriceHistorySection } from './AreaPriceHistorySection';
 import { AreaVisaBlock } from './AreaVisaBlock';
-import { getVisaEligibility } from '@/lib/api';
-import type { VisaArea } from '@/lib/types';
+import { NetYieldBlock } from '@/components/NetYieldBlock';
+import { getVisaEligibility, getServiceCharges } from '@/lib/api';
+import type { VisaArea, ServiceChargeArea } from '@/lib/types';
 import { AreaMiniMap } from './AreaMiniMap';
 import { getMapAreas, getMapBuildings } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
@@ -129,13 +130,19 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     // both already swallowed individually
   }
 
-  // Visa eligibility for this area (keyed on the cadastral name_norm).
+  // Visa eligibility + service-charge estimate for this area (keyed on the
+  // cadastral name_norm).
   let visaArea: VisaArea | null = null;
+  let serviceArea: ServiceChargeArea | null = null;
   try {
-    const visa = await getVisaEligibility();
-    visaArea = visa.areas.find((a) => a.name_norm === histName) ?? null;
+    const [visa, sc] = await Promise.all([
+      getVisaEligibility().catch(() => null),
+      getServiceCharges().catch(() => null),
+    ]);
+    visaArea = visa?.areas.find((a) => a.name_norm === histName) ?? null;
+    serviceArea = sc?.areas.find((a) => a.name_norm === histName) ?? null;
   } catch {
-    visaArea = null;
+    /* both swallowed */
   }
 
   // Pull top buildings in this area via DLD overlay's mapped name_norm.
@@ -707,6 +714,17 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         <div className="mt-5">
           <AreaPriceHistorySection priceHistory={priceHistory} />
         </div>
+
+        {area.latest?.rental_yield != null && area.latest.rental_yield > 0 && (
+          <div className="mt-5">
+            <NetYieldBlock
+              grossYield={area.latest.rental_yield}
+              ppsf={area.latest.avg_price_per_sqft ?? serviceArea?.avg_ppsf}
+              defaultRate={serviceArea?.service_rate}
+              isVilla={(serviceArea?.villa_share ?? 0) > 0.5}
+            />
+          </div>
+        )}
 
         {visaArea && (
           <div className="mt-5">

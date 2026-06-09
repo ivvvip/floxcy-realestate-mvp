@@ -2228,6 +2228,24 @@ export interface ProfilePatchRequest {
   lead_access?: boolean;
 }
 
+// ---------- Service-charge estimates (net yield) ----------
+
+export interface ServiceChargeArea {
+  name_norm: string;
+  name: string;
+  avg_ppsf: number;
+  villa_share: number;
+  service_rate: number;
+}
+
+export interface ServiceCharges {
+  meta: { window: string; source: string; note: string };
+  bands: Record<string, number>;
+  default_rate: number;
+  vacancy_pct: number;
+  areas: ServiceChargeArea[];
+}
+
 // ---------- UAE visa eligibility ----------
 
 export interface VisaArea {
