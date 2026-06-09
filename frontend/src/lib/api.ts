@@ -739,6 +739,12 @@ export async function getCityMarketTiming(): Promise<import('./types').MarketTim
   return request<import('./types').MarketTiming>('/api/v1/dld/market-timing', { revalidate: 3600 });
 }
 
+// ---------- UAE visa eligibility ----------
+
+export async function getVisaEligibility(): Promise<import('./types').VisaEligibility> {
+  return request<import('./types').VisaEligibility>('/api/v1/dld/visa-eligibility', { revalidate: 3600 });
+}
+
 // ---------- User feedback ----------
 
 export async function submitFeedback(

@@ -2228,6 +2228,24 @@ export interface ProfilePatchRequest {
   lead_access?: boolean;
 }
 
+// ---------- UAE visa eligibility ----------
+
+export interface VisaArea {
+  name_norm: string;
+  name: string;
+  sales: number;
+  median_price: number;
+  pct_investor_visa: number;
+  pct_golden_visa: number;
+}
+
+export interface VisaEligibility {
+  meta: { window: string; total_residential_sales: number; source: string; note: string };
+  thresholds: { investor_visa_aed: number; golden_visa_aed: number };
+  global: { pct_investor_visa: number; pct_golden_visa: number };
+  areas: VisaArea[];
+}
+
 // ---------- Dubai Market Timing (city-level, verified 2021-2025) ----------
 
 export interface MarketTimingMonth {

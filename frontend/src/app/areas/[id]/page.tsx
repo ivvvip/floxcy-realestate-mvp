@@ -23,6 +23,9 @@ import { AreaSmartSummary, AreaBottomCTAs } from './AreaSmartSummary';
 import { AreaBedroomBreakdown } from './AreaBedroomBreakdown';
 import { AreaCommunityProfile } from './AreaCommunityProfile';
 import { AreaPriceHistorySection } from './AreaPriceHistorySection';
+import { AreaVisaBlock } from './AreaVisaBlock';
+import { getVisaEligibility } from '@/lib/api';
+import type { VisaArea } from '@/lib/types';
 import { AreaMiniMap } from './AreaMiniMap';
 import { getMapAreas, getMapBuildings } from '@/lib/api';
 import { PriceTrend } from '@/components/charts/PriceTrend';
@@ -124,6 +127,15 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
     undervaluation = u;
   } catch {
     // both already swallowed individually
+  }
+
+  // Visa eligibility for this area (keyed on the cadastral name_norm).
+  let visaArea: VisaArea | null = null;
+  try {
+    const visa = await getVisaEligibility();
+    visaArea = visa.areas.find((a) => a.name_norm === histName) ?? null;
+  } catch {
+    visaArea = null;
   }
 
   // Pull top buildings in this area via DLD overlay's mapped name_norm.
@@ -695,6 +707,12 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
         <div className="mt-5">
           <AreaPriceHistorySection priceHistory={priceHistory} />
         </div>
+
+        {visaArea && (
+          <div className="mt-5">
+            <AreaVisaBlock area={visaArea} />
+          </div>
+        )}
 
         {/* Rent & Yield History (2021-2026) — DLD Ejari + derived yield */}
         {yieldHistory && yieldHistory.points.filter(p => p.gross_yield_pct != null).length >= 2 && (() => {

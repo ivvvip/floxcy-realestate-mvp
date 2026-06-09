@@ -1,0 +1,594 @@
+{
+  "meta": {
+    "window": "2021\u20132026",
+    "total_residential_sales": 614671,
+    "source": "Dubai Land Department transactions (residential Flat/Villa sales)",
+    "note": "Eligibility is rule-based on property value. Rules may change \u2014 verify with DLD/ICP/GDRFA."
+  },
+  "thresholds": {
+    "investor_visa_aed": 750000,
+    "golden_visa_aed": 2000000
+  },
+  "global": {
+    "pct_investor_visa": 79.3,
+    "pct_golden_visa": 33.1
+  },
+  "areas": [
+    {
+      "name_norm": "saih shuaib 1",
+      "name": "Saih Shuaib 1",
+      "sales": 331,
+      "median_price": 6575000,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 100.0
+    },
+    {
+      "name_norm": "jumeirah second",
+      "name": "Jumeirah Second",
+      "sales": 373,
+      "median_price": 21000000,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 100.0
+    },
+    {
+      "name_norm": "world islands",
+      "name": "World Islands",
+      "sales": 49,
+      "median_price": 63750000,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 100.0
+    },
+    {
+      "name_norm": "trade center first",
+      "name": "Trade Center First",
+      "sales": 424,
+      "median_price": 4066451,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 99.8
+    },
+    {
+      "name_norm": "palm jabal ali",
+      "name": "Palm Jabal Ali",
+      "sales": 213,
+      "median_price": 4447000,
+      "pct_investor_visa": 99.5,
+      "pct_golden_visa": 99.5
+    },
+    {
+      "name_norm": "island 2",
+      "name": "Island 2",
+      "sales": 260,
+      "median_price": 17550000,
+      "pct_investor_visa": 99.2,
+      "pct_golden_visa": 99.2
+    },
+    {
+      "name_norm": "trade center second",
+      "name": "Trade Center Second",
+      "sales": 965,
+      "median_price": 5060000,
+      "pct_investor_visa": 99.8,
+      "pct_golden_visa": 94.2
+    },
+    {
+      "name_norm": "zaabeel first",
+      "name": "Zaabeel First",
+      "sales": 2149,
+      "median_price": 3323888,
+      "pct_investor_visa": 99.8,
+      "pct_golden_visa": 93.4
+    },
+    {
+      "name_norm": "al yelayiss 1",
+      "name": "Al Yelayiss 1",
+      "sales": 4955,
+      "median_price": 2825000,
+      "pct_investor_visa": 99.9,
+      "pct_golden_visa": 91.7
+    },
+    {
+      "name_norm": "wadi al safa 6",
+      "name": "Wadi Al Safa 6",
+      "sales": 1035,
+      "median_price": 3250000,
+      "pct_investor_visa": 99.5,
+      "pct_golden_visa": 91.3
+    },
+    {
+      "name_norm": "al hebiah sixth",
+      "name": "Al Hebiah Sixth",
+      "sales": 2557,
+      "median_price": 2700000,
+      "pct_investor_visa": 99.6,
+      "pct_golden_visa": 90.2
+    },
+    {
+      "name_norm": "palm deira",
+      "name": "Palm Deira",
+      "sales": 8229,
+      "median_price": 2733000,
+      "pct_investor_visa": 99.7,
+      "pct_golden_visa": 86.7
+    },
+    {
+      "name_norm": "palm jumeirah",
+      "name": "Palm Jumeirah",
+      "sales": 9114,
+      "median_price": 4186900,
+      "pct_investor_visa": 99.4,
+      "pct_golden_visa": 85.6
+    },
+    {
+      "name_norm": "zaabeel second",
+      "name": "Zaabeel Second",
+      "sales": 2933,
+      "median_price": 2850000,
+      "pct_investor_visa": 99.8,
+      "pct_golden_visa": 85.6
+    },
+    {
+      "name_norm": "al thanayah fourth",
+      "name": "Al Thanayah Fourth",
+      "sales": 2377,
+      "median_price": 3060000,
+      "pct_investor_visa": 99.5,
+      "pct_golden_visa": 85.4
+    },
+    {
+      "name_norm": "al safouh second",
+      "name": "Al Safouh Second",
+      "sales": 1644,
+      "median_price": 3255000,
+      "pct_investor_visa": 88.0,
+      "pct_golden_visa": 84.5
+    },
+    {
+      "name_norm": "al wasl",
+      "name": "Al Wasl",
+      "sales": 8183,
+      "median_price": 3127800,
+      "pct_investor_visa": 99.9,
+      "pct_golden_visa": 83.6
+    },
+    {
+      "name_norm": "al kheeran",
+      "name": "Al Kheeran",
+      "sales": 303,
+      "median_price": 2850000,
+      "pct_investor_visa": 99.3,
+      "pct_golden_visa": 79.9
+    },
+    {
+      "name_norm": "al yufrah 1",
+      "name": "Al Yufrah 1",
+      "sales": 8764,
+      "median_price": 2944888,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 78.9
+    },
+    {
+      "name_norm": "jumeirah first",
+      "name": "Jumeirah First",
+      "sales": 2079,
+      "median_price": 2750000,
+      "pct_investor_visa": 99.6,
+      "pct_golden_visa": 76.0
+    },
+    {
+      "name_norm": "al kifaf",
+      "name": "Al Kifaf",
+      "sales": 2980,
+      "median_price": 2396777,
+      "pct_investor_visa": 99.9,
+      "pct_golden_visa": 75.3
+    },
+    {
+      "name_norm": "um suqaim third",
+      "name": "Um Suqaim Third",
+      "sales": 3657,
+      "median_price": 2525000,
+      "pct_investor_visa": 99.7,
+      "pct_golden_visa": 71.6
+    },
+    {
+      "name_norm": "burj khalifa",
+      "name": "Burj Khalifa",
+      "sales": 19408,
+      "median_price": 2500000,
+      "pct_investor_visa": 98.6,
+      "pct_golden_visa": 67.4
+    },
+    {
+      "name_norm": "madinat dubai almelaheyah",
+      "name": "Madinat Dubai Almelaheyah",
+      "sales": 13800,
+      "median_price": 2322944,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 65.4
+    },
+    {
+      "name_norm": "marsa dubai",
+      "name": "Marsa Dubai",
+      "sales": 36543,
+      "median_price": 2530000,
+      "pct_investor_visa": 95.7,
+      "pct_golden_visa": 64.4
+    },
+    {
+      "name_norm": "al khairan first",
+      "name": "Al Khairan First",
+      "sales": 18718,
+      "median_price": 2268888,
+      "pct_investor_visa": 99.7,
+      "pct_golden_visa": 61.8
+    },
+    {
+      "name_norm": "nad al shiba first",
+      "name": "Nad Al Shiba First",
+      "sales": 4363,
+      "median_price": 2007620,
+      "pct_investor_visa": 96.6,
+      "pct_golden_visa": 50.5
+    },
+    {
+      "name_norm": "bukadra",
+      "name": "Bukadra",
+      "sales": 9670,
+      "median_price": 1977293,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 48.8
+    },
+    {
+      "name_norm": "ras al khor industrial first",
+      "name": "Ras Al Khor Industrial First",
+      "sales": 3564,
+      "median_price": 1898903,
+      "pct_investor_visa": 100.0,
+      "pct_golden_visa": 47.8
+    },
+    {
+      "name_norm": "al barsha first",
+      "name": "Al Barsha First",
+      "sales": 230,
+      "median_price": 1938474,
+      "pct_investor_visa": 92.2,
+      "pct_golden_visa": 47.8
+    },
+    {
+      "name_norm": "hadaeq sheikh mohammed bin rashid",
+      "name": "Hadaeq Sheikh Mohammed Bin Rashid",
+      "sales": 23111,
+      "median_price": 1900000,
+      "pct_investor_visa": 96.8,
+      "pct_golden_visa": 46.5
+    },
+    {
+      "name_norm": "wadi al safa 4",
+      "name": "Wadi Al Safa 4",
+      "sales": 5000,
+      "median_price": 1690000,
+      "pct_investor_visa": 86.0,
+      "pct_golden_visa": 41.8
+    },
+    {
+      "name_norm": "dubai investment park second",
+      "name": "Dubai Investment Park Second",
+      "sales": 8545,
+      "median_price": 1383000,
+      "pct_investor_visa": 93.9,
+      "pct_golden_visa": 41.2
+    },
+    {
+      "name_norm": "al thanyah third",
+      "name": "Al Thanyah Third",
+      "sales": 3992,
+      "median_price": 1650000,
+      "pct_investor_visa": 93.5,
+      "pct_golden_visa": 39.4
+    },
+    {
+      "name_norm": "mirdif",
+      "name": "Mirdif",
+      "sales": 1464,
+      "median_price": 1742018,
+      "pct_investor_visa": 90.6,
+      "pct_golden_visa": 37.4
+    },
+    {
+      "name_norm": "madinat al mataar",
+      "name": "Madinat Al Mataar",
+      "sales": 26249,
+      "median_price": 1534000,
+      "pct_investor_visa": 78.9,
+      "pct_golden_visa": 36.1
+    },
+    {
+      "name_norm": "business bay",
+      "name": "Business Bay",
+      "sales": 44796,
+      "median_price": 1500000,
+      "pct_investor_visa": 93.9,
+      "pct_golden_visa": 33.0
+    },
+    {
+      "name_norm": "dubai investment park first",
+      "name": "Dubai Investment Park First",
+      "sales": 2978,
+      "median_price": 1248800,
+      "pct_investor_visa": 80.7,
+      "pct_golden_visa": 30.5
+    },
+    {
+      "name_norm": "al thanyah fifth",
+      "name": "Al Thanyah Fifth",
+      "sales": 17429,
+      "median_price": 1350000,
+      "pct_investor_visa": 80.1,
+      "pct_golden_visa": 28.6
+    },
+    {
+      "name_norm": "wadi al safa 5",
+      "name": "Wadi Al Safa 5",
+      "sales": 31897,
+      "median_price": 1127574,
+      "pct_investor_visa": 69.1,
+      "pct_golden_visa": 27.6
+    },
+    {
+      "name_norm": "al safouh first",
+      "name": "Al Safouh First",
+      "sales": 309,
+      "median_price": 1350000,
+      "pct_investor_visa": 95.5,
+      "pct_golden_visa": 23.0
+    },
+    {
+      "name_norm": "wadi al safa 3",
+      "name": "Wadi Al Safa 3",
+      "sales": 14292,
+      "median_price": 1059200,
+      "pct_investor_visa": 67.4,
+      "pct_golden_visa": 22.4
+    },
+    {
+      "name_norm": "wadi al safa 7",
+      "name": "Wadi Al Safa 7",
+      "sales": 6202,
+      "median_price": 1223916,
+      "pct_investor_visa": 73.3,
+      "pct_golden_visa": 22.3
+    },
+    {
+      "name_norm": "al merkadh",
+      "name": "Al Merkadh",
+      "sales": 26653,
+      "median_price": 1200000,
+      "pct_investor_visa": 74.8,
+      "pct_golden_visa": 20.6
+    },
+    {
+      "name_norm": "muhaisanah first",
+      "name": "Muhaisanah First",
+      "sales": 857,
+      "median_price": 1570800,
+      "pct_investor_visa": 99.9,
+      "pct_golden_visa": 17.4
+    },
+    {
+      "name_norm": "al jadaf",
+      "name": "Al Jadaf",
+      "sales": 8316,
+      "median_price": 1175000,
+      "pct_investor_visa": 81.6,
+      "pct_golden_visa": 16.8
+    },
+    {
+      "name_norm": "jabal ali first",
+      "name": "Jabal Ali First",
+      "sales": 20237,
+      "median_price": 1100000,
+      "pct_investor_visa": 71.7,
+      "pct_golden_visa": 15.9
+    },
+    {
+      "name_norm": "al thanyah first",
+      "name": "Al Thanyah First",
+      "sales": 546,
+      "median_price": 1132838,
+      "pct_investor_visa": 80.4,
+      "pct_golden_visa": 15.9
+    },
+    {
+      "name_norm": "al yelayiss 2",
+      "name": "Al Yelayiss 2",
+      "sales": 11728,
+      "median_price": 1219888,
+      "pct_investor_visa": 84.3,
+      "pct_golden_visa": 14.4
+    },
+    {
+      "name_norm": "al hebiah fourth",
+      "name": "Al Hebiah Fourth",
+      "sales": 13851,
+      "median_price": 779220,
+      "pct_investor_visa": 53.3,
+      "pct_golden_visa": 14.3
+    },
+    {
+      "name_norm": "al satwa",
+      "name": "Al Satwa",
+      "sales": 2436,
+      "median_price": 1280158,
+      "pct_investor_visa": 95.9,
+      "pct_golden_visa": 13.2
+    },
+    {
+      "name_norm": "al goze fourth",
+      "name": "Al Goze Fourth",
+      "sales": 700,
+      "median_price": 702359,
+      "pct_investor_visa": 48.1,
+      "pct_golden_visa": 11.6
+    },
+    {
+      "name_norm": "al hebiah first",
+      "name": "Al Hebiah First",
+      "sales": 10796,
+      "median_price": 1164705,
+      "pct_investor_visa": 89.1,
+      "pct_golden_visa": 11.1
+    },
+    {
+      "name_norm": "al hebiah third",
+      "name": "Al Hebiah Third",
+      "sales": 6075,
+      "median_price": 966000,
+      "pct_investor_visa": 67.7,
+      "pct_golden_visa": 8.2
+    },
+    {
+      "name_norm": "al hebiah fifth",
+      "name": "Al Hebiah Fifth",
+      "sales": 5779,
+      "median_price": 1180000,
+      "pct_investor_visa": 70.2,
+      "pct_golden_visa": 7.9
+    },
+    {
+      "name_norm": "al barshaa south second",
+      "name": "Al Barshaa South Second",
+      "sales": 9666,
+      "median_price": 1012348,
+      "pct_investor_visa": 85.4,
+      "pct_golden_visa": 7.4
+    },
+    {
+      "name_norm": "me'aisem first",
+      "name": "Me'Aisem First",
+      "sales": 12820,
+      "median_price": 761052,
+      "pct_investor_visa": 51.9,
+      "pct_golden_visa": 5.2
+    },
+    {
+      "name_norm": "al barsha south fourth",
+      "name": "Al Barsha South Fourth",
+      "sales": 61033,
+      "median_price": 845000,
+      "pct_investor_visa": 62.1,
+      "pct_golden_visa": 3.9
+    },
+    {
+      "name_norm": "wadi al safa 2",
+      "name": "Wadi Al Safa 2",
+      "sales": 4732,
+      "median_price": 870000,
+      "pct_investor_visa": 64.5,
+      "pct_golden_visa": 3.7
+    },
+    {
+      "name_norm": "al barsha south fifth",
+      "name": "Al Barsha South Fifth",
+      "sales": 11158,
+      "median_price": 936999,
+      "pct_investor_visa": 71.2,
+      "pct_golden_visa": 3.5
+    },
+    {
+      "name_norm": "nadd hessa",
+      "name": "Nadd Hessa",
+      "sales": 9875,
+      "median_price": 735000,
+      "pct_investor_visa": 48.8,
+      "pct_golden_visa": 2.7
+    },
+    {
+      "name_norm": "saih shuaib 2",
+      "name": "Saih Shuaib 2",
+      "sales": 1660,
+      "median_price": 622728,
+      "pct_investor_visa": 42.7,
+      "pct_golden_visa": 2.3
+    },
+    {
+      "name_norm": "al barshaa south third",
+      "name": "Al Barshaa South Third",
+      "sales": 17639,
+      "median_price": 775975,
+      "pct_investor_visa": 53.2,
+      "pct_golden_visa": 2.1
+    },
+    {
+      "name_norm": "jabal ali industrial second",
+      "name": "Jabal Ali Industrial Second",
+      "sales": 1966,
+      "median_price": 771175,
+      "pct_investor_visa": 50.7,
+      "pct_golden_visa": 2.0
+    },
+    {
+      "name_norm": "rega al buteen",
+      "name": "Rega Al Buteen",
+      "sales": 52,
+      "median_price": 1112500,
+      "pct_investor_visa": 82.7,
+      "pct_golden_visa": 1.9
+    },
+    {
+      "name_norm": "al hebiah second",
+      "name": "Al Hebiah Second",
+      "sales": 3832,
+      "median_price": 690000,
+      "pct_investor_visa": 41.3,
+      "pct_golden_visa": 0.5
+    },
+    {
+      "name_norm": "warsan fourth",
+      "name": "Warsan Fourth",
+      "sales": 3635,
+      "median_price": 575923,
+      "pct_investor_visa": 27.2,
+      "pct_golden_visa": 0.4
+    },
+    {
+      "name_norm": "al warsan first",
+      "name": "Al Warsan First",
+      "sales": 9834,
+      "median_price": 344000,
+      "pct_investor_visa": 13.0,
+      "pct_golden_visa": 0.0
+    },
+    {
+      "name_norm": "madinat hind 4",
+      "name": "Madinat Hind 4",
+      "sales": 2329,
+      "median_price": 679000,
+      "pct_investor_visa": 30.0,
+      "pct_golden_visa": 0.0
+    },
+    {
+      "name_norm": "nad al hamar",
+      "name": "Nad Al Hamar",
+      "sales": 104,
+      "median_price": 1223250,
+      "pct_investor_visa": 89.4,
+      "pct_golden_visa": 0.0
+    },
+    {
+      "name_norm": "hessyan first",
+      "name": "Hessyan First",
+      "sales": 102,
+      "median_price": 485000,
+      "pct_investor_visa": 20.6,
+      "pct_golden_visa": 0.0
+    },
+    {
+      "name_norm": "al qusais industrial fifth",
+      "name": "Al Qusais Industrial Fifth",
+      "sales": 72,
+      "median_price": 471295,
+      "pct_investor_visa": 25.0,
+      "pct_golden_visa": 0.0
+    }
+  ]
+}

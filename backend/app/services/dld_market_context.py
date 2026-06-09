@@ -33,12 +33,49 @@ logger = logging.getLogger("floxcy.advisor.context")
 
 # Bump when the context shape changes — invalidates Redis cache transparently.
 # v3: appended the city-level Market Timing block (seasonal buy/sell guidance).
-CONTEXT_CACHE_KEY = "ai:advisor:context:v3"
+# v4: appended UAE residence-visa thresholds + eligible-area guidance.
+CONTEXT_CACHE_KEY = "ai:advisor:context:v4"
 CONTEXT_CACHE_TTL_S = 3600  # 1 hour
 
 from pathlib import Path
 
-_TIMING_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "market_timing.json"
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_TIMING_PATH = _DATA_DIR / "market_timing.json"
+_VISA_PATH = _DATA_DIR / "visa_eligibility.json"
+
+
+def _visa_block() -> str:
+    """UAE residence-visa thresholds + a few eligible-area examples for the LLM."""
+    if not _VISA_PATH.exists():
+        return ""
+    try:
+        d = json.loads(_VISA_PATH.read_text())
+    except (OSError, ValueError):
+        return ""
+    th = d.get("thresholds", {})
+    areas = d.get("areas", [])
+    # affordable golden-visa entry points: areas with the lowest median price that
+    # still have a meaningful share of ≥AED 2M sales.
+    golden = sorted(
+        [a for a in areas if a.get("pct_golden_visa", 0) >= 20],
+        key=lambda a: a.get("median_price", 0),
+    )[:5]
+    investor = sorted(
+        [a for a in areas if a.get("pct_investor_visa", 0) >= 40],
+        key=lambda a: a.get("median_price", 0),
+    )[:5]
+    g = d.get("global", {})
+    return (
+        "\n\nUAE residence visa by property value (rules-based; tell the user to verify with DLD/ICP):\n"
+        f"- AED {int(th.get('investor_visa_aed', 750000)):,}+ → 2-year renewable investor visa.\n"
+        f"- AED {int(th.get('golden_visa_aed', 2000000)):,}+ → 10-year Golden Visa (family sponsorship).\n"
+        f"- Across Dubai residential sales, {g.get('pct_investor_visa')}% qualify for the investor visa "
+        f"and {g.get('pct_golden_visa')}% for the Golden Visa.\n"
+        f"- Affordable Golden-Visa entry areas (lowest median with ≥AED 2M options): "
+        f"{', '.join(a['name'] for a in golden)}.\n"
+        f"- Investor-visa entry areas: {', '.join(a['name'] for a in investor)}.\n"
+        "- The property must be retained to keep the visa. Verify current rules with DLD/ICP/GDRFA."
+    )
 
 
 def _market_timing_block() -> str:
@@ -253,6 +290,7 @@ async def build_dld_market_context(
         + "\n".join(table_rows)
         + "\n\n" + notes
         + _market_timing_block()
+        + _visa_block()
     )
 
     try:

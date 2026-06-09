@@ -18,6 +18,7 @@ const LINKS = [
   { href: '/opportunities', key: 'nav.opportunities' },
   { href: '/offplan', key: 'nav.offplan' },
   { href: '/timing', key: 'nav.timing' },
+  { href: '/visa', key: 'nav.visa' },
   { href: '/compare', key: 'nav.compare' },
   { href: '/advisor', key: 'nav.ai_analyst' },
   { href: '/rent-check', key: 'nav.rent_check' },
