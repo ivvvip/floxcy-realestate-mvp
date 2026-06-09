@@ -2,13 +2,10 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 from sqlalchemy import String, Text, Float, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import TYPE_CHECKING, Optional, List
+from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional
 
 from app.database import Base
-
-if TYPE_CHECKING:
-    from app.models.market_snapshot import MarketSnapshot
 
 
 class Area(Base):
@@ -25,10 +22,6 @@ class Area(Base):
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    snapshots: Mapped[List["MarketSnapshot"]] = relationship(
-        "MarketSnapshot", back_populates="area", cascade="all, delete-orphan"
-    )
 
     def __repr__(self):
         return f"<Area {self.name}>"

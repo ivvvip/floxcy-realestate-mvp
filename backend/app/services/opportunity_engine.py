@@ -29,11 +29,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from statistics import median
 from typing import Optional
-
-from app.models.area import Area
-from app.models.market_snapshot import MarketSnapshot
 
 
 COMPONENT_WEIGHTS = {
@@ -313,77 +309,6 @@ def _build_why_risks_bestfor_strategy(
     return why, risks, best_for, strategy
 
 
-def build_report(
-    *,
-    area: Area,
-    latest: MarketSnapshot,
-    history: list[MarketSnapshot],
-    cohort_median_price: float,
-) -> OpportunityReport:
-    """Score one area against the cohort. Caller provides median for value component."""
-    components = compute_components(
-        rental_yield=float(latest.rental_yield),
-        appreciation_1y=float(latest.appreciation_1y) if latest.appreciation_1y else None,
-        price_per_sqft=float(latest.avg_price_per_sqft),
-        cohort_median_price=cohort_median_price,
-        occupancy_rate=float(latest.occupancy_rate) if latest.occupancy_rate else None,
-        transaction_volume=latest.transaction_volume,
-        risk_score=float(latest.risk_score) if latest.risk_score else None,
-    )
-    score = score_from_components(components)
-    opp_type = classify_type(
-        score=score,
-        rental_yield=float(latest.rental_yield),
-        appreciation_1y=float(latest.appreciation_1y) if latest.appreciation_1y else None,
-        components=components,
-        demand_score=float(latest.demand_score) if latest.demand_score else None,
-        risk_score=float(latest.risk_score) if latest.risk_score else None,
-    )
-    confidence = _confidence_from_components(components, components.demand_c)
-
-    why, risks, best_for, strategy = _build_why_risks_bestfor_strategy(
-        area_name=area.name,
-        opp_type=opp_type,
-        components=components,
-        rental_yield=float(latest.rental_yield),
-        appreciation_1y=float(latest.appreciation_1y) if latest.appreciation_1y else None,
-        price_per_sqft=float(latest.avg_price_per_sqft),
-        cohort_median_price=cohort_median_price,
-        risk_score=float(latest.risk_score) if latest.risk_score else None,
-        demand_score=float(latest.demand_score) if latest.demand_score else None,
-        occupancy_rate=float(latest.occupancy_rate) if latest.occupancy_rate else None,
-        transaction_volume=latest.transaction_volume,
-    )
-
-    return OpportunityReport(
-        area_id=str(area.id),
-        area_name=area.name,
-        area_name_arabic=area.name_arabic,
-        area_type=area.area_type,
-        opportunity_score=score,
-        opportunity_type=opp_type,
-        confidence_level=confidence,
-        components=components,
-        key_metrics=KeyMetrics(
-            rental_yield=float(latest.rental_yield),
-            price_per_sqft=float(latest.avg_price_per_sqft),
-            appreciation_1y=float(latest.appreciation_1y) if latest.appreciation_1y else None,
-            appreciation_3y=float(latest.appreciation_3y) if latest.appreciation_3y else None,
-            investment_score=float(latest.investment_score) if latest.investment_score else None,
-            risk_score=float(latest.risk_score) if latest.risk_score else None,
-            demand_score=float(latest.demand_score) if latest.demand_score else None,
-            transaction_volume=latest.transaction_volume,
-            occupancy_rate=float(latest.occupancy_rate) if latest.occupancy_rate else None,
-        ),
-        why=why,
-        risks=risks,
-        best_for=best_for,
-        strategy=strategy,
-        snapshot_date=latest.snapshot_date.isoformat(),
-        last_updated=datetime.now(timezone.utc).isoformat(),
-    )
-
-
 def attach_nearby(reports: list[OpportunityReport], areas_by_id: dict, k: int = 3) -> None:
     """Mutates each report's nearby_comparison with k closest peers by haversine."""
     coords = [
@@ -467,13 +392,6 @@ def report_to_dict(r: OpportunityReport) -> dict:
         "snapshot_date": r.snapshot_date,
         "last_updated": r.last_updated,
     }
-
-
-def compute_cohort_median(snapshots: list[MarketSnapshot]) -> float:
-    prices = [float(s.avg_price_per_sqft) for s in snapshots]
-    if not prices:
-        return 1500.0
-    return float(median(prices))
 
 
 # =============================================================================
