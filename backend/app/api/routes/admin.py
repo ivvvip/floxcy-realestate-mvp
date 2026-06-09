@@ -26,33 +26,10 @@ from app.schemas.auth import (
     AuditLogEntry,
     MeResponse,
 )
-from app.services.seed_data import seed_snapshots_with_session
-
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
-
-# ---------- Re-seed (admin only) ----------
-
-@router.post("/seed", dependencies=[Depends(require_admin)])
-async def reseed_market_snapshots(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    principal: AuthPrincipal = Depends(require_admin),
-):
-    ip, ua = get_request_meta(request)
-    summary = await seed_snapshots_with_session(db)
-    await write_audit(
-        db,
-        actor_user_id=principal.user_id,
-        actor_label=principal.label,
-        action="seed_market_snapshots",
-        target_type="market_snapshots",
-        payload=summary,
-        ip=ip,
-        user_agent=ua,
-    )
-    await db.commit()
-    return {"status": "ok", **summary}
+# NOTE: POST /api/v1/admin/seed + seed_data.py were removed in Phase 1 — the
+# seeded market_snapshots ("World B") is retired; DLD is the only source.
 
 
 # ---------- Users ----------
