@@ -23,6 +23,7 @@ from app.models.broker_application import BrokerApplication
 from app.models.consultation import Consultation
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
+from app.models.dld_project import DldDeveloper, DldProject, ProjectEnrichment
 
 # this is the Alembic Config object
 config = context.config

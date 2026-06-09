@@ -28,6 +28,7 @@ from app.models.dld import (
     DldReraBroker,
     DldYieldHistory,
 )
+from app.models.dld_project import DldDeveloper, DldProject, ProjectEnrichment
 from app.models.investment_opportunity import InvestmentOpportunity
 from app.models.investor_lead import InvestorLead
 from app.models.rent_alert import RentAlert
@@ -52,7 +53,10 @@ __all__ = [
     "DldBuildingRentHistory",
     "DldBuildingsSales",
     "DldCanonicalArea",
+    "DldDeveloper",
     "DldGiftTransfer",
+    "DldProject",
+    "ProjectEnrichment",
     "DldCommercialBenchmark",
     "DldLaborCampStats",
     "DldLeaseExpiryForecast",
