@@ -107,8 +107,8 @@ async def area_explanation(
     user_msg = (
         f"Area: {area_name}\n"
         f"Undervaluation score: {score}/100 (tier: {tier})\n"
-        f"Latest rental yield: {rental_yield:.2f}%\n"
-        f"Price per sqft: AED {price_per_sqft:,.0f}\n"
+        f"Latest rental yield: {(rental_yield if rental_yield is not None else 0):.2f}%\n"
+        f"Price per sqft: AED {(price_per_sqft if price_per_sqft is not None else 0):,.0f}\n"
         f"1Y appreciation: "
         f"{(appreciation_1y if appreciation_1y is not None else 0):.2f}%\n"
         f"Risk score: "
@@ -218,8 +218,8 @@ async def opportunity_explanation(
         f"Area: {area_name}\n"
         f"Opportunity score: {opportunity_score}/100\n"
         f"Opportunity type: {opportunity_type}\n"
-        f"Rental yield: {rental_yield:.2f}%\n"
-        f"Price per sqft: AED {price_per_sqft:,.0f} "
+        f"Rental yield: {(rental_yield if rental_yield is not None else 0):.2f}%\n"
+        f"Price per sqft: AED {(price_per_sqft if price_per_sqft is not None else 0):,.0f} "
         f"(cohort median: AED {cohort_median_price:,.0f})\n"
         f"1Y appreciation: "
         f"{(appreciation_1y if appreciation_1y is not None else 0):+.2f}%\n"
@@ -353,8 +353,8 @@ async def structured_area_insight(
     user_msg = (
         f"Area: {area_name}\n"
         f"Undervaluation score: {score}/100 (tier: {tier})\n"
-        f"Latest rental yield: {rental_yield:.2f}%\n"
-        f"Price per sqft: AED {price_per_sqft:,.0f}\n"
+        f"Latest rental yield: {(rental_yield if rental_yield is not None else 0):.2f}%\n"
+        f"Price per sqft: AED {(price_per_sqft if price_per_sqft is not None else 0):,.0f}\n"
         f"1Y appreciation: "
         f"{(appreciation_1y if appreciation_1y is not None else 0):+.2f}%\n"
         f"3Y appreciation: "
@@ -468,9 +468,13 @@ async def market_brief(
         lines.append("")
         lines.append("Top opportunities (by undervaluation score):")
         for o in top_opportunities[:5]:
+            # yield/price may be None (DLD areas scored on appreciation-only) —
+            # coerce so the prompt line never crashes on NoneType formatting.
+            _y = o.get('yield') or 0
+            _p = o.get('price') or 0
             lines.append(
                 f"  {o['name']}: score {o['score']} ({o.get('tier','-')}) "
-                f"· yield {o.get('yield',0):.2f}% · AED {o.get('price',0):,.0f}/sqft"
+                f"· yield {_y:.2f}% · AED {_p:,.0f}/sqft"
             )
     if top_movers:
         lines.append("")
