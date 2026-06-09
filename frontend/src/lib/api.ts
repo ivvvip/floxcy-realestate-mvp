@@ -733,6 +733,12 @@ export async function adminPatchUserSubscription(
   });
 }
 
+// ---------- Dubai Market Timing (city-level) ----------
+
+export async function getCityMarketTiming(): Promise<import('./types').MarketTiming> {
+  return request<import('./types').MarketTiming>('/api/v1/dld/market-timing', { revalidate: 3600 });
+}
+
 // ---------- DLD data layer ----------
 
 export async function getDldStats(): Promise<DldStatsResponse> {

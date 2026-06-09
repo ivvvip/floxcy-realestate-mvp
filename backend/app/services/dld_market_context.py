@@ -32,8 +32,43 @@ from app.schemas.dld import (
 logger = logging.getLogger("floxcy.advisor.context")
 
 # Bump when the context shape changes — invalidates Redis cache transparently.
-CONTEXT_CACHE_KEY = "ai:advisor:context:v2"
+# v3: appended the city-level Market Timing block (seasonal buy/sell guidance).
+CONTEXT_CACHE_KEY = "ai:advisor:context:v3"
 CONTEXT_CACHE_TTL_S = 3600  # 1 hour
+
+from pathlib import Path
+
+_TIMING_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "market_timing.json"
+
+
+def _market_timing_block() -> str:
+    """Concise, statistically-verified city-level timing facts for the LLM.
+    CITY-LEVEL ONLY — never per-area (per-area monthly timing is noise)."""
+    if not _TIMING_PATH.exists():
+        return ""
+    try:
+        d = json.loads(_TIMING_PATH.read_text())
+    except (OSError, ValueError):
+        return ""
+    bb = d.get("best_buy", {})
+    bs = d.get("best_sell", {})
+    summer = d.get("summer", {})
+    sig = d.get("significance", {})
+    return (
+        "\n\nDubai Market Timing (city-level, DLD sales 2021–2025, "
+        f"{d.get('meta', {}).get('total_sales', 0):,} sales; "
+        f"demand seasonality significant {sig.get('significant_years', '?')} years):\n"
+        f"- Best time to BUY: {bb.get('month')} — ~{bb.get('pct_below_avg')}% below the annual "
+        f"average price/sqft and the lowest competition (verified {bb.get('years_consistent')} years).\n"
+        f"- Best time to SELL: {bs.get('months')} — peak buyer demand + highest prices.\n"
+        f"- Busiest months: {', '.join(d.get('demand_high_months', []))}. "
+        f"Quietest: {', '.join(d.get('demand_low_months', []))}.\n"
+        f"- There is NO summer slowdown — summer is {summer.get('share_pct')}% of sales "
+        f"(never below the 25% flat line), and {summer.get('busiest_summer_month')} is one of the busiest months. "
+        "Do not claim a summer slowdown.\n"
+        "- This timing is CITY-WIDE only; individual areas vary and per-area monthly timing is "
+        "not statistically reliable. Prices are registration-date based; the seasonal price swing is modest (~±7%)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +252,7 @@ async def build_dld_market_context(
         + header + "\n"
         + "\n".join(table_rows)
         + "\n\n" + notes
+        + _market_timing_block()
     )
 
     try:

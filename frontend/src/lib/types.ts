@@ -2227,3 +2227,30 @@ export interface ProfilePatchRequest {
   subscription_tier?: string;
   lead_access?: boolean;
 }
+
+// ---------- Dubai Market Timing (city-level, verified 2021-2025) ----------
+
+export interface MarketTimingMonth {
+  m: number;
+  name: string;
+  sales: number;
+  pct: number;
+  avg_ppsf: number | null;
+  demand_index: number;
+  demand_years_above: number;
+  price_index: number;
+  price_years_below: number;
+}
+
+export interface MarketTiming {
+  meta: { window: string; total_sales: number; source: string; note: string };
+  months: MarketTimingMonth[];
+  best_buy: { month: string; m: number; pct_below_avg: number; years_consistent: string; reason: string };
+  best_sell: { months: string; reason: string };
+  demand_high_months: string[];
+  demand_low_months: string[];
+  quarters: { q: number; pct: number; label: string }[];
+  summer: { share_pct: number; flat_pct: number; below_flat_years: string; busiest_summer_month: string; verdict: string };
+  significance: { method: string; significant_years: string; chi2_by_year: Record<string, number> };
+  caveats: string[];
+}

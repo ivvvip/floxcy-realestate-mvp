@@ -1,0 +1,210 @@
+{
+  "meta": {
+    "window": "2021\u20132025",
+    "total_sales": 681809,
+    "source": "Dubai Land Department transactions (registration dates)",
+    "note": "Complete years only \u2014 pre-2021 is sparse and 2026 is partial, both excluded."
+  },
+  "months": [
+    {
+      "m": 1,
+      "name": "Jan",
+      "sales": 43684,
+      "pct": 6.4,
+      "avg_ppsf": 1761,
+      "demand_index": 0.748,
+      "demand_years_above": 0,
+      "price_index": 1.0081,
+      "price_years_below": 4
+    },
+    {
+      "m": 2,
+      "name": "Feb",
+      "sales": 46738,
+      "pct": 6.9,
+      "avg_ppsf": 1582,
+      "demand_index": 0.798,
+      "demand_years_above": 0,
+      "price_index": 0.9305,
+      "price_years_below": 5
+    },
+    {
+      "m": 3,
+      "name": "Mar",
+      "sales": 53520,
+      "pct": 7.8,
+      "avg_ppsf": 1609,
+      "demand_index": 0.966,
+      "demand_years_above": 2,
+      "price_index": 0.9663,
+      "price_years_below": 5
+    },
+    {
+      "m": 4,
+      "name": "Apr",
+      "sales": 48903,
+      "pct": 7.2,
+      "avg_ppsf": 1621,
+      "demand_index": 0.861,
+      "demand_years_above": 0,
+      "price_index": 0.9508,
+      "price_years_below": 5
+    },
+    {
+      "m": 5,
+      "name": "May",
+      "sales": 58245,
+      "pct": 8.5,
+      "avg_ppsf": 1674,
+      "demand_index": 0.984,
+      "demand_years_above": 3,
+      "price_index": 0.9897,
+      "price_years_below": 3
+    },
+    {
+      "m": 6,
+      "name": "Jun",
+      "sales": 55826,
+      "pct": 8.2,
+      "avg_ppsf": 1618,
+      "demand_index": 1.025,
+      "demand_years_above": 2,
+      "price_index": 0.978,
+      "price_years_below": 4
+    },
+    {
+      "m": 7,
+      "name": "Jul",
+      "sales": 59108,
+      "pct": 8.7,
+      "avg_ppsf": 1668,
+      "demand_index": 0.999,
+      "demand_years_above": 3,
+      "price_index": 0.9936,
+      "price_years_below": 4
+    },
+    {
+      "m": 8,
+      "name": "Aug",
+      "sales": 61029,
+      "pct": 9.0,
+      "avg_ppsf": 1676,
+      "demand_index": 1.092,
+      "demand_years_above": 5,
+      "price_index": 1.0081,
+      "price_years_below": 2
+    },
+    {
+      "m": 9,
+      "name": "Sep",
+      "sales": 65605,
+      "pct": 9.6,
+      "avg_ppsf": 1682,
+      "demand_index": 1.149,
+      "demand_years_above": 5,
+      "price_index": 1.0076,
+      "price_years_below": 2
+    },
+    {
+      "m": 10,
+      "name": "Oct",
+      "sales": 65374,
+      "pct": 9.6,
+      "avg_ppsf": 1713,
+      "demand_index": 1.12,
+      "demand_years_above": 5,
+      "price_index": 1.0314,
+      "price_years_below": 1
+    },
+    {
+      "m": 11,
+      "name": "Nov",
+      "sales": 63379,
+      "pct": 9.3,
+      "avg_ppsf": 1691,
+      "demand_index": 1.186,
+      "demand_years_above": 4,
+      "price_index": 1.0373,
+      "price_years_below": 2
+    },
+    {
+      "m": 12,
+      "name": "Dec",
+      "sales": 60398,
+      "pct": 8.9,
+      "avg_ppsf": 1730,
+      "demand_index": 1.071,
+      "demand_years_above": 5,
+      "price_index": 1.0561,
+      "price_years_below": 1
+    }
+  ],
+  "best_buy": {
+    "month": "February",
+    "m": 2,
+    "pct_below_avg": 7.0,
+    "years_consistent": "5/5",
+    "reason": "lowest prices + lowest competition"
+  },
+  "best_sell": {
+    "months": "November\u2013December",
+    "reason": "peak buyer demand + highest prices of the year"
+  },
+  "demand_high_months": [
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+  ],
+  "demand_low_months": [
+    "Jan",
+    "Feb",
+    "Apr"
+  ],
+  "quarters": [
+    {
+      "q": 1,
+      "pct": 21.1,
+      "label": "quietest"
+    },
+    {
+      "q": 2,
+      "pct": 23.9,
+      "label": ""
+    },
+    {
+      "q": 3,
+      "pct": 27.2,
+      "label": ""
+    },
+    {
+      "q": 4,
+      "pct": 27.7,
+      "label": "peak"
+    }
+  ],
+  "summer": {
+    "share_pct": 25.8,
+    "flat_pct": 25.0,
+    "below_flat_years": "0/5",
+    "busiest_summer_month": "Aug",
+    "verdict": "No summer slowdown \u2014 myth busted"
+  },
+  "significance": {
+    "method": "Per-year chi-square goodness-of-fit vs uniform (df=11, crit .05 = 19.68) + cross-year direction consistency.",
+    "significant_years": "5/5",
+    "chi2_by_year": {
+      "2021": 2739.1,
+      "2022": 3479.5,
+      "2023": 2145.5,
+      "2024": 5654.1,
+      "2025": 2470.0
+    }
+  },
+  "caveats": [
+    "Based on DLD registration dates \u2014 the deal may have been agreed earlier.",
+    "The price signal is real but modest (~\u00b17% around the annual average).",
+    "City-wide pattern only. Individual areas vary, and per-area monthly timing is NOT statistically reliable."
+  ]
+}

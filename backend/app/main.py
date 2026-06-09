@@ -35,6 +35,7 @@ from app.api.routes import (
     dld_projects,
     claims,
     admin_accounts,
+    market_timing,
 )
 from app.services.bootstrap import ensure_bootstrap_admin
 
@@ -149,6 +150,7 @@ app.include_router(offplan.router)
 app.include_router(dld_projects.router)
 app.include_router(claims.router)
 app.include_router(admin_accounts.router)
+app.include_router(market_timing.router)
 
 
 @app.get("/")
