@@ -318,10 +318,10 @@ function Results({ r }: { r: RoiCalcResponse }) {
 
       <Section icon={<Coins className="h-3.5 w-3.5" />} title="Rental returns" num={2}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPI label="Gross yield" tooltip="Gross Yield" value={`${r.rental_returns.gross_yield_pct.toFixed(2)}%`} accent />
+          <KPI label="Gross yield" tooltip="Gross yield" value={`${r.rental_returns.gross_yield_pct.toFixed(2)}%`} accent />
           <KPI
             label="Net yield"
-            tooltip="Net Yield"
+            tooltip="Net yield"
             value={`${r.rental_returns.net_yield_pct.toFixed(2)}%`}
             tone={r.rental_returns.net_yield_pct >= 6 ? 'positive' : r.rental_returns.net_yield_pct >= 4 ? 'neutral' : 'negative'}
           />

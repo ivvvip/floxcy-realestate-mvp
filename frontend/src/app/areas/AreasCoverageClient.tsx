@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Database, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, priceReliable, MIN_SALES_FOR_PRICE } from '@/lib/format';
 import type { AreaCoverageItem, CoverageTier } from '@/lib/types';
 
 interface Props {
@@ -265,10 +265,13 @@ function AreaCard({ a }: { a: AreaCoverageItem }) {
         <Mini
           label="Median AED/sqft"
           value={
-            a.median_price_per_sqft != null
+            a.median_price_per_sqft != null && priceReliable(a.sales_count)
               ? formatNumber(a.median_price_per_sqft, 0)
-              : '—'
+              : a.sales_count > 0 && a.sales_count < MIN_SALES_FOR_PRICE
+                ? `${a.sales_count} sale${a.sales_count === 1 ? '' : 's'}`
+                : '—'
           }
+          dim={!priceReliable(a.sales_count)}
         />
         <Mini
           label="Yield (capped)"

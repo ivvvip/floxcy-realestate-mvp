@@ -13,7 +13,7 @@ interface MetricContent {
 }
 
 const METRICS: Record<string, MetricContent> = {
-  'Gross Yield': {
+  'Gross yield': {
     what: 'Annual rental income ÷ property price',
     for: 'Income investors seeking cash flow',
     good: '>7% excellent | 5-7% good | <5% low',
@@ -91,7 +91,7 @@ const METRICS: Record<string, MetricContent> = {
     good: '>60% stable | <40% high turnover',
     tip: 'Higher renewal = happier tenants',
   },
-  'Net Yield': {
+  'Net yield': {
     what: 'Yield after service charges & costs',
     for: 'Serious investors calculating returns',
     good: '>6% excellent | 4-6% good',

@@ -63,7 +63,7 @@ export function YieldVsAppreciationMatrix({
         <div>
           <h3 className="text-sm font-semibold text-fg inline-flex items-center">
             Yield × 5-year appreciation
-            <MetricTooltip metric="Gross Yield" />
+            <MetricTooltip metric="Gross yield" />
             <MetricTooltip metric="5Y Appreciation" />
           </h3>
           <p className="mt-0.5 text-[11px] text-fg-subtle">

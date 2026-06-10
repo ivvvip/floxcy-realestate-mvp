@@ -36,6 +36,12 @@ import { HomeFastestGrowing } from './HomeFastestGrowing';
 import { HomeLongTermPerformance } from './HomeLongTermPerformance';
 import { HomeFeaturedDevelopers } from './HomeFeaturedDevelopers';
 
+export const metadata = {
+  description:
+    'Dubai real estate intelligence powered by official DLD data. Market timing, '
+    + 'net yields, Golden Visa eligibility, and area analysis for smart property investment.',
+};
+
 export const revalidate = 300;
 
 export default async function HomePage() {

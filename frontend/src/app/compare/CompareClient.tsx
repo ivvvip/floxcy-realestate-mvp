@@ -221,7 +221,7 @@ function MetricsTable({ areas }: { areas: CompareAreaData[] }) {
     },
     {
       label: 'Gross yield',
-      tooltip: 'Gross Yield',
+      tooltip: 'Gross yield',
       render: (a) =>
         a.latest_yield != null ? formatPercent(a.latest_yield, 2) : '—',
     },

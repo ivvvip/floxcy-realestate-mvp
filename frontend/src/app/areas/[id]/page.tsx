@@ -370,7 +370,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="Rental Yield"
-                tooltip="Gross Yield"
+                tooltip="Gross yield"
                 value={formatPercent(area.latest.rental_yield, 2)}
                 mono
               />
@@ -607,7 +607,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               />
               <MetricTile
                 label="Rental yield"
-                tooltip="Gross Yield"
+                tooltip="Gross yield"
                 value={
                   area.dld.rental_yield_pct != null
                     ? formatPercent(area.dld.rental_yield_pct)
@@ -777,7 +777,7 @@ export default async function AreaDetailPage({ params }: AreaDetailProps) {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border">
                 <MetricTile
                   label="Latest gross yield"
-                  tooltip="Gross Yield"
+                  tooltip="Gross yield"
                   value={
                     endYield >= 20
                       ? '≥20%'

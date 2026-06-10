@@ -335,7 +335,7 @@ function DealCard({ deal }: { deal: BrokerDealFeedItem }) {
           <div>
             <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
               Yield
-              <MetricTooltip metric="Gross Yield" />
+              <MetricTooltip metric="Gross yield" />
             </div>
             <div className="text-fg tabular">
               {deal.rental_yield != null ? formatPercent(deal.rental_yield, 2) : '—'}
@@ -415,7 +415,7 @@ function SignalCard({ signal }: { signal: AreaSignalFeedItem }) {
           <div>
             <div className="text-fg-subtle uppercase tracking-wide inline-flex items-center">
               Yield
-              <MetricTooltip metric="Gross Yield" />
+              <MetricTooltip metric="Gross yield" />
             </div>
             <div className="text-fg tabular">
               {formatPercent(signal.key_metrics.rental_yield, 2)}

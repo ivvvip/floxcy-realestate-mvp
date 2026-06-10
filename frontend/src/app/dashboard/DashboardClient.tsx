@@ -34,7 +34,7 @@ function tooltipForLabel(label: string): MetricKey | null {
   if (l.startsWith('sales ') || l === 'sales') return 'Sales YTD';
   // Section titles (per-area)
   if (l.includes('off-plan') || l.includes('offplan')) return 'Off-Plan %';
-  if (l.includes('yield')) return 'Gross Yield';
+  if (l.includes('yield')) return 'Gross yield';
   if (l.includes('appreciation')) return '5Y Appreciation';
   if (l.includes('rent growth')) return 'Rent Growth YoY';
   if (l.includes('supply')) return 'Supply Risk';

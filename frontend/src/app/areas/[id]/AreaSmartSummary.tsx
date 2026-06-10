@@ -106,7 +106,7 @@ export function AreaSmartSummary({
             <PlainTile
               icon={<Coins className="h-3.5 w-3.5 text-fg-muted" strokeWidth={2} />}
               label="Rental Yield"
-              tooltip="Gross Yield"
+              tooltip="Gross yield"
               headline={
                 yieldPct != null ? `${yieldPct.toFixed(2)}% gross` : '—'
               }

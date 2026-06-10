@@ -22,7 +22,7 @@ import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { MetricTile } from '@/components/data/MetricTile';
 import { getDldAreaTopBuildings, getDldAreaPriceHistory, getServiceCharges } from '@/lib/api';
-import { formatAED, formatPercent, formatNumber } from '@/lib/format';
+import { formatAED, formatPercent, formatNumber, priceReliable, limitedSalesNote } from '@/lib/format';
 import type { AreaLimitedDetail, ServiceChargeArea } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { AreaPriceHistorySection } from './AreaPriceHistorySection';
@@ -173,11 +173,13 @@ export async function LimitedAreaPage({ area }: { area: AreaLimitedDetail }) {
                 <MetricTile
                   label="Median price / sqft"
                   value={
-                    d.median_price_per_sqft
+                    d.median_price_per_sqft && priceReliable(d.sales_count)
                       ? formatAED(d.median_price_per_sqft)
-                      : '—'
+                      : !priceReliable(d.sales_count)
+                        ? limitedSalesNote(d.sales_count)
+                        : '—'
                   }
-                  hint="DLD 2026 YTD"
+                  hint={!priceReliable(d.sales_count) ? 'too few sales for a reliable median' : 'DLD 2026 YTD'}
                   mono
                 />
                 <MetricTile

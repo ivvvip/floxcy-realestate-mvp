@@ -336,7 +336,7 @@ export default async function BuildingDetailPage({ params }: PageProps) {
               />
               <Tile
                 label="Implied yield"
-                tooltip="Gross Yield"
+                tooltip="Gross yield"
                 value={
                   b.implied_yield_pct != null
                     ? formatPercent(b.implied_yield_pct, 2)

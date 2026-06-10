@@ -56,6 +56,20 @@ export function formatPercent(value: number, digits = 2) {
   return `${value.toFixed(digits)}%`;
 }
 
+// A median price/sqft from a handful of sales is statistically meaningless
+// (e.g. 120 AED/sqft off a single transaction looks like a bug). Below this
+// sample we suppress the number and show a "limited data" note instead.
+export const MIN_SALES_FOR_PRICE = 10;
+
+export function priceReliable(salesCount: number | null | undefined): boolean {
+  return salesCount == null || salesCount >= MIN_SALES_FOR_PRICE;
+}
+
+export function limitedSalesNote(salesCount: number | null | undefined): string {
+  const n = salesCount ?? 0;
+  return `Limited · ${n} sale${n === 1 ? '' : 's'}`;
+}
+
 // Display cap mirrors the backend (DISPLAY_YIELD_CAP_PCT in schemas/dld.py).
 // Yields at or above the cap are presented as "≥20%" so users know the
 // number is bounded — raw DLD yields above 20% are nearly always artefacts.

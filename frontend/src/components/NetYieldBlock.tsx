@@ -5,7 +5,7 @@ import { Wallet, Info } from 'lucide-react';
 import { computeNetYield, serviceRateFor, VACANCY_DEFAULT_PCT } from '@/lib/netYield';
 
 /**
- * True Returns (Net Yield) — gross is advertised, net is what actually hits the
+ * True Returns (Net yield) — gross is advertised, net is what actually hits the
  * account. Service charge defaults to the area estimate and is user-editable;
  * everything recalculates live. Honest "estimate / verify via Mollak" labeling.
  */
@@ -33,7 +33,7 @@ export function NetYieldBlock({
     <section className="surface-card overflow-hidden">
       <div className="border-b border-border px-4 py-3 flex items-center gap-2">
         <Wallet className="h-3.5 w-3.5 text-accent" strokeWidth={2.5} />
-        <h2 className="text-sm font-semibold text-fg">True Returns — Net Yield</h2>
+        <h2 className="text-sm font-semibold text-fg">True Returns — Net yield</h2>
         <span className="ml-auto text-[10px] text-fg-subtle border border-border rounded px-1.5 py-0.5">estimate</span>
       </div>
       <div className="p-4 space-y-2 text-xs">
