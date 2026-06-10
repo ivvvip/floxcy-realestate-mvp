@@ -8,14 +8,23 @@ UAE AI-Powered Real Estate Investment Intelligence Platform. Provides Dubai mark
 - **Frontend**: Next.js 14 at https://floxcy.com
 - **Database**: PostgreSQL 18 + Redis 7.2 (Coolify-managed)
 - **Deploy**: Coolify (https://coolify.floxcy.com)
-- **DNS**: Cloudflare (Zone ID: 89ac3a0e622b0d2dce96fc850e4a6c52)
+- **DNS**: Cloudflare — ⚠️ see warning below; the configured zone is NOT Floxcy's.
 - **Server**: Contabo VPS (185.205.246.175)
+
+> ⚠️ **Cloudflare zone mismatch (verified 2026-06-10).** The `$CLOUDFLARE_API_TOKEN`
+> and `$CLOUDFLARE_ZONE_ID` (`89ac3a0e622b0d2dce96fc850e4a6c52`) in the env point
+> to **Loxcya's** Cloudflare zone — it contains only `*.loxcya.com` records, NOT
+> `floxcy.com`. **Do NOT use them for Floxcy DNS.** Doing so would create Floxcy
+> records inside Loxcya's zone, breaking the hard Floxcy↔Loxcya isolation rule.
+> Floxcy's real Cloudflare zone (wherever `floxcy.com` is actually hosted) needs
+> to be configured separately before any Floxcy DNS change is possible. Until
+> then, use DNS-free workarounds (e.g. `*.<vps-ip>.sslip.io`) for new hostnames.
 
 ## API Tokens & URLs
 
 ### Environment variables available:
-- `$CLOUDFLARE_API_TOKEN` - DNS management
-- `$CLOUDFLARE_ZONE_ID` - floxcy.com zone
+- `$CLOUDFLARE_API_TOKEN` - ⚠️ Loxcya's Cloudflare token, NOT Floxcy's — do not use for Floxcy DNS (see Architecture warning)
+- `$CLOUDFLARE_ZONE_ID` - ⚠️ Loxcya's zone (`*.loxcya.com`), NOT floxcy.com — do not use for Floxcy DNS
 - `$COOLIFY_API_TOKEN` - Deployment management
 - `$COOLIFY_URL` - https://coolify.floxcy.com
 - `gh` (GitHub CLI) - Logged in as ivvvip
@@ -122,6 +131,11 @@ curl -X POST \
 ```
 
 ### Add new DNS record (Cloudflare)
+> ⚠️ **STOP — this targets Loxcya's zone, not Floxcy's** (see the Cloudflare
+> warning above). Running this as-is would add a Floxcy hostname inside Loxcya's
+> zone, violating Floxcy↔Loxcya isolation. Do NOT use it for Floxcy until
+> Floxcy's real Cloudflare zone/token is configured. For Floxcy preview hosts,
+> use a DNS-free `*.185.205.246.175.sslip.io` domain on the Coolify app instead.
 ```bash
 curl -X POST \
   "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records" \
