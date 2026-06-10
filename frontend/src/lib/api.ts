@@ -745,6 +745,12 @@ export async function getVisaEligibility(): Promise<import('./types').VisaEligib
   return request<import('./types').VisaEligibility>('/api/v1/dld/visa-eligibility', { revalidate: 3600 });
 }
 
+// ---------- Market cycle phase ----------
+
+export async function getMarketCycle(): Promise<import('./types').MarketCycle> {
+  return request<import('./types').MarketCycle>('/api/v1/dld/market-cycle', { revalidate: 3600 });
+}
+
 // ---------- Service-charge estimates ----------
 
 export async function getServiceCharges(): Promise<import('./types').ServiceCharges> {

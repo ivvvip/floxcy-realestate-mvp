@@ -2228,6 +2228,33 @@ export interface ProfilePatchRequest {
   lead_access?: boolean;
 }
 
+// ---------- Market cycle phase ----------
+
+export interface MarketCycleYear {
+  year: number;
+  sales: number;
+  avg_ppsf: number;
+  yoy_price_pct: number | null;
+  yoy_volume_pct: number | null;
+  offplan_share_pct: number | null;
+  partial: boolean;
+}
+
+export interface MarketCycle {
+  meta: { window: string; complete_through: number; source: string; note: string };
+  phase: 'recovery' | 'growth' | 'growth_maturing' | 'peak' | 'correction';
+  phase_label: string;
+  gauge: number; // 0 = Recovery .. 1 = Correction
+  signals: {
+    price: { latest_ppsf: number; yoy_pct: number; cagr_3y_pct: number | null; cagr_5y_pct: number | null; decelerating: boolean; direction: string };
+    volume: { latest: number; long_run_avg: number; vs_avg_pct: number; record_high: boolean };
+    vs_history: { vs_2014_pct: number | null; record_high_price: boolean };
+    supply: { offplan_share_pct: number | null; offplan_share_2020_pct: number | null; trend: string };
+  };
+  interpretation: string;
+  by_year: MarketCycleYear[];
+}
+
 // ---------- Service-charge estimates (net yield) ----------
 
 export interface ServiceChargeArea {

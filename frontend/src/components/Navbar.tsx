@@ -21,6 +21,7 @@ const PRIMARY: Item[] = [
 
 const TOOLS: Item[] = [
   { href: '/timing', key: 'nav.timing' },
+  { href: '/cycle', key: 'nav.cycle' },
   { href: '/compare', key: 'nav.compare' },
   { href: '/visa', key: 'nav.visa' },
   { href: '/rent-check', key: 'nav.rent_check' },

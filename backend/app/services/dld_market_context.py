@@ -35,7 +35,8 @@ logger = logging.getLogger("floxcy.advisor.context")
 # v3: appended the city-level Market Timing block (seasonal buy/sell guidance).
 # v4: appended UAE residence-visa thresholds + eligible-area guidance.
 # v5: appended the net-yield explainer (gross vs net after service charges).
-CONTEXT_CACHE_KEY = "ai:advisor:context:v5"
+# v6: appended the market-cycle-phase signals (interpretation, not prediction).
+CONTEXT_CACHE_KEY = "ai:advisor:context:v6"
 CONTEXT_CACHE_TTL_S = 3600  # 1 hour
 
 from pathlib import Path
@@ -43,6 +44,32 @@ from pathlib import Path
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 _TIMING_PATH = _DATA_DIR / "market_timing.json"
 _VISA_PATH = _DATA_DIR / "visa_eligibility.json"
+_CYCLE_PATH = _DATA_DIR / "market_cycle.json"
+
+
+def _cycle_block() -> str:
+    """Market-cycle phase signals for the LLM. Interpretation, NOT prediction —
+    the model must say so and must not forecast crashes or booms."""
+    if not _CYCLE_PATH.exists():
+        return ""
+    try:
+        d = json.loads(_CYCLE_PATH.read_text())
+    except (OSError, ValueError):
+        return ""
+    s = d.get("signals", {})
+    pr, vol, hist, sup = s.get("price", {}), s.get("volume", {}), s.get("vs_history", {}), s.get("supply", {})
+    return (
+        f"\n\nMarket cycle phase (interpretation of signals, NOT a prediction — say so, and never "
+        f"forecast a crash or boom): Dubai residential looks like **{d.get('phase_label')}** "
+        f"(through {d.get('meta', {}).get('complete_through')}).\n"
+        f"- Price: {pr.get('latest_ppsf')} AED/sqft, {pr.get('yoy_pct')}% YoY "
+        f"({'decelerating' if pr.get('decelerating') else 'steady'}), 5y CAGR {pr.get('cagr_5y_pct')}%.\n"
+        f"- Volume: {vol.get('latest'):,} sales, {vol.get('vs_avg_pct')}% above the long-run average"
+        f"{' (record high)' if vol.get('record_high') else ''}.\n"
+        f"- Price vs 2014: {hist.get('vs_2014_pct')}% higher ({'record high' if hist.get('record_high_price') else 'below prior high'}).\n"
+        f"- Supply: off-plan share {sup.get('offplan_share_pct')}% and {sup.get('trend')}.\n"
+        f"- Read: {d.get('interpretation')}"
+    )
 
 
 def _visa_block() -> str:
@@ -292,6 +319,7 @@ async def build_dld_market_context(
         + "\n\n" + notes
         + _market_timing_block()
         + _visa_block()
+        + _cycle_block()
         + (
             "\n\nGross vs NET yield (always steer the user to net): the yields in the table "
             "above are GROSS. Net yield subtracts service charges and vacancy, and is what "

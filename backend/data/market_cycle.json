@@ -1,0 +1,210 @@
+{
+  "meta": {
+    "window": "2008\u20132026",
+    "complete_through": 2025,
+    "source": "Dubai Land Department residential (Flat/Villa) sales",
+    "note": "Cycle phase is an interpretation of market signals, not a prediction. Pre-2014 PPSF is sparse/noisy and not used for trend or peak claims."
+  },
+  "phase": "growth_maturing",
+  "phase_label": "Growth \u2014 Maturing",
+  "gauge": 0.58,
+  "signals": {
+    "price": {
+      "latest_ppsf": 1887,
+      "yoy_pct": 5.8,
+      "cagr_3y_pct": 7.9,
+      "cagr_5y_pct": 11.9,
+      "decelerating": true,
+      "direction": "rising"
+    },
+    "volume": {
+      "latest": 180354,
+      "long_run_avg": 52813,
+      "vs_avg_pct": 241,
+      "record_high": true
+    },
+    "vs_history": {
+      "vs_2014_pct": 48.6,
+      "record_high_price": true
+    },
+    "supply": {
+      "offplan_share_pct": 73,
+      "offplan_share_2020_pct": 53,
+      "trend": "rising"
+    }
+  },
+  "interpretation": "Prices and volume are at record highs but price growth has decelerated for several years running, while the off-plan supply share keeps climbing \u2014 a maturing expansion drifting toward the later part of the cycle. Whether this becomes a soft plateau or a peak cannot be predicted.",
+  "by_year": [
+    {
+      "year": 2008,
+      "sales": 14944,
+      "avg_ppsf": 780,
+      "yoy_price_pct": null,
+      "yoy_volume_pct": null,
+      "offplan_share_pct": 0,
+      "partial": false
+    },
+    {
+      "year": 2009,
+      "sales": 50044,
+      "avg_ppsf": 1768,
+      "yoy_price_pct": 126.6,
+      "yoy_volume_pct": 234.9,
+      "offplan_share_pct": 50,
+      "partial": false
+    },
+    {
+      "year": 2010,
+      "sales": 26933,
+      "avg_ppsf": 1057,
+      "yoy_price_pct": -40.2,
+      "yoy_volume_pct": -46.2,
+      "offplan_share_pct": 33,
+      "partial": false
+    },
+    {
+      "year": 2011,
+      "sales": 20957,
+      "avg_ppsf": 1003,
+      "yoy_price_pct": -5.0,
+      "yoy_volume_pct": -22.2,
+      "offplan_share_pct": 10,
+      "partial": false
+    },
+    {
+      "year": 2012,
+      "sales": 24315,
+      "avg_ppsf": 2861,
+      "yoy_price_pct": 185.2,
+      "yoy_volume_pct": 16.0,
+      "offplan_share_pct": 12,
+      "partial": false
+    },
+    {
+      "year": 2013,
+      "sales": 44883,
+      "avg_ppsf": 1114,
+      "yoy_price_pct": -61.1,
+      "yoy_volume_pct": 84.6,
+      "offplan_share_pct": 20,
+      "partial": false
+    },
+    {
+      "year": 2014,
+      "sales": 38079,
+      "avg_ppsf": 1271,
+      "yoy_price_pct": 14.0,
+      "yoy_volume_pct": -15.2,
+      "offplan_share_pct": 29,
+      "partial": false
+    },
+    {
+      "year": 2015,
+      "sales": 29233,
+      "avg_ppsf": 1175,
+      "yoy_price_pct": -7.5,
+      "yoy_volume_pct": -23.2,
+      "offplan_share_pct": 42,
+      "partial": false
+    },
+    {
+      "year": 2016,
+      "sales": 28639,
+      "avg_ppsf": 1180,
+      "yoy_price_pct": 0.4,
+      "yoy_volume_pct": -2.0,
+      "offplan_share_pct": 52,
+      "partial": false
+    },
+    {
+      "year": 2017,
+      "sales": 32788,
+      "avg_ppsf": 1168,
+      "yoy_price_pct": -1.0,
+      "yoy_volume_pct": 14.5,
+      "offplan_share_pct": 59,
+      "partial": false
+    },
+    {
+      "year": 2018,
+      "sales": 23743,
+      "avg_ppsf": 1164,
+      "yoy_price_pct": -0.4,
+      "yoy_volume_pct": -27.6,
+      "offplan_share_pct": 58,
+      "partial": false
+    },
+    {
+      "year": 2019,
+      "sales": 29484,
+      "avg_ppsf": 1150,
+      "yoy_price_pct": -1.2,
+      "yoy_volume_pct": 24.2,
+      "offplan_share_pct": 65,
+      "partial": false
+    },
+    {
+      "year": 2020,
+      "sales": 24739,
+      "avg_ppsf": 1077,
+      "yoy_price_pct": -6.3,
+      "yoy_volume_pct": -16.1,
+      "offplan_share_pct": 53,
+      "partial": false
+    },
+    {
+      "year": 2021,
+      "sales": 44337,
+      "avg_ppsf": 1226,
+      "yoy_price_pct": 13.8,
+      "yoy_volume_pct": 79.2,
+      "offplan_share_pct": 50,
+      "partial": false
+    },
+    {
+      "year": 2022,
+      "sales": 72149,
+      "avg_ppsf": 1501,
+      "yoy_price_pct": 22.5,
+      "yoy_volume_pct": 62.7,
+      "offplan_share_pct": 57,
+      "partial": false
+    },
+    {
+      "year": 2023,
+      "sales": 106046,
+      "avg_ppsf": 1650,
+      "yoy_price_pct": 9.9,
+      "yoy_volume_pct": 47.0,
+      "offplan_share_pct": 62,
+      "partial": false
+    },
+    {
+      "year": 2024,
+      "sales": 152820,
+      "avg_ppsf": 1783,
+      "yoy_price_pct": 8.0,
+      "yoy_volume_pct": 44.1,
+      "offplan_share_pct": 69,
+      "partial": false
+    },
+    {
+      "year": 2025,
+      "sales": 180354,
+      "avg_ppsf": 1887,
+      "yoy_price_pct": 5.8,
+      "yoy_volume_pct": 18.0,
+      "offplan_share_pct": 73,
+      "partial": false
+    },
+    {
+      "year": 2026,
+      "sales": 58965,
+      "avg_ppsf": 1966,
+      "yoy_price_pct": 4.2,
+      "yoy_volume_pct": -67.3,
+      "offplan_share_pct": 75,
+      "partial": true
+    }
+  ]
+}
