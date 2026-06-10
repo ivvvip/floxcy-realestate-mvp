@@ -30,6 +30,7 @@ import { DataBadge } from '@/components/data/DataBadge';
 import { Sparkline } from '@/components/data/Sparkline';
 import { summaryForLatest, describeOpportunity, interpretRisk } from '@/lib/insights';
 import { cn } from '@/lib/cn';
+import { getLocale, getT } from '@/i18n/server';
 import { RoiMiniWidget } from './RoiMiniWidget';
 import { HomeOpportunities } from './HomeOpportunities';
 import { HomeFastestGrowing } from './HomeFastestGrowing';
@@ -45,6 +46,7 @@ export const metadata = {
 export const revalidate = 300;
 
 export default async function HomePage() {
+  const t = getT(getLocale());
   let summary: DashboardSummary | null = null;
   let stats: AreaStats | null = null;
   let dld: DldStatsResponse | null = null;
@@ -268,20 +270,18 @@ export default async function HomePage() {
               <div className="flex items-center gap-2">
                 <span className="pill pill-accent">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                  Live · Dubai market open
+                  {t('homepage.hero_live')}
                 </span>
                 <span className="text-[11px] text-fg-subtle tabular">
                   Last refresh · {lastUpdated} GST
                 </span>
               </div>
               <h1 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-tight text-fg leading-[1.1]">
-                Dubai&apos;s Most Intelligent{' '}
-                <span className="text-accent">Real Estate Platform</span>
+                {t('homepage.hero_headline_a')}{' '}
+                <span className="text-accent">{t('homepage.hero_headline_accent')}</span>
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-fg-muted">
-                Powered by <span className="text-fg font-medium">12+ million</span>{' '}
-                official DLD records. The only platform with{' '}
-                <span className="text-fg font-medium">building-level income intelligence</span>.
+                {t('homepage.hero_subhead')}
               </p>
               {/* 3 primary CTAs — full-width stacked on mobile, side-by-side
                   from sm. min-h-[44px] keeps each tap target accessible. */}
@@ -290,19 +290,19 @@ export default async function HomePage() {
                   href="/rent-check"
                   className="flex h-11 items-center justify-center gap-1.5 rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:bg-accent/90 transition-colors"
                 >
-                  🔍 Is My Rent Fair?
+                  {t('homepage.cta_rent_check')}
                 </Link>
                 <Link
                   href="/opportunities"
                   className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
                 >
-                  📊 Explore Investment Areas
+                  {t('homepage.cta_explore')}
                 </Link>
                 <Link
                   href="/buildings"
                   className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-bg-card px-4 text-sm font-medium text-fg hover:border-accent/40 transition-colors"
                 >
-                  🏢 Building X-Ray
+                  {t('homepage.cta_buildings')}
                 </Link>
               </div>
               {/* Trust bar — flex-wrap so the attribution line breaks
@@ -310,8 +310,7 @@ export default async function HomePage() {
               <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg-subtle">
                 <ShieldCheck className="h-3.5 w-3.5 text-positive shrink-0" strokeWidth={2} />
                 <span>
-                  Powered by Dubai Land Department · Official Data ·
-                  Updated {market?.last_updated ?? 'June 2026'}
+                  {t('homepage.trust_prefix')} {market?.last_updated ?? 'June 2026'}
                 </span>
               </div>
               {/* Market signals strip */}

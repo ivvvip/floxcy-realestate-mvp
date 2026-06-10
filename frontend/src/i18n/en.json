@@ -145,13 +145,15 @@
   },
 
   "homepage": {
-    "hero_headline_pre": "Find UAE Real Estate Opportunities",
-    "hero_headline_post": "Before the Market Does",
-    "hero_subhead": "Floxcy combines market intelligence, AI analysis, and verified investment specialists to help investors discover and act on high-quality UAE property opportunities.",
-    "cta_explore": "Explore Opportunities",
-    "cta_rent_check": "Is Your Rent Fair?",
-    "cta_join_broker": "Join as Broker",
-    "cta_dashboard": "Market dashboard"
+    "hero_live": "Live · Dubai market open",
+    "hero_headline_a": "Dubai's Most Intelligent",
+    "hero_headline_accent": "Real Estate Platform",
+    "hero_subhead": "Powered by 12+ million official DLD records — the only platform with building-level income intelligence.",
+    "cta_rent_check": "🔍 Is My Rent Fair?",
+    "cta_explore": "📊 Explore Investment Areas",
+    "cta_buildings": "🏢 Building X-Ray",
+    "trust_prefix": "Powered by Dubai Land Department · Official Data · Updated",
+    "footer_tagline": "UAE real estate investment intelligence, powered by official DLD data."
   },
 
   "disclaimer": {

@@ -7,6 +7,7 @@ import { Building2, Menu, X, ChevronDown } from 'lucide-react';
 import { Container } from './Container';
 import { cn } from '@/lib/cn';
 import { useT } from '@/i18n/useT';
+import { LocaleToggle } from './LocaleToggle';
 
 // href + i18n key. Add new keys under `nav.*` in en.json + ar.json.
 type Item = { href: string; key: string };
@@ -85,6 +86,7 @@ export function Navbar() {
           </ul>
 
           <div className="hidden items-center gap-2 lg:flex">
+            <LocaleToggle />
             <Link
               href="/roi-calculator"
               className="inline-flex h-8 items-center justify-center rounded-md bg-accent px-3 text-xs font-medium text-accent-fg transition-colors hover:bg-accent/90 whitespace-nowrap"
@@ -146,6 +148,9 @@ export function Navbar() {
             >
               {t('nav.calculate_roi')}
             </Link>
+            <div className="flex justify-center pb-2">
+              <LocaleToggle />
+            </div>
           </div>
         </Container>
       </div>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono, Noto_Sans_Arabic } from 'next/font/google';
+import { Inter, JetBrains_Mono, Tajawal } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
@@ -19,14 +19,14 @@ const mono = JetBrains_Mono({
   display: 'swap',
 });
 
-// Arabic font — loaded so the browser preloads it, even though Arabic
-// strings aren't displayed yet. Setting the CSS variable lets us flip
-// the font stack via `lang="ar"` in globals.css without a code change.
-const arabic = Noto_Sans_Arabic({
+// Arabic font — Tajawal (clean, modern Arabic geometric sans). Exposed as the
+// `--font-arabic` CSS variable; globals.css flips the body font stack to it
+// whenever `<html lang="ar">` is set, so no per-component change is needed.
+const arabic = Tajawal({
   subsets: ['arabic'],
   variable: '--font-arabic',
   display: 'swap',
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '700'],
 });
 
 export const metadata: Metadata = {

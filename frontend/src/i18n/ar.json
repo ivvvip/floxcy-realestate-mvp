@@ -145,13 +145,15 @@
   },
 
   "homepage": {
-    "hero_headline_pre": "Find UAE Real Estate Opportunities",
-    "hero_headline_post": "Before the Market Does",
-    "hero_subhead": "Floxcy combines market intelligence, AI analysis, and verified investment specialists to help investors discover and act on high-quality UAE property opportunities.",
-    "cta_explore": "Explore Opportunities",
-    "cta_rent_check": "Is Your Rent Fair?",
-    "cta_join_broker": "Join as Broker",
-    "cta_dashboard": "Market dashboard"
+    "hero_live": "مباشر · سوق دبي مفتوح",
+    "hero_headline_a": "أذكى منصة عقارية",
+    "hero_headline_accent": "في دبي",
+    "hero_subhead": "مدعومة بأكثر من 12 مليون سجل رسمي من دائرة الأراضي والأملاك — المنصة الوحيدة التي توفّر معلومات الدخل على مستوى المبنى.",
+    "cta_rent_check": "🔍 هل إيجاري عادل؟",
+    "cta_explore": "📊 استكشف مناطق الاستثمار",
+    "cta_buildings": "🏢 تحليل المباني",
+    "trust_prefix": "مدعوم من دائرة الأراضي والأملاك بدبي · بيانات رسمية · آخر تحديث",
+    "footer_tagline": "منصة ذكاء الاستثمار العقاري في الإمارات، مدعومة ببيانات دائرة الأراضي والأملاك الرسمية."
   },
 
   "disclaimer": {

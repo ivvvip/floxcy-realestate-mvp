@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { Container } from './Container';
+import { getLocale, getT } from '@/i18n/server';
 
 export function Footer() {
+  const t = getT(getLocale());
   return (
     <footer className="mt-16 border-t border-border bg-bg/60">
       <Container>
@@ -15,9 +17,7 @@ export function Footer() {
               <span className="text-sm font-semibold text-fg">Floxcy</span>
             </div>
             <p className="mt-3 max-w-sm text-xs leading-relaxed text-fg-muted">
-              Institutional-grade real estate intelligence for UAE property
-              investors. Transparent scoring, confidence-aware data, public
-              API.
+              {t('homepage.footer_tagline')}
             </p>
           </div>
 
