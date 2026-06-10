@@ -71,10 +71,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col font-sans">
-        <Navbar />
+        <Navbar locale={locale} />
         <main className="flex-1">{children}</main>
         <Footer />
-        <FeedbackWidget />
+        <FeedbackWidget locale={locale} />
       </body>
     </html>
   );

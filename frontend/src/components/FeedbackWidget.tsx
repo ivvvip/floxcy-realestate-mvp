@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { MessageSquare, X, Star, Check } from 'lucide-react';
 import { submitFeedback } from '@/lib/api';
-import { useT } from '@/i18n/useT';
+import { makeT, DEFAULT_LOCALE, type Locale } from '@/i18n';
 
 /**
  * Floating "How useful was this page?" widget — bottom-right, all pages.
  * Posts a star rating + free-text + optional email to /api/v1/feedback.
  */
-export function FeedbackWidget() {
-  const t = useT();
+export function FeedbackWidget({ locale = DEFAULT_LOCALE }: { locale?: Locale }) {
+  const t = makeT(locale);
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);

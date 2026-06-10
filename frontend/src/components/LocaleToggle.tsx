@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { Globe } from 'lucide-react';
-import { useLocale } from '@/i18n/useT';
+import { DEFAULT_LOCALE, type Locale } from '@/i18n';
 
 /**
  * EN ⇄ AR language toggle.
@@ -12,8 +12,7 @@ import { useLocale } from '@/i18n/useT';
  * request. Navigating to `/ar…` or `/en…` makes middleware set the NEXT_LOCALE
  * cookie and rewrite back to the bare path, so the choice persists afterwards.
  */
-export function LocaleToggle({ className = '' }: { className?: string }) {
-  const locale = useLocale();
+export function LocaleToggle({ locale = DEFAULT_LOCALE, className = '' }: { locale?: Locale; className?: string }) {
   const pathname = usePathname() || '/';
   const rest = pathname === '/' ? '' : pathname;
   const enHref = `/en${rest}` || '/en';

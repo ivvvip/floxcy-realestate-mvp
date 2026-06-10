@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Building2, Menu, X, ChevronDown } from 'lucide-react';
 import { Container } from './Container';
 import { cn } from '@/lib/cn';
-import { useT } from '@/i18n/useT';
+import { makeT, type Locale } from '@/i18n';
 import { LocaleToggle } from './LocaleToggle';
 
 // href + i18n key. Add new keys under `nav.*` in en.json + ar.json.
@@ -46,11 +46,11 @@ function isActive(pathname: string | null, href: string): boolean {
   return href === '/' ? pathname === '/' : !!pathname?.startsWith(href);
 }
 
-export function Navbar() {
+export function Navbar({ locale }: { locale: Locale }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menu, setMenu] = useState<null | 'tools' | 'more'>(null);
-  const t = useT();
+  const t = makeT(locale);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur-md">
@@ -86,7 +86,7 @@ export function Navbar() {
           </ul>
 
           <div className="hidden items-center gap-2 lg:flex">
-            <LocaleToggle />
+            <LocaleToggle locale={locale} />
             <Link
               href="/roi-calculator"
               className="inline-flex h-8 items-center justify-center rounded-md bg-accent px-3 text-xs font-medium text-accent-fg transition-colors hover:bg-accent/90 whitespace-nowrap"
@@ -149,7 +149,7 @@ export function Navbar() {
               {t('nav.calculate_roi')}
             </Link>
             <div className="flex justify-center pb-2">
-              <LocaleToggle />
+              <LocaleToggle locale={locale} />
             </div>
           </div>
         </Container>
