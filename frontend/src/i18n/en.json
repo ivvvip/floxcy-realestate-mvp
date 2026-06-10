@@ -60,7 +60,8 @@
     "share": "Share",
     "copy": "Copy",
     "copied": "Copied!",
-    "more": "More…"
+    "more": "More…",
+    "feedback": "Feedback"
   },
 
   "tiers": {
@@ -153,7 +154,40 @@
     "cta_explore": "📊 Explore Investment Areas",
     "cta_buildings": "🏢 Building X-Ray",
     "trust_prefix": "Powered by Dubai Land Department · Official Data · Updated",
-    "footer_tagline": "UAE real estate investment intelligence, powered by official DLD data."
+    "footer_tagline": "UAE real estate investment intelligence, powered by official DLD data.",
+    "last_refresh": "Last refresh",
+    "ticker_tracked_areas": "Tracked Areas",
+    "ticker_tracked_buildings": "Tracked Buildings",
+    "ticker_avg_yield": "Avg Yield · UAE",
+    "ticker_avg_ppsf": "Avg AED/sqft",
+    "ticker_12mo_volume": "12mo Volume",
+    "ticker_top_performer": "Top Performer",
+    "glance_eyebrow": "Dubai market · at a glance",
+    "glance_heading": "Live DLD coverage",
+    "sig_yield_trend": "Yield trend",
+    "sig_price_sqft": "Price/sqft",
+    "sig_sentiment": "Sentiment",
+    "sig_bullish": "Bullish",
+    "sig_bearish": "Bearish",
+    "sig_mixed": "Mixed",
+    "sig_coverage": "Coverage",
+    "areas_suffix": "areas",
+    "top_ranked": "Live · top-ranked areas",
+    "all_areas": "All areas →",
+    "diff_eyebrow": "What makes Floxcy different",
+    "diff_heading": "Four things you won't find on any other Dubai real-estate site",
+    "card_building_title": "Building Income X-Ray",
+    "card_building_body": "See exactly how much any Dubai building earns annually. 1,560 buildings analyzed. No other platform has this.",
+    "card_building_cta": "Open Building X-Ray",
+    "card_yield_title": "Real Yield Calculator",
+    "card_yield_body": "6.66% yield in Business Bay – calculated from 2,293,196 actual DLD Ejari contracts.",
+    "card_yield_cta": "See area yields",
+    "card_rent_title": "Rent Fairness Tool",
+    "card_rent_body": "Is your rent fair? Compare against real DLD contracts. Free. Instant. Official data.",
+    "card_rent_cta": "Check my rent",
+    "card_broker_title": "RERA Broker Matching",
+    "card_broker_body": "34,396 verified RERA brokers. Find one who speaks your language and knows your area.",
+    "card_broker_cta": "Match me with a broker"
   },
 
   "disclaimer": {

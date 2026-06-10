@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { MessageSquare, X, Star, Check } from 'lucide-react';
 import { submitFeedback } from '@/lib/api';
+import { useT } from '@/i18n/useT';
 
 /**
  * Floating "How useful was this page?" widget — bottom-right, all pages.
  * Posts a star rating + free-text + optional email to /api/v1/feedback.
  */
 export function FeedbackWidget() {
+  const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
@@ -64,7 +66,7 @@ export function FeedbackWidget() {
           className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-card/95 backdrop-blur px-3.5 py-2.5 text-xs font-medium text-fg shadow-lg hover:border-accent/50 hover:text-accent transition-colors"
         >
           <MessageSquare className="h-4 w-4" strokeWidth={2} />
-          <span className="hidden sm:inline">Feedback</span>
+          <span className="hidden sm:inline">{t('common.feedback')}</span>
         </button>
       )}
 

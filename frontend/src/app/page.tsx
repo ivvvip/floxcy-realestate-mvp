@@ -118,29 +118,29 @@ export default async function HomePage() {
         <Container>
           <div className="flex overflow-x-auto snap-x scrollbar-thin -mx-4 sm:mx-0">
             <MetricTile
-              label="Tracked Areas"
+              label={t('homepage.ticker_tracked_areas')}
               value={formatNumber(totalAreas)}
               hint={`${Object.keys(segCounts).length} segments`}
             />
             <MetricTile
-              label="Tracked Buildings"
+              label={t('homepage.ticker_tracked_buildings')}
               value={formatNumber(dld?.total_buildings ?? 8075)}
               hint="DLD Ejari"
             />
             <MetricTile
-              label="Avg Yield · UAE"
+              label={t('homepage.ticker_avg_yield')}
               value={summary ? formatPercent(summary.avg_yield, 2) : '—'}
               delta={yieldDelta}
               deltaFormat="percent"
             />
             <MetricTile
-              label="Avg AED/sqft"
+              label={t('homepage.ticker_avg_ppsf')}
               value={summary ? formatNumber(summary.avg_price_per_sqft, 0) : '—'}
               delta={priceDelta}
               deltaFormat="percent"
             />
             <MetricTile
-              label="12mo Volume"
+              label={t('homepage.ticker_12mo_volume')}
               value={
                 summary
                   ? formatAED(summary.total_transaction_volume, { compact: true })
@@ -149,7 +149,7 @@ export default async function HomePage() {
               hint="Trailing"
             />
             <MetricTile
-              label="Top Performer"
+              label={t('homepage.ticker_top_performer')}
               value={
                 <span className="text-base font-medium truncate inline-block max-w-full">
                   {summary?.top_performer?.name ?? '—'}
@@ -171,10 +171,10 @@ export default async function HomePage() {
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
                     <Database className="h-3 w-3 text-accent" strokeWidth={2} />
-                    Dubai market · at a glance
+                    {t('homepage.glance_eyebrow')}
                   </div>
                   <h2 className="mt-1 text-lg font-semibold text-fg">
-                    Live DLD coverage
+                    {t('homepage.glance_heading')}
                   </h2>
                 </div>
                 <span className="text-[11px] text-fg-subtle">
@@ -273,7 +273,7 @@ export default async function HomePage() {
                   {t('homepage.hero_live')}
                 </span>
                 <span className="text-[11px] text-fg-subtle tabular">
-                  Last refresh · {lastUpdated} GST
+                  {t('homepage.last_refresh')} · {lastUpdated} GST
                 </span>
               </div>
               <h1 className="mt-3 text-[28px] md:text-[36px] font-semibold tracking-tight text-fg leading-[1.1]">
@@ -317,7 +317,7 @@ export default async function HomePage() {
               <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
                 <Signal
                   icon={TrendingUp}
-                  label="Yield trend"
+                  label={t('homepage.sig_yield_trend')}
                   value={
                     summary
                       ? formatPercent(summary.avg_yield, 2)
@@ -327,7 +327,7 @@ export default async function HomePage() {
                 />
                 <Signal
                   icon={LineChartIcon}
-                  label="Price/sqft"
+                  label={t('homepage.sig_price_sqft')}
                   value={
                     summary ? formatNumber(summary.avg_price_per_sqft, 0) : '—'
                   }
@@ -335,19 +335,19 @@ export default async function HomePage() {
                 />
                 <Signal
                   icon={Activity}
-                  label="Sentiment"
+                  label={t('homepage.sig_sentiment')}
                   value={
                     yieldDelta != null && yieldDelta >= 0 && priceDelta != null && priceDelta >= 0
-                      ? 'Bullish'
+                      ? t('homepage.sig_bullish')
                       : yieldDelta != null && priceDelta != null && yieldDelta < 0 && priceDelta < 0
-                        ? 'Bearish'
-                        : 'Mixed'
+                        ? t('homepage.sig_bearish')
+                        : t('homepage.sig_mixed')
                   }
                 />
                 <Signal
                   icon={Briefcase}
-                  label="Coverage"
-                  value={`${totalAreas} areas`}
+                  label={t('homepage.sig_coverage')}
+                  value={`${totalAreas} ${t('homepage.areas_suffix')}`}
                   hint={`${segCounts.residential ?? 0}R · ${segCounts.commercial ?? 0}C · ${segCounts.mixed ?? 0}M`}
                 />
               </div>
@@ -358,13 +358,13 @@ export default async function HomePage() {
               <div className="border border-border rounded-lg bg-bg-card overflow-hidden">
                 <div className="chart-header">
                   <span className="chart-header-label">
-                    Live · top-ranked areas
+                    {t('homepage.top_ranked')}
                   </span>
                   <Link
                     href="/areas"
                     className="text-[11px] font-medium text-accent hover:text-accent/80"
                   >
-                    All areas →
+                    {t('homepage.all_areas')}
                   </Link>
                 </div>
                 <ul>
@@ -418,67 +418,38 @@ export default async function HomePage() {
           <div className="py-8">
             <div className="text-[11px] uppercase tracking-wide text-fg-subtle font-medium inline-flex items-center gap-1.5">
               <Sparkles className="h-3 w-3 text-accent" strokeWidth={2} />
-              What makes Floxcy different
+              {t('homepage.diff_eyebrow')}
             </div>
             <h2 className="mt-1 text-lg font-semibold text-fg">
-              Four things you won&apos;t find on any other Dubai real-estate site
+              {t('homepage.diff_heading')}
             </h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <DifferentiatorCard
                 emoji="🏢"
-                title="Building Income X-Ray"
-                body={
-                  <>
-                    See exactly how much any Dubai building earns annually.{' '}
-                    <span className="text-fg font-medium">
-                      1,560 buildings analyzed
-                    </span>
-                    . No other platform has this.
-                  </>
-                }
-                cta="Open Building X-Ray"
+                title={t('homepage.card_building_title')}
+                body={t('homepage.card_building_body')}
+                cta={t('homepage.card_building_cta')}
                 href="/buildings"
               />
               <DifferentiatorCard
                 emoji="💰"
-                title="Real Yield Calculator"
-                body={
-                  <>
-                    <span className="text-fg font-medium">6.66% yield in Business Bay</span>{' '}
-                    — calculated from{' '}
-                    {market?.rent_contracts != null
-                      ? formatNumber(market.rent_contracts)
-                      : '4.3M+'}{' '}
-                    actual DLD Ejari contracts.
-                  </>
-                }
-                cta="See area yields"
+                title={t('homepage.card_yield_title')}
+                body={t('homepage.card_yield_body')}
+                cta={t('homepage.card_yield_cta')}
                 href="/areas"
               />
               <DifferentiatorCard
                 emoji="⚖️"
-                title="Rent Fairness Tool"
-                body={
-                  <>
-                    Is your rent fair? Compare against real DLD contracts. Free.
-                    Instant. Official data.
-                  </>
-                }
-                cta="Check my rent"
+                title={t('homepage.card_rent_title')}
+                body={t('homepage.card_rent_body')}
+                cta={t('homepage.card_rent_cta')}
                 href="/rent-check"
               />
               <DifferentiatorCard
                 emoji="🤝"
-                title="RERA Broker Matching"
-                body={
-                  <>
-                    <span className="text-fg font-medium">
-                      {formatNumber(market?.active_brokers ?? 34396)} verified RERA brokers
-                    </span>
-                    . Find one who speaks your language and knows your area.
-                  </>
-                }
-                cta="Match me with a broker"
+                title={t('homepage.card_broker_title')}
+                body={t('homepage.card_broker_body')}
+                cta={t('homepage.card_broker_cta')}
                 href="/brokers/directory"
               />
             </div>
