@@ -124,7 +124,7 @@ function TenantRightsNotice() {
       </div>
       <div className="border-t border-border pt-3 grid sm:grid-cols-2 gap-2">
         <a
-          href="https://www.dubailand.gov.ae/en/eservices/ejari/"
+          href="https://dubailand.gov.ae/en/eservices/register-renew-ejari-contract/"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent hover:bg-accent/20"

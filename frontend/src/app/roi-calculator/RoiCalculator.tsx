@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { calculateDldRoi } from '@/lib/api';
 import { formatAED, formatNumber } from '@/lib/format';
+import { areaMatchesQuery, primaryAlias } from '@/lib/areaSynonyms';
 import { cn } from '@/lib/cn';
 import { MetricTooltip } from '@/components/MetricTooltip';
 import type {
@@ -675,8 +676,11 @@ function AreaCombo({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 100);
-    return options.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 120);
+    // Show the whole data-rich list when not searching (it's bounded — only
+    // areas with DLD price data reach here). Search matches marketing synonyms
+    // too, so "Dubai Marina"/"JVC"/"Downtown" find their cadastral twins.
+    if (!q) return options.slice(0, 300);
+    return options.filter((o) => areaMatchesQuery(o, q)).slice(0, 300);
   }, [options, query]);
 
   return (
@@ -698,7 +702,7 @@ function AreaCombo({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search all 284 canonical areas…"
+              placeholder="Search areas with DLD data (try JVC, Dubai Marina…)"
               autoFocus
               className="w-full bg-transparent pl-9 pr-3 py-2 text-sm outline-none"
             />
@@ -709,9 +713,12 @@ function AreaCombo({
                 <button
                   type="button"
                   onClick={() => { onChange(o.name); setOpen(false); setQuery(''); }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-fg hover:bg-bg-elev"
+                  className="w-full text-left px-3 py-1.5 text-sm text-fg hover:bg-bg-elev flex items-center gap-2"
                 >
-                  {o.name}
+                  <span className="truncate">{o.name}</span>
+                  {primaryAlias(o.name_norm) && (
+                    <span className="ml-auto shrink-0 text-[10px] text-fg-subtle">· {primaryAlias(o.name_norm)}</span>
+                  )}
                 </button>
               </li>
             ))}

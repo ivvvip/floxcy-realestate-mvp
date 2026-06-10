@@ -3,7 +3,7 @@ import { Calculator } from 'lucide-react';
 import { Container } from '@/components/Container';
 import { Breadcrumbs } from '@/components/nav/Breadcrumbs';
 import { RoiCalculator } from './RoiCalculator';
-import { getCanonicalAreas } from '@/lib/api';
+import { getAllAreas } from '@/lib/api';
 
 export const metadata: Metadata = {
   title: 'ROI Calculator',
@@ -16,14 +16,30 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function RoiCalculatorPage() {
-  // Pre-fetch all canonical areas so the combobox can search across the
-  // full 284-area universe. Falls back to empty list if API hiccups.
+  // Source the combobox from areas that actually have DLD price data, so every
+  // selection pre-fills a real benchmark and produces an accurate ROI. Bare
+  // canonical names with no price/rent (the rest of the 284) can't pre-fill and
+  // only confuse the calculator. Data-rich (full-coverage) areas list first.
+  // Include areas with full or partial DLD coverage — the same classification
+  // /areas and /compare use, so the ROI list is consistent with them. We filter
+  // on coverage_tier (not the list's median_price field) because crowded
+  // marketing areas like JVC resolve their price on the detail page even though
+  // the list-level metric is null; tier 'partial' captures them. 'limited' and
+  // 'none' are too thin for a meaningful ROI pre-fill.
+  const TIER_RANK: Record<string, number> = { full: 0, partial: 1 };
   let areaOptions: { name: string; name_norm: string }[] = [];
   try {
-    const r = await getCanonicalAreas({ min_occurrences: 0 });
+    const r = await getAllAreas({ sort_by: 'name' });
     areaOptions = r.items
-      .map((a) => ({ name: a.area_name, name_norm: a.area_name_upper }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter((a) => a.coverage_tier === 'full' || a.coverage_tier === 'partial')
+      .sort(
+        (a, b) =>
+          (TIER_RANK[a.coverage_tier] ?? 9) - (TIER_RANK[b.coverage_tier] ?? 9) ||
+          a.name.localeCompare(b.name),
+      )
+      // name_norm = lowercased DLD name so the combo can match marketing
+      // synonyms (JVC, Dubai Marina, Downtown) and show the alias hint.
+      .map((a) => ({ name: a.name, name_norm: a.name.toLowerCase() }));
   } catch {
     // empty list — combobox renders "No matches"
   }
